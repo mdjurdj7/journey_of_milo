@@ -64,7 +64,7 @@ func _check_card_data() -> void:
 	var owed: StatusData = load(OWED_PATH)
 	_expect_eq(card.card_name, "Come Due", "The card loads")
 	_expect_eq([card.card_type, card.rarity, card.target_type, card.card_class], [CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.TargetType.SELF, &"wanderer"], "...a Skill, Common, no target, the Wanderer's")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\nGain {energy} Energy.\nNext turn, gain {debt} less.", "...its text")
+	_expect_eq(card.description, "Gain {energy} Energy.\nNext turn, gain {debt} less.", "...its text")
 	_expect(card.effects.size() == 3 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.GAIN_ENERGY and card.effects[2].effect_type == CardEffect.EffectType.APPLY_STATUS and card.effects[2].status_data == owed, "...SPEND_TOLL, GAIN_ENERGY, then Owed")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...its art kept")
@@ -151,12 +151,12 @@ func _check_face() -> void:
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(load(CARD_PATH))
-	_expect_eq(view.rules_text.get_parsed_text(), "Spend 5 Toll.\nGain 2 Energy.\nNext turn, gain 2 less.", "The face reads its rule")
+	_expect_eq(view.rules_text.get_parsed_text(), "Gain 2 Energy.\nNext turn, gain 2 less.", "The face reads its rule")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
 	_expect_eq(view.type_label.text, "TOLL", "...labelled TOLL")
 	_expect_eq(view.cost_label.text, "0", "...0 Energy")
 	view.set_card_data(load(TEMPERED_PATH))
-	_expect_eq(view.rules_text.get_parsed_text(), "Spend 5 Toll.\nGain 2 Energy.\nNext turn, gain 1 less.", "Come Due+'s face")
+	_expect_eq(view.rules_text.get_parsed_text(), "Gain 2 Energy.\nNext turn, gain 1 less.", "Come Due+'s face")
 	view.free()
 	_completed += 1
 

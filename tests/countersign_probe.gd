@@ -73,7 +73,7 @@ func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq([card.card_name, card.card_type, card.rarity, card.removal_scope, card.offer, card.card_class], ["Twice Over", CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.RemovalScope.SPENT, CardData.OfferScope.REWARDABLE, &"wanderer"], "Twice Over: an Uncommon Skill, Spent, rewardable, the Wanderer's")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.COPY_HAND_CARD, "...SPEND_TOLL, then COPY_HAND_CARD")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\nCopy another card in hand.\nSpent.", "...its text, numbers from data")
+	_expect_eq(card.description, "Copy another card in hand.\nSpent.", "...its text, numbers from data")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Twice Over.png", "...with its art")
 	var tempered: CardData = load(TEMPERED_PATH)

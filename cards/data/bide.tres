@@ -21,8 +21,7 @@ card_name = "Bide"
 card_type = 1
 rarity = 1
 target_type = 1
-description = "Spend {toll_cost} Toll.
-Choose up to {keep} cards in your hand. They gain Keep."
+description = "Choose up to {keep} cards in your hand. They gain Keep."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_keep")])
 art = ExtResource("3_art")
 tempered = ExtResource("4_tempered")

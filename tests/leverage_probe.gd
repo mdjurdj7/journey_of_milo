@@ -77,7 +77,7 @@ func _check_data() -> void:
 	_expect_eq(card.effects.size(), 2, "Two effects")
 	_expect_eq(card.effects[0].effect_type, CardEffect.EffectType.SPEND_TOLL, "...Spend Toll first")
 	_expect_eq([card.effects[1].effect_type, card.effects[1].status_data], [CardEffect.EffectType.APPLY_STATUS, status], "...then the Leverage status")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\nThe next card you play this turn costs {reduction} less Energy.", "The card's text, its numbers from data")
+	_expect_eq(card.description, "The next card you play this turn costs {reduction} less Energy.", "The card's text, its numbers from data")
 	_expect_eq([status.default_duration_turns, status.stack_rule, status.ends_at_turn_end], [StatusData.DURATION_UNTIL_REMOVED, StatusData.StackRule.IGNORE, true], "The status: until spent or the turn ends, stacks by count")
 	var tempered: CardData = card.tempered
 	_expect_eq([tempered.card_name, tempered.removal_scope, tempered.description], ["Leverage+", CardData.RemovalScope.NONE, card.description], "Leverage+: the same text, not Spent")

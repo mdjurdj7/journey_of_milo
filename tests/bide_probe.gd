@@ -78,7 +78,7 @@ func _check_data() -> void:
 	var card: CardData = load(BIDE_PATH)
 	_expect_eq([card.card_name, card.card_type, card.rarity, card.removal_scope], ["Bide", CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.RemovalScope.NONE], "Bide: a Common Skill, not Spent")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.GRANT_KEEP, "...SPEND_TOLL, then GRANT_KEEP")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\nChoose up to {keep} cards in your hand. They gain Keep.", "...its text, numbers from data")
+	_expect_eq(card.description, "Choose up to {keep} cards in your hand. They gain Keep.", "...its text, numbers from data")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...its art kept")
 	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")

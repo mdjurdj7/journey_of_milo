@@ -20,8 +20,7 @@ cost = 0
 card_type = 1
 rarity = 2
 target_type = 1
-description = "Spend {toll_cost} Toll.
-{battle}Replay {replay_attack}.{/battle}{none}No Attack to replay yet.{/none}{outside}Play the last Attack you played this turn again.{/outside}"
+description = "{battle}Replay {replay_attack}.{/battle}{none}No Attack to replay yet.{/none}{outside}Play the last Attack you played this turn again.{/outside}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_replay")])
 art = ExtResource("9_art")
 card_class = &"wanderer"

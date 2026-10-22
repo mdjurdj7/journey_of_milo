@@ -21,8 +21,7 @@ card_name = "Collateral"
 card_type = 1
 rarity = 2
 target_type = 1
-description = "Spend {toll_cost} Toll.
-Play one of your top {look} cards free.
+description = "Play one of your top {look} cards free.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_look")])
 removal_scope = 1

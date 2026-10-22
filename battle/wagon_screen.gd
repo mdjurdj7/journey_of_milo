@@ -381,7 +381,7 @@ func _open_preview(index: int) -> void:
 		return
 	for view: CardView in [_before_view, _after_view]:
 		view.hover_enabled = false
-	_after_view.mark_changes(_before_view.rules_text.get_parsed_text(), _before_view.card_data.cost, cost_mark_gap_px)
+	_after_view.mark_changes(_before_view.rules_text.get_parsed_text(), _before_view.card_data.cost, cost_mark_gap_px, CardView.required_toll(_before_view.card_data))
 	_mode = Mode.PREVIEW
 	_mouse_on = -1
 	_relayout()

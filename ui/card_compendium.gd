@@ -487,7 +487,7 @@ func _add_card(flow: HFlowContainer, card: CardData) -> void:
 	if _show_tempered and card.tempered != null:
 		var before_text: String = card_view.rules_text.get_parsed_text()
 		card_view.set_card_data(card.tempered)
-		card_view.mark_changes(before_text, card.cost, cost_mark_gap_px)
+		card_view.mark_changes(before_text, card.cost, cost_mark_gap_px, CardView.required_toll(card))
 	card_view.clicked.connect(_on_card_clicked.bind(card_view, slot))
 
 func _add_spacer(height_px: float) -> void:

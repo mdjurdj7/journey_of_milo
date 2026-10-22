@@ -20,8 +20,7 @@ cost = 1
 card_type = 1
 rarity = 3
 target_type = 1
-description = "Spend {toll_cost} Toll.
-{battle}Undo {undo_attack} ({undo_hp}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}
+description = "{battle}Undo {undo_attack} ({undo_hp}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_undo")])
 removal_scope = 1

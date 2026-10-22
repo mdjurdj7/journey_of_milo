@@ -78,7 +78,7 @@ func _check_data() -> void:
 	_expect_eq([card.card_name, card.card_type, card.rarity, card.removal_scope, card.card_class], ["Owed Time", CardData.CardType.SKILL, CardData.CardRarity.RARE, CardData.RemovalScope.SPENT, &"wanderer"], "Owed Time: a Rare Spent Skill")
 	_expect_eq([card.target_type, card.offer], [CardData.TargetType.SELF, CardData.OfferScope.REWARDABLE], "...no target, rewardable")
 	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Owed Time.png", "...with its art")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\nTake another turn after this.\nSpent.", "...its text")
+	_expect_eq(card.description, "Take another turn after this.\nSpent.", "...its text")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL, "...spends Toll")
 	_expect(card.effects.size() == 2 and card.effects[1].effect_type == CardEffect.EffectType.APPLY_STATUS and card.effects[1].status_data == status, "...then owes a turn")
 	_expect_eq([status.display_name, status.grants_extra_turn, status.stack_rule, status.default_charges, status.ends_at_turn_end], ["Owed Time", true, StatusData.StackRule.ADD_CHARGES, 1, false], "The status: a charge per play, kept past the turn's end")

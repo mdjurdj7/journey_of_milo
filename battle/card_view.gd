@@ -115,6 +115,12 @@ const TOKEN_LOOK := "{look}"
 # The Toll a SPEND_TOLL or a TOLL_BLOCK spends - its toll_cost (Second
 # Swing's 5, Settled Account's 5).
 const TOKEN_TOLL_COST := "{toll_cost}"
+# The Toll glyph (white, tinted toll ink - BattleTheme.toll_ink) and the
+# theme that holds the ink. Hovered, the glyph answers keyword_at() as
+# the Toll keyword.
+const TOLL_GLYPH_PATH := "res://assets/ui/toll_glyph.svg"
+const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
+const TOLL_KEYWORD := "Toll"
 # The Energy owed next turn - the value of an effect applying an energy-
 # debt status (StatusData.energy_debt - Come Due's 2).
 const TOKEN_DEBT := "{debt}"
@@ -285,6 +291,34 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # card that costs HP - as wide as the wider of the two, right-aligned.
 @export var cost_rule_y_px: float = 33.0
 @export_range(0.0, 1.0) var cost_rule_alpha: float = 0.3
+# A required Toll cost (required_toll() - a SPEND_TOLL) is a badge in the
+# header, left of the Energy numeral: the Toll glyph, toll_glyph_gap_px,
+# then its number in cost_font at toll_badge_font_size_px on the header
+# baseline, toll_badge_gap_px clear of the Energy numeral - both in the
+# toll ink, no box. The glyph's ink is toll_glyph_height_fraction of the
+# Energy numeral's size tall, centred on the badge numeral's figures, then
+# moved by toll_glyph_offset_px. The name gets what is left. Each
+# re-applies live.
+@export var toll_badge_font_size_px: int = 18:
+	set(value):
+		toll_badge_font_size_px = value
+		_relayout()
+@export_range(0.1, 2.0) var toll_glyph_height_fraction: float = 0.58:
+	set(value):
+		toll_glyph_height_fraction = value
+		_relayout()
+@export var toll_glyph_gap_px: float = 1.0:
+	set(value):
+		toll_glyph_gap_px = value
+		_relayout()
+@export var toll_badge_gap_px: float = 8.0:
+	set(value):
+		toll_badge_gap_px = value
+		_relayout()
+@export var toll_glyph_offset_px: Vector2 = Vector2.ZERO:
+	set(value):
+		toll_glyph_offset_px = value
+		_relayout()
 # The rules text's sizes at 1x, largest first: each is tried in turn
 # until the text fits the space under the art field. The last is the
 # floor - text that still doesn't fit there wraps on and the card grows
@@ -635,6 +669,15 @@ var _name_font_size: int = 0
 # clipped into it by the field.
 var _art_rule: Control = null
 var _hp_cost: int = 0
+# The Toll cost badge (toll_badge_font_size_px): the glyph and the number,
+# made in _ready().
+var _toll_glyph: TextureRect = null
+var _toll_cost_label: Label = null
+# What mark_changes() marks: the Energy cost, the Toll badge.
+var _cost_changed: bool = false
+var _toll_changed: bool = false
+# The glyph's ink cropped from its SVG's box - shared by every card.
+static var _toll_glyph_texture: Texture2D = null
 # Keep on this card (set_kept()), and whether it is Sheathe's one-turn
 # Keep rather than Keep itself.
 var _kept: bool = false
@@ -746,6 +789,24 @@ func _ready() -> void:
 	# here, as set_playable() does from now on.
 	_keyword_reveal.modulate.a = 1.0 / maxf(modulate.a, 0.01)
 	_apply_keyword_reveal_style()
+	_toll_cost_label = Label.new()
+	_toll_cost_label.name = "TollCostLabel"
+	_toll_cost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toll_cost_label.visible = false
+	cost_label.add_sibling(_toll_cost_label)
+	_toll_glyph = TextureRect.new()
+	_toll_glyph.name = "TollGlyph"
+	_toll_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toll_glyph.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_toll_glyph.stretch_mode = TextureRect.STRETCH_SCALE
+	_toll_glyph.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_toll_glyph.texture = toll_glyph_texture()
+	_toll_glyph.visible = false
+	cost_label.add_sibling(_toll_glyph)
+	# The toll ink lives on the theme: a tune there re-inks every face.
+	var battle_theme: BattleTheme = _battle_theme()
+	if battle_theme != null:
+		battle_theme.changed.connect(_on_battle_theme_changed)
 	set_process(false)
 	_apply_style()
 	_apply_layout()
@@ -811,10 +872,15 @@ func set_stance(stance: Stance) -> void:
 		_refresh_dynamic_text()
 		_apply_layout()
 
-# Everything on the face whose number can move: the rules text's tokens
-# and the HP cost line. Re-run whenever the card or the stance changes.
+# Everything on the face whose number can move: the rules text's tokens,
+# the HP cost line and the Toll badge. Re-run whenever the card or the
+# stance changes.
 func _refresh_dynamic_text() -> void:
 	_hp_cost = _derive_hp_cost(card_data)
+	var toll: int = required_toll(card_data)
+	_toll_cost_label.text = str(toll) if toll > 0 else ""
+	_toll_cost_label.visible = toll > 0
+	_toll_glyph.visible = toll > 0
 	# The line is everything playing it costs in HP. In a fight it is
 	# CardBonus.predicted_self_loss() - the number the HP bar previews, so
 	# the two always agree; outside one, the card's own self-loss and the
@@ -1749,6 +1815,8 @@ func keyword_at(local_pos: Vector2) -> String:
 			return SHEATHED_KEYWORD if _kept_once else KEEP_KEYWORD
 	if strike_label_rect().has_point(local_pos):
 		return STRIKE_LABEL_WORD
+	if toll_badge_rect().has_point(local_pos):
+		return TOLL_KEYWORD
 	return ""
 
 # The STRIKE type label's drawn word and the hit pad round it, in this
@@ -1951,10 +2019,12 @@ func _screen_rect() -> Rect2:
 # the same, the whole of a line that changed in its words or that the
 # before text doesn't have ([u] in the rules text - the face's own ink,
 # at its own size), and the cost (a 1 px line under its numeral,
-# `cost_mark_gap_px` below the baseline, drawn by a "CostMark" child).
+# `cost_mark_gap_px` below the baseline, drawn by a "CostMark" child) -
+# and so the Toll badge's number, against `before_toll` (required_toll()
+# of that card; -1: not compared).
 # Run once, after set_card_data(): the face re-rendering its rules text
 # drops the [u] marks.
-func mark_changes(before_text: String, before_cost: int, cost_mark_gap_px: float) -> void:
+func mark_changes(before_text: String, before_cost: int, cost_mark_gap_px: float, before_toll: int = -1) -> void:
 	_cost_mark_gap_px = cost_mark_gap_px
 	var old_lines: PackedStringArray = before_text.split("\n")
 	var new_lines: PackedStringArray = rules_text.get_parsed_text().split("\n")
@@ -1973,7 +2043,9 @@ func mark_changes(before_text: String, before_cost: int, cost_mark_gap_px: float
 		rules_text.text = "\n".join(bbcode)
 	else:
 		push_warning("CardView: '%s' rules text doesn't split into its lines; no hairlines under it." % card_data.card_name)
-	if before_cost != card_data.cost:
+	_cost_changed = before_cost != card_data.cost
+	_toll_changed = before_toll >= 0 and before_toll != required_toll(card_data) and _toll_cost_label.visible
+	if (_cost_changed or _toll_changed) and get_node_or_null(^"CostMark") == null:
 		var cost_mark := Control.new()
 		cost_mark.name = "CostMark"
 		cost_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1991,7 +2063,10 @@ func set_cost_mark_gap(cost_mark_gap_px: float) -> void:
 # Width -1: one screen pixel at any scale the card is drawn at.
 func _draw_cost_mark(cost_mark: Control) -> void:
 	var y: float = header_baseline_px + _cost_mark_gap_px
-	cost_mark.draw_line(Vector2(cost_label.position.x, y), Vector2(cost_label.position.x + cost_label.size.x, y), ink_color, -1.0)
+	if _cost_changed:
+		cost_mark.draw_line(Vector2(cost_label.position.x, y), Vector2(cost_label.position.x + cost_label.size.x, y), ink_color, -1.0)
+	if _toll_changed:
+		cost_mark.draw_line(Vector2(_toll_cost_label.position.x, y), Vector2(_toll_cost_label.position.x + _toll_cost_label.size.x, y), _toll_ink(), -1.0)
 
 # Which numbers (by order in the line) differ, when the two lines are the
 # same words round them; empty when the words differ too, or nothing does.
@@ -2310,6 +2385,11 @@ func _apply_style() -> void:
 	if cost_font != null:
 		cost_label.add_theme_font_override("font", _msdf(cost_font))
 
+	_apply_toll_ink()
+	_toll_cost_label.add_theme_font_size_override("font_size", toll_badge_font_size_px)
+	if cost_font != null:
+		_toll_cost_label.add_theme_font_override("font", _msdf(cost_font))
+
 	var hp_ink: Color = ink_color
 	hp_ink.a = hp_cost_alpha
 	hp_cost_label.add_theme_color_override("font_color", hp_ink)
@@ -2532,8 +2612,10 @@ func _apply_layout() -> void:
 		cost_rule.size = Vector2(rule_width, 1.0)
 	cost_rule.visible = hp_cost_label.visible
 
+	var badge_width: float = _lay_out_toll_badge()
+
 	# One line, always: the art field sits at a fixed height below it.
-	var name_width: float = card_size.x - outer_margin * 2.0 - cost_width - name_cost_gap
+	var name_width: float = card_size.x - outer_margin * 2.0 - cost_width - name_cost_gap - badge_width
 	_name_font_size = _fit_name_size(name_width)
 	name_label.add_theme_font_size_override("font_size", _name_font_size)
 	name_label.position = Vector2(outer_margin, _top_for_baseline(name_label, _name_font_size, header_baseline_px))
@@ -2581,6 +2663,85 @@ func _string_width(label: Label, font_size: int) -> float:
 		return 0.0
 	return font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 
+# The Toll badge left of the Energy numeral, on the header baseline: the
+# number toll_badge_gap_px off the numeral, the glyph toll_glyph_gap_px
+# before it, centred on its figures. Returns the header width it takes
+# (its gap to the numeral included) - 0 with no Toll cost.
+func _lay_out_toll_badge() -> float:
+	if _toll_cost_label == null or not _toll_cost_label.visible:
+		return 0.0
+	var number_width: float = _string_width(_toll_cost_label, toll_badge_font_size_px)
+	var right: float = cost_label.position.x - toll_badge_gap_px
+	_toll_cost_label.position = Vector2(right - number_width, _top_for_baseline(_toll_cost_label, toll_badge_font_size_px, header_baseline_px))
+	_toll_cost_label.size = Vector2(number_width, _line_height(_toll_cost_label, toll_badge_font_size_px))
+	var glyph_size: Vector2 = toll_glyph_size(float(cost_font_size_px) * toll_glyph_height_fraction)
+	var figures_middle: float = header_baseline_px + _cap_top(cost_font, toll_badge_font_size_px, "0") / 2.0
+	_toll_glyph.position = Vector2(_toll_cost_label.position.x - toll_glyph_gap_px - glyph_size.x, figures_middle - glyph_size.y / 2.0) + toll_glyph_offset_px
+	_toll_glyph.size = glyph_size
+	return cost_label.position.x - _toll_glyph.position.x
+
+# The badge's glyph and number, in this card's own unscaled pixels - empty
+# on a card with no Toll cost. Answers keyword_at() as Toll.
+func toll_badge_rect() -> Rect2:
+	if _toll_cost_label == null or not _toll_cost_label.visible:
+		return Rect2()
+	return Rect2(_toll_glyph.position, _toll_glyph.size).merge(Rect2(_toll_cost_label.position, _toll_cost_label.size)).grow(KEYWORD_HIT_PAD_PX)
+
+# The glyph at `height` px of ink, at its own aspect.
+static func toll_glyph_size(height: float) -> Vector2:
+	var texture: Texture2D = toll_glyph_texture()
+	if texture == null or texture.get_height() <= 0:
+		return Vector2(height * 0.5, height)
+	return Vector2(height * float(texture.get_width()) / float(texture.get_height()), height)
+
+# The Toll glyph's ink - the SVG cropped to its used rect, so a height
+# given is the stroke's own, not its 24-unit box's.
+static func toll_glyph_texture() -> Texture2D:
+	if _toll_glyph_texture != null:
+		return _toll_glyph_texture
+	var source: Texture2D = load(TOLL_GLYPH_PATH)
+	if source == null:
+		return null
+	var atlas := AtlasTexture.new()
+	atlas.atlas = source
+	var image: Image = source.get_image()
+	atlas.region = Rect2(image.get_used_rect()) if image != null and not image.is_empty() else Rect2(Vector2.ZERO, source.get_size())
+	_toll_glyph_texture = atlas
+	return _toll_glyph_texture
+
+# The Toll a card requires to be played (its SPEND_TOLL's toll_cost) - its
+# badge's number; 0 for none.
+static func required_toll(card: CardData) -> int:
+	if card == null:
+		return 0
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL and effect.toll_cost > 0:
+			return effect.toll_cost
+	return 0
+
+static func _battle_theme() -> BattleTheme:
+	return load(BATTLE_THEME_PATH) as BattleTheme
+
+# BattleTheme.toll_ink, or the card's own ink without the theme.
+func _toll_ink() -> Color:
+	var battle_theme: BattleTheme = _battle_theme()
+	return battle_theme.toll_ink if battle_theme != null else ink_color
+
+func _apply_toll_ink() -> void:
+	var toll_ink: Color = _toll_ink()
+	_toll_cost_label.add_theme_color_override("font_color", toll_ink)
+	_toll_glyph.modulate = toll_ink
+
+# The theme changes on every value set it applies - only a new toll ink
+# re-inks the face.
+func _on_battle_theme_changed() -> void:
+	if not is_node_ready() or _toll_ink() == _toll_glyph.modulate:
+		return
+	_apply_toll_ink()
+	if card_data != null:
+		_refresh_dynamic_text()
+		_apply_layout()
+
 # Where a one-line Label's top goes so its baseline sits at `baseline` -
 # a Label draws its first line's baseline one font ascent below its top.
 func _top_for_baseline(label: Label, font_size: int, baseline: float) -> float:
@@ -2592,15 +2753,16 @@ func _top_for_baseline(label: Label, font_size: int, baseline: float) -> float:
 # How far above the baseline `font` (hinted - see _msdf()) inks a flat capital
 # (negative = up), from the glyph itself - the line box's ascent
 # overstates it. An "H", not the label's own text, so every type's
-# footer lands on the same pixel whatever its round letters overshoot.
+# footer lands on the same pixel whatever its round letters overshoot -
+# or `letter` (a "0" for figures, an "x" for the x-height).
 # The glyph's offset is its bitmap's, which the rasteriser pads by
 # GLYPH_RECT_MARGIN_PX on every side; the ink starts inside that.
-func _cap_top(font: Font, font_size: int) -> float:
+func _cap_top(font: Font, font_size: int, letter: String = "H") -> float:
 	if font == null:
 		return -float(font_size) * 0.7
 	var ts: TextServer = TextServerManager.get_primary_interface()
 	var rid: RID = font.get_rids()[0]
-	var glyph: int = ts.font_get_glyph_index(rid, font_size, "H".unicode_at(0), 0)
+	var glyph: int = ts.font_get_glyph_index(rid, font_size, letter.unicode_at(0), 0)
 	return ts.font_get_glyph_offset(rid, Vector2i(font_size, 0), glyph).y + GLYPH_RECT_MARGIN_PX
 
 # One line's real height for this label's font at this size, rounded up

@@ -84,7 +84,7 @@ func _check_card_data() -> void:
 	_expect_eq([card.card_type, card.rarity, card.card_class], [CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, &"wanderer"], "...a Skill, Uncommon, the Wanderer's")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...no target of its own")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.NONE, "...not Spent")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\n{battle}Replay {replay_attack}.{/battle}{none}No Attack to replay yet.{/none}{outside}Play the last Attack you played this turn again.{/outside}", "...its text")
+	_expect_eq(card.description, "{battle}Replay {replay_attack}.{/battle}{none}No Attack to replay yet.{/none}{outside}Play the last Attack you played this turn again.{/outside}", "...its text")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.REPLAY_LAST_ATTACK, "...SPEND_TOLL, then REPLAY_LAST_ATTACK")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...its art kept")
@@ -206,22 +206,28 @@ func _check_face() -> void:
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(_card())
-	_expect_eq(view.rules_text.get_parsed_text(), "Spend 5 Toll.\nPlay the last Attack you played this turn again.", "The face reads its rule")
+	_expect_eq(view.rules_text.get_parsed_text(), "Play the last Attack you played this turn again.", "The face reads its rule")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
 	_expect_eq(view.type_label.text, "TOLL", "...labelled TOLL")
 	_expect(not view.hp_cost_label.visible, "...no HP badge")
+	# Its Toll cost is the header's badge, left of the Energy numeral; the
+	# badge answers the hover as Toll.
+	var badge: Rect2 = view.toll_badge_rect()
+	_expect(badge.has_area() and badge.end.x <= view.cost_label.position.x, "...its Toll a badge left of the Energy cost (%s)" % badge)
+	_expect_eq((view.get_node("TollCostLabel") as Label).text, str(_toll), "...reading its Toll")
+	_expect_eq(view.keyword_at(badge.get_center()), "Toll", "...hovered: the Toll slip")
 	# In a fight: nothing to replay yet, then the Attack it would replay,
 	# by name - the card the hand's ghost shows.
 	var player: Combatant = _player()
 	var ctx := EffectContext.new()
 	ctx.player = player
 	view.set_bonus_context(ctx)
-	_expect_eq(view.rules_text.get_parsed_text(), "Spend %d Toll.\nNo Attack to replay yet." % _toll, "In a fight with no Attack played: nothing to replay")
+	_expect_eq(view.rules_text.get_parsed_text(), "No Attack to replay yet.", "In a fight with no Attack played: nothing to replay")
 	_expect(view.replay_attack() == null, "...and no ghost")
 	var slash: CardData = load(SLASH_PATH)
 	player.record_attack(slash, null, true)
 	view.set_bonus_context(ctx)
-	_expect_eq(view.rules_text.get_parsed_text(), "Spend %d Toll.\nReplay %s." % [_toll, slash.card_name], "After %s: it names it" % slash.card_name)
+	_expect_eq(view.rules_text.get_parsed_text(), "Replay %s." % slash.card_name, "After %s: it names it" % slash.card_name)
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
 	_expect(view.replay_attack() == slash, "...the ghost's card")
 	view.free()

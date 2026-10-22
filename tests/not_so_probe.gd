@@ -80,7 +80,7 @@ func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq([card.card_name, card.card_type, card.rarity, card.removal_scope, card.offer, card.card_class], ["Not So", CardData.CardType.SKILL, CardData.CardRarity.RARE, CardData.RemovalScope.SPENT, CardData.OfferScope.REWARDABLE, &"wanderer"], "Not So: a Rare Skill, Spent, rewardable, the Wanderer's")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.UNDO_LAST_ATTACK, "...SPEND_TOLL, then UNDO_LAST_ATTACK")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\n{battle}Undo {undo_attack} ({undo_hp}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}\nSpent.", "...its text")
+	_expect_eq(card.description, "{battle}Undo {undo_attack} ({undo_hp}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}\nSpent.", "...its text")
 	_expect(not card.keyword_slips, "...no keyword slips")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...carrying its art")
@@ -242,7 +242,7 @@ func _check_face() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(view)
 	await process_frame
-	var rule: String = "Spend 10 Toll.\nUndo the last attack; return it.\nSpent."
+	var rule: String = "Undo the last attack; return it.\nSpent."
 	view.set_card_data(load(CARD_PATH))
 	_expect_eq(view.rules_text.get_parsed_text(), rule, "Outside a fight: the rule")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
@@ -252,7 +252,7 @@ func _check_face() -> void:
 	player.block = 3
 	EnemyTurn.take_turn(_sputter(2), load(SPUTTER_PATH), player)
 	view.set_bonus_context(_ctx(player))
-	_expect_eq(view.rules_text.get_parsed_text(), "Spend 10 Toll.\nUndo Scissor (6); return it.\nSpent.", "...the Scissor's 6 on the record: the live undo")
+	_expect_eq(view.rules_text.get_parsed_text(), "Undo Scissor (6); return it.\nSpent.", "...the Scissor's 6 on the record: the live undo")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
 	view.set_keyword_inspect(true)
 	_expect(not view.keyword_hover_allowed(), "Inspected: no keyword slips")

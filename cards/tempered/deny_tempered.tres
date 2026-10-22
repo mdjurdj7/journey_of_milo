@@ -23,8 +23,7 @@ card_type = 1
 rarity = 2
 target_type = 0
 removal_scope = 1
-description = "Spend {toll_cost} Toll.
-Delay target enemy.
+description = "Delay target enemy.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_delay")])
 art = ExtResource("4_art")

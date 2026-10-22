@@ -23,8 +23,7 @@ card_type = 1
 rarity = 3
 target_type = 1
 removal_scope = 1
-description = "Spend {toll_cost} Toll.
-Take another turn after this.
+description = "Take another turn after this.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_owed_time")])
 art = ExtResource("9_art")

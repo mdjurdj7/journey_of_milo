@@ -22,8 +22,7 @@ card_name = "Leverage"
 card_type = 1
 rarity = 2
 target_type = 1
-description = "Spend {toll_cost} Toll.
-The next card you play this turn costs {reduction} less Energy."
+description = "The next card you play this turn costs {reduction} less Energy."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_spend_toll"), SubResource("CardEffect_apply_status")])
 art = ExtResource("9_art")
 tempered = ExtResource("10_tempered")

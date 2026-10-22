@@ -27,8 +27,7 @@ card_name = "Come Due+"
 card_type = 1
 rarity = 1
 target_type = 1
-description = "Spend {toll_cost} Toll.
-Gain {energy} Energy.
+description = "Gain {energy} Energy.
 Next turn, gain {debt} less."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_energy"), SubResource("E_owed")])
 art = ExtResource("9_art")
