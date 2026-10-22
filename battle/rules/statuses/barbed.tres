@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "barbed"
+display_name = "Barbed"
+description = "Until your next turn, the first attack that hits your Block takes {barbed} damage."
+category = 2
+default_duration_turns = 1
+stack_rule = 3
+ignores_strike_backs = true
+barbed_damage = 3

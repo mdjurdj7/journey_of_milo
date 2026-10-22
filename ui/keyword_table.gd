@@ -15,10 +15,13 @@ class_name KeywordTable
 # (the title's compendium).
 #   {devour}     what Devour gives for each Energy - Take In's
 #                DEVOUR_FROM_HAND value, the card that Devours
+#   {barbed}     what Barbed deals back - the Barbed status's
+#                barbed_damage
 
 const TABLE_PATH := "res://ui/keywords.tres"
 const FALLBACK_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const DEVOUR_CARD_PATH := "res://cards/data/take_in.tres"
+const BARBED_STATUS_PATH := "res://battle/rules/statuses/barbed.tres"
 
 # Keyword -> definition template, in the order a reader meets them. Whole
 # words, case-sensitive, as they're written in rules text.
@@ -95,4 +98,7 @@ static func live_values() -> Dictionary:
 			if effect != null and effect.effect_type == CardEffect.EffectType.DEVOUR_FROM_HAND:
 				values["devour"] = effect.value
 				break
+	var barbed: StatusData = load(BARBED_STATUS_PATH) as StatusData
+	if barbed != null:
+		values["barbed"] = barbed.barbed_damage
 	return values

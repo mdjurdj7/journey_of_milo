@@ -2340,6 +2340,15 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	# What it left on them (the Adder's Venom) shows with the hit.
 	if int(result.get("applied_to_player", 0)) > 0:
 		status_changed.emit()
+	# Barbed going off (EnemyTurn.land_attack()'s "barbed_fired"): gone from
+	# the player's row, and its damage back - already taken off the enemy -
+	# reported as the worn piece's is, below.
+	if result.get("barbed_fired", false):
+		status_changed.emit()
+		var barbed: int = int(result.get("barbed", 0))
+		var barbed_target: Combatant = _combatants.get(enemy)
+		if barbed > 0 and barbed_target != null:
+			_report_damage("player", barbed_target, barbed, "hit_back")
 	# The worn piece's damage back (EnemyTurn.land_attack()'s "hit_back"),
 	# already taken off the enemy: reported as the Wanderer's damage, not a
 	# card's - a kill held for its blow and dropped, like a countdown's.

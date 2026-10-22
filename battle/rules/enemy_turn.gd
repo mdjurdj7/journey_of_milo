@@ -300,6 +300,10 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 		own_statuses = Status.without(own_statuses, Status.marks(own_statuses))
 	var player_statuses: Array[Status] = Status.strike_back_view(player.statuses) if strike_back else player.statuses
 	var reduction_left: int = Status.attack_total_reduction(own_statuses) + Status.attack_total_reduction(player_statuses)
+	# Barbed on the player (Stoneshell): armed for the first hit their
+	# Block takes any of - never a strike back's - and spent by it.
+	var barbed: Status = null if strike_back else barbed_on(player)
+	var barbed_fired: bool = false
 	# What lives on the intent (StatusData.intent_mark - Braced, Garnished;
 	# never on a strike back), and what each takes off this attack, for
 	# "mark_numbers": a modifier (Braced) its hits before and after it, a
@@ -353,6 +357,8 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 		result["absorbed"] += damage_result["absorbed"]
 		# What Toll paid of it (Thick Skin - DamagePipeline.resolve()).
 		result["tolled"] = int(result.get("tolled", 0)) + int(damage_result["tolled"])
+		if barbed != null and not barbed_fired and int(damage_result["blocked"]) > 0:
+			barbed_fired = true
 		# Saved, what reached HP is what was actually lost - the number the
 		# run's HP, the floating number and Grace all take from here - and a
 		# save that left them higher than before the hit (survive HP over
@@ -386,6 +392,17 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 		result["grace_opened"] = open_grace(player, largest_hit, total_to_hp)
 		# On the record for Not So: the whole attack, every hit of it.
 		player.record_hit_taken(combatant, intent.intent_name if intent != null else "", total_to_hp, grace_share(player, largest_hit, total_to_hp))
+	# Barbed's damage back (StatusData.barbed_damage): the hit Block took
+	# set it off; it lands once the attack has resolved, as the worn
+	# piece's does - through the enemy's Block, ordinary damage, so
+	# nothing strikes back at it. "barbed_fired" says it went off,
+	# "barbed" what reached HP - the controller's to report.
+	if barbed_fired:
+		Status.remove_from(player.statuses, barbed)
+		result["barbed_fired"] = true
+		if player.hp > 0 and combatant.hp > 0:
+			var barbs: Dictionary = DamagePipeline.resolve(barbed.data.barbed_damage, combatant)
+			result["barbed"] = barbs["damage_to_hp"]
 	# The worn piece's damage back (hit_back_damage): once for the attack,
 	# however many hits and whatever Block took, through the enemy's own
 	# Block - ordinary damage, not an Attack card, so nothing strikes back
@@ -393,6 +410,13 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	if player.hit_back_damage > 0 and player.hp > 0 and combatant.hp > 0:
 		var back: Dictionary = DamagePipeline.resolve(player.hit_back_damage, combatant)
 		result["hit_back"] = back["damage_to_hp"]
+
+# The player's armed Barbed (StatusData.barbed_damage), or null.
+static func barbed_on(player: Combatant) -> Status:
+	for active in player.statuses:
+		if active.data != null and active.data.barbed_damage > 0:
+			return active
+	return null
 
 # Whether a hit of `amount`, against `block` and `absorb`, is the one the
 # worn piece's first hit takes (Combatant.first_hit_scale): one is armed

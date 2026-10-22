@@ -28,7 +28,8 @@ const FOLDER_CLASS: Dictionary = {
 	"res://cards/neutral/": &"",
 }
 # Offered only on a channel of its own (CardData.OfferScope.OWN_CHANNEL).
-const OWN_CHANNEL: Array[String] = ["Samphire"]
+# Stoneshell comes only from the Warped Shell.
+const OWN_CHANNEL: Array[String] = ["Samphire", "Stoneshell"]
 # Weapon cards come only with their weapon: every card here, and its
 # tempered copy, is OWN_CHANNEL.
 const WEAPON_CARD_DIR := "res://cards/weapon/"
@@ -88,6 +89,7 @@ const EXPECTED_RARITY: Dictionary = {
 	"Owed Time": CardData.CardRarity.RARE,
 	"Wrest": CardData.CardRarity.COMMON,
 	"Thick Skin": CardData.CardRarity.COMMON,
+	"Stoneshell": CardData.CardRarity.COMMON,
 	"Gnaw": CardData.CardRarity.COMMON,
 	"Settled Account": CardData.CardRarity.COMMON,
 	"Left Hand": CardData.CardRarity.COMMON,

@@ -68,6 +68,7 @@ const CARD_ART: Dictionary = {
 	"countersign": "res://cards/art/Wanderer/Twice Over.png",
 	"wrest": "res://cards/art/Wanderer/Wrest.png",
 	"thick_skin": "res://cards/art/Wanderer/Thick Skin.png",
+	"stoneshell": "res://cards/art/Wanderer/Stoneshell.png",
 	"go_under": "res://cards/art/Wanderer/Go Under.png",
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",

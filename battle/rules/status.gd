@@ -142,6 +142,7 @@ func template_values(holder: Combatant = null) -> Dictionary:
 		"decay": data.tick_decay,
 		"times": times_word(1.0 + magnitude / 100.0),
 		"critical_percent": data.raises_critical_percent,
+		"barbed": data.barbed_damage,
 	}
 	if holder != null:
 		values["survive_hp"] = data.survive_hp(holder.max_hp, holder.critical_fraction())

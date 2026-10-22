@@ -33,7 +33,7 @@ const BIDE_PATH := "res://cards/data/bide.tres"
 const NOT_SO_PATH := "res://cards/data/not_so.tres"
 const REWARD_SCREEN_PATH := "res://battle/reward_screen.tscn"
 const REWARD_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
-const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed", "Keep", "Advance", "Hold", "Withdraw", "Burst", "Devour"]
+const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed", "Keep", "Advance", "Hold", "Withdraw", "Burst", "Devour", "Barbed"]
 const DEFINITIONS: Dictionary = {
 	"Toll": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Each card that spends any Toll hurries every Sentence by a turn.",
 	"Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to half the largest hit.",
@@ -47,6 +47,7 @@ const DEFINITIONS: Dictionary = {
 	"Withdraw": "Follows Hold in a chain: the chain rises a level and Recover draws a card. A card that doesn't follow ends the chain.",
 	"Burst": "Reads the chain level from before this card was played.",
 	"Devour": "Remove a card from your hand for the rest of this fight. For each Energy it cost: an Attack makes your Attacks deal 2 more this fight; a Skill gives 2 Block at the start of each turn.",
+	"Barbed": "Until your next turn, the first attack that hits your Block takes 3 damage.",
 }
 const SCALES: Array[float] = [0.95, 1.15, 2.2]
 const ENEMY_HP := 999

@@ -16,5 +16,6 @@ entries = Dictionary[String, String]({
 "Hold": "Follows Advance in a chain: the chain rises a level and Parry gives Block for each level. A card that doesn't follow ends the chain.",
 "Withdraw": "Follows Hold in a chain: the chain rises a level and Recover draws a card. A card that doesn't follow ends the chain.",
 "Burst": "Reads the chain level from before this card was played.",
-"Devour": "Remove a card from your hand for the rest of this fight. For each Energy it cost: an Attack makes your Attacks deal {devour} more this fight; a Skill gives {devour} Block at the start of each turn."
+"Devour": "Remove a card from your hand for the rest of this fight. For each Energy it cost: an Attack makes your Attacks deal {devour} more this fight; a Skill gives {devour} Block at the start of each turn.",
+"Barbed": "Until your next turn, the first attack that hits your Block takes {barbed} damage."
 })

@@ -64,6 +64,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {block}    turn_start_block × stacks
 #   {survive_hp} survive_hp() for the holder (only with one - describe(holder))
 #   {decay}    tick_decay
+#   {barbed}   barbed_damage
 #   {critical_percent} raises_critical_percent
 #   {share}    ransom_heal_fraction in words ("half") - or, with none, that
 #              of the status it gives way to (grants_on_turn_start)
@@ -289,6 +290,14 @@ enum Mark { NONE, COIL, DROP }
 # the enemy's intent; No Further's armed status and Unbroken's on the
 # player.
 @export var ignores_strike_backs: bool = false
+
+# Barbed (Stoneshell): the first enemy attack hit its holder's Block takes
+# any of costs that attacker this much - once the attack has resolved,
+# through the attacker's Block, as plain damage, not an Attack card, so
+# nothing strikes back at it (EnemyTurn.land_attack()). Spent when it
+# fires; a strike back never fires it (give it ignores_strike_backs
+# too). 0 = none.
+@export var barbed_damage: int = 0
 
 # A status that waits for its holder to be Critical (No Further): the
 # first time the holder is Critical after an action - an enemy's attack,

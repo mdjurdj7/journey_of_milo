@@ -5,7 +5,8 @@ extends SceneTree
 # on equip, current HP clamped when it comes off), the first hit that gets
 # past Block scaled once a fight (Grace opening on what then reaches HP,
 # the intent preview agreeing), Block as a fight opens, damage back once
-# per attack through the enemy's Block - a kill by it included - and an
+# per attack through the enemy's Block - a kill by it included - Barbed's
+# (Stoneshell) once, on the first hit Block takes, and an
 # elite's table rolling by rarity, never the piece already worn. On the
 # sand (WorldArmor): its line once he walks up, the plate's TAKE / LEAVE
 # and "Replaces ...", a swap setting the old piece down where he stands to
@@ -24,13 +25,14 @@ extends SceneTree
 # trinket_probe does. Untyped against anything that names the RunState
 # autoload: a SceneTree script compiles before the autoloads register.
 
-const CASES := 17
+const CASES := 18
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
 const ENEMIES_DIR := "res://battle/rules/enemies"
 const TAIL_PATH := "res://run/weapons/greyshelfs_tail.tres"
+const BARBED_PATH := "res://battle/rules/statuses/barbed.tres"
 const SAFETY_SECONDS := 240.0
 
 var _run_state: Node = null
@@ -52,6 +54,7 @@ func _initialize() -> void:
 	_check_first_hit_scaled_once()
 	_check_first_hit_preview()
 	_check_hit_back_once_per_attack()
+	_check_barbed()
 	await _check_fight_opening()
 	await _check_hit_back_kill_in_fight()
 	await _check_find_line()
@@ -247,6 +250,52 @@ func _check_hit_back_once_per_attack() -> void:
 	var turn: Dictionary = EnemyTurn.take_turn(dying, data, shield)
 	_expect_eq(dying.hp, 0, "Damage back can kill on the enemy's own turn")
 	_expect_eq((turn["actions"] as Array).size(), 1, "...and a repeated attack stops at the one that killed it")
+	_completed += 1
+
+# Barbed (Stoneshell): the first hit Block takes any of sets it off -
+# its damage back once, through the enemy's Block, and it's gone; a
+# second attack that turn finds nothing. No Block, no Barbed; a strike
+# back passes it by; the next turn's start clears it.
+func _check_barbed() -> void:
+	var barbed: StatusData = load(BARBED_PATH)
+	var back: int = barbed.barbed_damage
+	_expect(back > 0, "Barbed deals something back (%d)" % back)
+	var data: EnemyData = _enemy_data(4, 3)
+	var player: Combatant = _player(60)
+	player.block = 4
+	Status.apply_to(player.statuses, barbed)
+	var enemy := Combatant.new(40)
+	enemy.block = 1
+	var result: Dictionary = _attack(enemy, data, data.intents[0], player)
+	_expect(bool(result.get("barbed_fired", false)), "A hit Block took sets Barbed off")
+	_expect_eq(enemy.hp, 40 - (back - 1), "...once for a three-hit attack, through the enemy's Block")
+	_expect_eq(int(result.get("barbed", 0)), back - 1, "...\"barbed\" is what reached its HP")
+	_expect(EnemyTurn.barbed_on(player) == null, "...and it's spent")
+	player.block = 99
+	var second: Dictionary = _attack(enemy, data, data.intents[0], player)
+	_expect(not bool(second.get("barbed_fired", false)) and enemy.hp == 40 - (back - 1), "A second attack that turn finds no Barbed")
+	var bare: Combatant = _player(60)
+	Status.apply_to(bare.statuses, barbed)
+	var untouched := Combatant.new(40)
+	_attack(untouched, data, data.intents[0], bare)
+	_expect(untouched.hp == 40 and EnemyTurn.barbed_on(bare) != null, "No Block: nothing back, and Barbed stays armed")
+	var braced: Combatant = _player(60)
+	braced.block = 99
+	Status.apply_to(braced.statuses, barbed)
+	var striker := Combatant.new(40)
+	var strike: Dictionary = {"intent": "Probe", "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0}
+	EnemyTurn.land_attack(striker, data, data.intents[0], braced, strike, true)
+	_expect(striker.hp == 40 and EnemyTurn.barbed_on(braced) != null, "A strike back Block takes passes Barbed by")
+	Status.tick_all(braced.statuses, func(_amount: int, _ticking: Status) -> void: pass)
+	Status.remove_expired(braced.statuses)
+	_expect(EnemyTurn.barbed_on(braced) == null, "The next turn's start clears it")
+	for path: String in ["res://cards/data/stoneshell.tres", "res://cards/tempered/stoneshell_tempered.tres"]:
+		var card := load(path) as CardData
+		var gives: StatusData = null
+		for effect in card.effects:
+			if effect.status_data != null:
+				gives = effect.status_data
+		_expect(gives == barbed, "%s gives Barbed" % card.card_name)
 	_completed += 1
 
 # --- In a fight ---
