@@ -38,6 +38,7 @@ const SHARED_DRAW_LINE_CARDS: Array[String] = ["On the Brink", "On the Brink+"]
 # here has changed its wording - or needs to.
 const SHRUNK_RULES: Dictionary = {
 	"Blood Arc": 14,
+	"Collateral": 14,
 	"Cornered": 14,
 	"Last Resort": 14,
 	"No Further": 14,
