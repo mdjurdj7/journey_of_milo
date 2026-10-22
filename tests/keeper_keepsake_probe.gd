@@ -287,8 +287,8 @@ func _check_keep_current() -> void:
 	_completed += 1
 
 # --- The Critical-entry Block hook, rules only ---
-# No keepsake carries critical_entry_block now (Blue Fastener carries
-# Block instead); the hook stays, checked through a probe-only trinket.
+# No keepsake carries critical_entry_block; Salt Collar, a worn piece,
+# does. Here the hook is checked through a probe-only trinket.
 
 func _check_critical_entry_rules() -> void:
 	# 70 max, Critical at 21 and under.
