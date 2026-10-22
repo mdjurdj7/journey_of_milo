@@ -53,8 +53,9 @@ func _initialize() -> void:
 		var character := load(CHARACTERS[index]) as CharacterData
 		var own: Array[CardData] = []
 		for card in cards:
-			# The neutral cards in the first class's run only.
-			if card.card_class == character.card_class or (card.card_class == &"" and index == 0):
+			# The class check RewardPool's offers use (CardData.usable_by()),
+			# the neutral cards in the first class's run only.
+			if card.usable_by(character) and (card.card_class != &"" or index == 0):
 				own.append(card)
 		total += own.size()
 		await _play_all(character, own)
