@@ -250,11 +250,16 @@ enum Mark { NONE, COIL, DROP }
 # it (EnemyTurn.preview_intent()). 1 = once, as every enemy acts.
 @export var repeats_intent: int = 1
 
-# Energy its holder gains at the start of each of their turns, on top of
-# the refill, if they are Critical at that moment (Dying Light) - judged
-# as the Energy refills (Combatant.turn_start_energy()); entering Critical
-# later in the turn gives nothing until the next one starts. 0 = none.
-@export var turn_start_energy_while_critical: int = 0
+# Dying Light: the first time each of its holder's turns they cross their
+# Critical line - into Critical or back out, from HP moving or the line
+# moving (On the Brink, Go Under) - they gain crossing_energy Energy and
+# draw crossing_draw. Judged per status at Status.resolve_critical_
+# triggers()'s beat (after a card, an enemy attack, the turn's ticks); a
+# crossing on the enemy's turn resolves as the holder's next turn starts,
+# once, as that turn's. BattleController resolves it (_resolve_
+# crossings()). {energy} and {draw} in the description. Both 0 = none.
+@export var crossing_energy: int = 0
+@export var crossing_draw: int = 0
 
 # Block its holder gains at the start of each of their turns, per stack,
 # after the turn's Block reset (Marrow - a Devoured Skill's yield,

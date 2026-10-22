@@ -207,6 +207,36 @@ signal draw_started(card_data: CardData)
 			_yield_line.set_line_height(value)
 @export_group("")
 
+@export_group("Wash")
+# Dying Light resolving (play_wash()): one pale wash passes across the
+# hand - each card brightens toward wash_color (a cool off-white, the
+# fog's, never warm, never pure white) up to wash_peak_alpha over
+# wash_in_sec and back over wash_out_sec, the leftmost card first and the
+# rightmost wash_sweep_sec later. Once, no loop, no glow. It starts as the
+# next drawn card launches, so the cards it draws arrive inside it. The
+# peak stays low enough that the ink reads through it.
+@export var wash_color: Color = Color(0.93, 0.95, 0.96):
+	set(value):
+		wash_color = value
+		_apply_wash()
+@export_range(0.0, 1.0) var wash_peak_alpha: float = 0.3:
+	set(value):
+		wash_peak_alpha = value
+		_apply_wash()
+@export var wash_in_sec: float = 0.15:
+	set(value):
+		wash_in_sec = value
+		_apply_wash()
+@export var wash_out_sec: float = 0.2:
+	set(value):
+		wash_out_sec = value
+		_apply_wash()
+@export var wash_sweep_sec: float = 0.1:
+	set(value):
+		wash_sweep_sec = value
+		_apply_wash()
+@export_group("")
+
 # The bitten card's render reaches this far past the card on every side,
 # so nothing the face draws just outside its rect is cut off.
 const DEVOUR_VIEW_MARGIN_PX := 24.0
@@ -262,6 +292,9 @@ var _arrival_tweens: Dictionary = {} # Control (slot) -> Tween
 # When the next drawn card may launch (Time.get_ticks_msec()) - the
 # stagger runs on across draws that come close together.
 var _next_launch_msec: int = 0
+# The wash's clock (play_wash()), -1 when none is playing, and its tween.
+var _wash_t: float = -1.0
+var _wash_tween: Tween = null
 # Set by discard_hand() while the Deck discards: the slots that go then
 # fade in place (_fade_and_remove()) the Nth after N stagger steps, not
 # all at once.
@@ -686,6 +719,65 @@ func _can_play(card: CardData, energy: int) -> bool:
 	return card.cost <= energy
 
 # Every slot's CardView, in hand order.
+# Dying Light resolved: the wash, once, from the next drawn card's launch
+# (the draw's stagger runs on from the turn's own draw). One already
+# playing starts again rather than doubling.
+func play_wash() -> void:
+	if _wash_tween != null and _wash_tween.is_valid():
+		_wash_tween.kill()
+	var delay: float = maxf(float(_next_launch_msec - Time.get_ticks_msec()) / 1000.0, 0.0)
+	var length: float = maxf(wash_in_sec, 0.0) + maxf(wash_out_sec, 0.0) + maxf(wash_sweep_sec, 0.0)
+	_wash_tween = create_tween()
+	if delay > 0.0:
+		_wash_tween.tween_interval(delay)
+	_wash_tween.tween_method(_set_wash_t, 0.0, length, maxf(length, 0.01))
+	_wash_tween.tween_callback(_set_wash_t.bind(-1.0))
+
+func is_wash_playing() -> bool:
+	return _wash_t >= 0.0
+
+func _set_wash_t(t: float) -> void:
+	_wash_t = t
+	_apply_wash()
+
+# Each card's wash at the clock: rising over wash_in_sec, falling over
+# wash_out_sec, its start wash_sweep_sec across the hand by its place.
+# Cards drawn meanwhile take it up as they arrive.
+func _apply_wash() -> void:
+	if not is_node_ready():
+		return
+	var views: Array[CardView] = _card_views()
+	for index in views.size():
+		var amount: float = 0.0
+		if _wash_t >= 0.0:
+			var place: float = float(index) / float(maxi(views.size() - 1, 1))
+			var local: float = _wash_t - place * maxf(wash_sweep_sec, 0.0)
+			if local > 0.0 and local < wash_in_sec:
+				amount = local / maxf(wash_in_sec, 0.001)
+			elif local >= wash_in_sec:
+				amount = 1.0 - clampf((local - wash_in_sec) / maxf(wash_out_sec, 0.001), 0.0, 1.0)
+		_set_card_wash(views[index], amount)
+
+# The card's wash panel, over the whole face in its rounded shape, made
+# the first time a wash reaches it.
+func _set_card_wash(card_view: CardView, amount: float) -> void:
+	var panel := card_view.get_node_or_null(^"Wash") as Panel
+	if panel == null:
+		if amount <= 0.0:
+			return
+		panel = Panel.new()
+		panel.name = "Wash"
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+		var style := StyleBoxFlat.new()
+		style.set_corner_radius_all(card_view.corner_radius)
+		panel.add_theme_stylebox_override("panel", style)
+		card_view.add_child(panel)
+	var wash_style := panel.get_theme_stylebox("panel") as StyleBoxFlat
+	if wash_style != null:
+		wash_style.bg_color = Color(wash_color, clampf(wash_peak_alpha, 0.0, 1.0) * clampf(amount, 0.0, 1.0))
+	panel.visible = amount > 0.0
+
 func _card_views() -> Array[CardView]:
 	var views: Array[CardView] = []
 	for slot in _slots:

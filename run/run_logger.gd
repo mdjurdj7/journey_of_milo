@@ -142,12 +142,19 @@ class_name RunLogger
 # "card" kept for the turn's end, whether it was "playable" then, and the
 # "energy" Sheathe cost.
 
+# Format 18 (2026-10-22): Dying Light reworked - the first time each turn
+# the Wanderer crosses his Critical line, Energy and a draw. Event
+# "dying_light", a detail line: the "fight" and "turn" it resolved in,
+# the "direction" crossed ("in" to Critical, "out" of it), and whether it
+# was "deferred" - crossed on the enemy's turn, resolved as his next one
+# started. The old turn-start Energy while Critical is gone.
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 17
+const FORMAT_VERSION := 18
 # Lines that aren't choices (_write_detail()) - a run made of nothing else
 # is still an empty one.
-const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark", "collector_stock"]
+const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark", "collector_stock", "dying_light"]
 
 # The switch - RegionField.run_logging_enabled pushes it here.
 static var enabled: bool = true
@@ -765,6 +772,11 @@ static func rarity_name(card: CardData) -> String:
 		return ""
 	var key: Variant = CardData.CardRarity.find_key(card.rarity)
 	return String(key).to_lower() if key != null else ""
+
+# Dying Light resolved: the crossing's direction ("in"/"out") and whether
+# it waited out the enemy's turn. A detail line, not a choice.
+static func dying_light(direction: String, deferred: bool) -> void:
+	_write_detail("dying_light", {"fight": _fights, "turn": _turn, "direction": direction, "deferred": deferred})
 
 # The collector screen's first open on a floor: what it lists and the
 # gold to pay with. A detail line, not a choice.

@@ -6,9 +6,10 @@
 script = ExtResource("1_status_data")
 id = "dying_light"
 display_name = "Dying Light"
-description = "While Critical, gain {energy} Energy at the start of your turn."
+description = "The first time each turn you cross your Critical line, gain {energy} Energy. Draw {draw}."
 category = 2
 default_duration_turns = -1
 stack_rule = 3
-turn_start_energy_while_critical = 1
+crossing_energy = 1
+crossing_draw = 2
 blocks_reapply_while_held = true

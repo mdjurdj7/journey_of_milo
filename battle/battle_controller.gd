@@ -1513,6 +1513,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 		await _land_extra_hits()
 	if _replay_pending:
 		await _replay_attack(target_enemy)
+	# A crossing the card (or its replay) made: Dying Light now.
+	_resolve_crossings()
 	deck.end_play()
 	# A CONSUMED card leaves the run's deck when this fight ends: its play
 	# is a choice the run log keeps on its own line, whatever the card.
@@ -2203,6 +2205,9 @@ func _log_status_gained(enemy: FieldEnemy, status: StatusData) -> void:
 # cap) see three separate hits, as they always did.
 func _run_enemy_turn() -> void:
 	_enemy_phase = true
+	# The player's turn is over: a crossing from here on is the next one's.
+	for crossing in Status.crossings(player.statuses):
+		crossing.crossing_spent = false
 	_signal_woken.clear()
 	_wake_unaided_dormant()
 	if _all_living_simultaneous():
@@ -2819,13 +2824,16 @@ func _start_player_turn() -> void:
 	player.block = mini(player.block, carry)
 	_enemy_phase = false
 	_player_turn += 1
+	# A crossing still waiting came on the enemy's turn: it resolves once
+	# this turn has drawn, as this turn's (_resolve_crossings()).
+	for crossing in Status.crossings(player.statuses):
+		if not crossing.crossing_pending.is_empty():
+			crossing.crossing_deferred = true
 	_multi_hit_draw_used = false
 	_card_count_draw_used = false
 	_skill_after_attack_draw_used = false
-	# The refill, Dying Light's 1 if the turn begins Critical - judged
-	# here, before any tick, so entering Critical later gives nothing
-	# until the next turn starts - and the Energy carried over, with any
-	# debt paid out of all of it.
+	# The refill and the Energy carried over, with any debt paid out of
+	# all of it.
 	var owed: int = Status.energy_debt(player.statuses)
 	var carried: int = _energy_carried
 	_energy_carried = 0
@@ -2937,6 +2945,34 @@ func _start_player_turn() -> void:
 
 	if not _check_battle_end():
 		_hand_container.draw_cards(turn_draw_amount)
+		# A crossing from the enemy's turn or this turn's ticks, after the
+		# turn's draw: its cards come in behind the hand's.
+		_resolve_crossings()
+
+# Each crossing status with a crossing waiting (Dying Light - Status.
+# _note_crossings()) resolves: its Energy, its draw, this turn's trigger
+# spent, a run-log line. The hand's wash plays once for all of them, as
+# their cards are drawn.
+func _resolve_crossings() -> void:
+	var due: Array[Status] = []
+	for crossing in Status.crossings(player.statuses):
+		if not crossing.crossing_pending.is_empty():
+			due.append(crossing)
+	if due.is_empty():
+		return
+	if _hand_container != null:
+		_hand_container.play_wash()
+	for crossing in due:
+		RunLogger.dying_light(crossing.crossing_pending, crossing.crossing_deferred)
+		print("BattleController: %s - crossed %s%s; +%d Energy, drawing %d." % [crossing.data.display_name, crossing.crossing_pending, " (deferred)" if crossing.crossing_deferred else "", crossing.data.crossing_energy, crossing.data.crossing_draw])
+		crossing.crossing_pending = ""
+		crossing.crossing_deferred = false
+		crossing.crossing_spent = true
+		if crossing.data.crossing_energy > 0:
+			player.energy += crossing.data.crossing_energy
+			energy_changed.emit(player.energy)
+		if crossing.data.crossing_draw > 0:
+			deck.draw(crossing.data.crossing_draw)
 
 func _check_battle_end() -> bool:
 	if player.hp <= 0:

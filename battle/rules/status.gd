@@ -23,6 +23,15 @@ var granted_by: String = ""
 # on - the one its enemy had queued as the card landed. It holds only
 # while that is still the intent queued (EnemyTurn.mark_loss()).
 var bound_intent: EnemyIntent = null
+# A crossing status's (StatusData.crossing_energy/_draw - Dying Light)
+# own record: whether its holder was Critical when last judged (-1: not
+# yet - the first look only takes the reading), the crossing waiting to
+# resolve ("in", "out", or "" for none), whether it waited out an enemy
+# turn, and whether this player turn's trigger is spent.
+var crossing_was_critical: int = -1
+var crossing_pending: String = ""
+var crossing_deferred: bool = false
+var crossing_spent: bool = false
 
 func _init(status_data: StatusData) -> void:
 	data = status_data
@@ -56,6 +65,11 @@ func apply_stack() -> void:
 func tick_duration() -> void:
 	if turns_remaining > 0:
 		turns_remaining -= 1
+
+# Whether this status resolves on a Critical crossing (StatusData.
+# crossing_energy/_draw - Dying Light).
+func is_crossing() -> bool:
+	return data != null and (data.crossing_energy > 0 or data.crossing_draw > 0)
 
 # Whether this status counts charges (StatusData.default_charges).
 func has_charges() -> bool:
@@ -138,7 +152,8 @@ func template_values(holder: Combatant = null) -> Dictionary:
 		"alone_bonus": data.grants_when_alone.attack_damage_bonus if data.grants_when_alone != null else 0,
 		"reduction": data.next_card_cost_reduction * stack_count,
 		"block": data.turn_start_block * stack_count,
-		"energy": data.turn_start_energy_while_critical,
+		"energy": data.crossing_energy,
+		"draw": data.crossing_draw,
 		"decay": data.tick_decay,
 		"times": times_word(1.0 + magnitude / 100.0),
 		"critical_percent": data.raises_critical_percent,
@@ -323,17 +338,6 @@ static func turn_start_block(statuses: Array[Status]) -> int:
 	for active in statuses:
 		if active.data != null and active.data.turn_start_block > 0:
 			total += active.data.turn_start_block * active.stack_count
-	return total
-
-# The Energy `statuses` add at the start of a turn begun Critical (or
-# not - `critical`): StatusData.turn_start_energy_while_critical, summed.
-static func turn_start_energy(statuses: Array[Status], critical: bool) -> int:
-	if not critical:
-		return 0
-	var total: int = 0
-	for active in statuses:
-		if active.data != null:
-			total += active.data.turn_start_energy_while_critical
 	return total
 
 # The highest Critical line `statuses` raise their holder's to (StatusData.
@@ -600,6 +604,7 @@ static func resolve_critical_triggers(holder: Combatant) -> void:
 	if holder == null:
 		return
 	holder.resolve_critical_entry()
+	_note_crossings(holder)
 	if not holder.is_critical():
 		return
 	for active in holder.statuses.duplicate():
@@ -607,6 +612,26 @@ static func resolve_critical_triggers(holder: Combatant) -> void:
 			continue
 		holder.statuses.erase(active)
 		apply_to(holder.statuses, active.data.grants_on_critical)
+
+# Each crossing status (Dying Light) on `holder` takes its reading: a
+# change since its last one is a crossing - kept to resolve unless one
+# already waits or this turn's is spent.
+static func _note_crossings(holder: Combatant) -> void:
+	var critical: int = 1 if holder.is_critical() else 0
+	for active in holder.statuses:
+		if not active.is_crossing():
+			continue
+		if active.crossing_was_critical >= 0 and critical != active.crossing_was_critical and active.crossing_pending.is_empty() and not active.crossing_spent:
+			active.crossing_pending = "in" if critical == 1 else "out"
+		active.crossing_was_critical = critical
+
+# The crossing statuses on `statuses` (Dying Light).
+static func crossings(statuses: Array[Status]) -> Array[Status]:
+	var found: Array[Status] = []
+	for active in statuses:
+		if active.is_crossing():
+			found.append(active)
+	return found
 
 # Its holder - an enemy - has just become the last of its pack
 # (EnemyTurn.leave_pack()): every status waiting for that (StatusData.
