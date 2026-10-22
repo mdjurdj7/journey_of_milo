@@ -849,6 +849,9 @@ func request_play(card_view: CardView) -> void:
 		return
 	if (_input_locked and not _play_in_flight) or _play_queued or _pending_card_view != null or _choice_open() or _look_open or card_view.card_data == null:
 		return
+	# A card out of the hand - played, fading - is no card to play.
+	if not deck.hand.has(card_view.card_data):
+		return
 	# Devour first: the card clicked is the one it eats, playable or not.
 	if _devour_picking:
 		_devour_picking = false
@@ -1413,12 +1416,16 @@ func _finish_turn(keep: Array[CardData]) -> void:
 #   the hand.
 func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: Array[CardView] = [], target_mound: int = -1) -> void:
 	if _play_in_flight or _swing_holds_next_play():
+		var targeted: bool = target_enemy != null
 		_play_queued = true
 		_emit_devour_changed()
 		while _play_in_flight or _swing_holds_next_play():
 			await get_tree().process_frame
 		_play_queued = false
-		if not _still_playable(card_view, target_enemy):
+		# Freed while it waited - the card, or its target's death ended -
+		# is gone: checked here, as a freed Object never passes
+		# _still_playable()'s typed arguments.
+		if not is_instance_valid(card_view) or (targeted and not is_instance_valid(target_enemy)) or not _still_playable(card_view, target_enemy):
 			if is_instance_valid(card_view):
 				card_view.release()
 				_return_if_look_card(card_view.card_data)

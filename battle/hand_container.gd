@@ -1054,6 +1054,9 @@ func play_card(card_data: CardData, _target_screen_pos: Vector2) -> void:
 
 	var card_view: CardView = slot.get_child(0) as CardView
 	card_view.mark_played()
+	# No more clicks while it fades: a click on it would play it again,
+	# queued behind its own play and freed under the queue.
+	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if _armed_slot == slot:
 		_armed_slot = null
 		armed_changed.emit(false)
