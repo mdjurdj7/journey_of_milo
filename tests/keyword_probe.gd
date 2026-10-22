@@ -391,8 +391,9 @@ func _check_compendium_below() -> void:
 	await _frames(5)
 	_completed += 1
 
-# The reward choice: a hovered card's longest definition (Not So's hover
-# note) sits below it on its slip, no wider than the card, on screen.
+# The reward choice: the longest definition, on a hovered card, sits below
+# it on its slip, no wider than the card, on screen. A card with its slips
+# off (CardData.keyword_slips - Not So) shows none.
 func _check_reward_below() -> void:
 	_run_state.call("new_run", load(CHARACTER_PATH))
 	var reward: Node = (load(REWARD_SCREEN_PATH) as PackedScene).instantiate()
@@ -409,20 +410,27 @@ func _check_reward_below() -> void:
 		view.set_card_data(load(NOT_SO_PATH) as CardData)
 		view.set_hovered(true)
 		await _frames(30)
+		_expect(not view.keyword_hover_allowed(), "Reward: a card with its slips off shows none")
+		view.set_card_data(load(SLASH_PATH) as CardData)
+		await _frames(5)
 		_expect(view.keyword_hover_allowed(), "Reward: a hovered choice card may define")
-		view.call("_show_keyword", view.card_data.card_name)
+		var longest: String = ""
+		for word: String in DEFINITIONS:
+			if longest.is_empty() or String(DEFINITIONS[word]).length() > String(DEFINITIONS[longest]).length():
+				longest = word
+		view.call("_show_keyword", longest)
 		await _frames(3)
 		var reveal: Rect2 = _reveal_rect(view)
 		var card_rect: Rect2 = _screen_rect(view)
 		_expect(view.keyword_reveal_below(), "Reward: below the card")
-		_expect(reveal.size.y > 0.0, "Reward: Not So's note has its lines")
+		_expect(reveal.size.y > 0.0, "Reward: %s's definition has its lines" % longest)
 		_expect(absf(reveal.position.y - (card_rect.end.y + view.keyword_reveal_gap_px)) <= 1.0, "Reward: the gap below the card (reveal %s, card %s)" % [reveal, card_rect])
 		_expect(reveal.size.x <= card_rect.size.x + 1.0, "Reward: no wider than the card (%.1f vs %.1f)" % [reveal.size.x, card_rect.size.x])
 		_expect(absf(reveal.get_center().x - card_rect.get_center().x) <= 1.0, "Reward: centred on it")
 		_expect(Rect2(Vector2.ZERO, root.get_visible_rect().size).encloses(reveal), "Reward: on screen (%s)" % reveal)
 		_expect_slip(view, "Reward")
 		var decline: Rect2 = reward.call("_decline_rect")
-		_expect(reveal.end.y < decline.position.y, "Reward: Not So's slip ends above NONE OF THESE (slip %s, NONE OF THESE %s)" % [reveal, decline])
+		_expect(reveal.end.y < decline.position.y, "Reward: the slip ends above NONE OF THESE (slip %s, NONE OF THESE %s)" % [reveal, decline])
 	reward.queue_free()
 	await _frames(5)
 	_completed += 1

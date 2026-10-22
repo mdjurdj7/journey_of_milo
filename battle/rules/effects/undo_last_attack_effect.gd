@@ -34,6 +34,13 @@ func resolve(_effect: CardEffect, ctx: EffectContext) -> void:
 	ctx.last_undo = {"intent": entry["intent"], "attacker": attacker, "restored": restored, "dealt": dealt, "grace_closed": grace_closed}
 	RunLogger.mechanic("undo", {"attack": entry["intent"], "enemy": RunLogger.combatant_id(attacker) if attacker != null else "", "restored": restored, "dealt": dealt, "grace_closed": grace_closed})
 
+# The HP undoing `entry` would give `player` back now: its HP, never past
+# max HP - what Not So's face names and the overlay's heal preview shows.
+static func restore_for(player: Combatant, entry: Dictionary) -> int:
+	if player == null or entry.is_empty():
+		return 0
+	return clampi(int(entry["hp"]), 0, maxi(player.max_hp - player.hp, 0))
+
 # `entry`'s share of the Grace window, if that window is still open and it
 # opened some: off the window's list, and the pool down to what the rest
 # of the window opened - the best other share (LARGEST_HIT), or less this

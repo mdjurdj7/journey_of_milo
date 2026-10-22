@@ -10,9 +10,11 @@ extends SceneTree
 # Attack (no Self-Eater), through its Block; a dead attacker takes
 # nothing, the HP comes back all the same. Blocked under 10 Toll or with
 # nothing to undo. The spend hurries a Sentence. The face reads the live
-# undo in a battle hand ("Undo 6 (Scissor); return it."), the rule
-# elsewhere or with nothing to undo, and its rules text answers the hover
-# with the card's note. Not So+ spends 7.
+# undo in a battle hand ("Undo Scissor (6); return it." -
+# the HP it would restore), the rule elsewhere or with nothing to undo, and
+# shows no keyword slips. While it is the hand's focus in a fight, the
+# overlay previews its heal over the Wanderer, gone on the play. Not So+
+# spends 7.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/not_so_probe.gd
 #
@@ -78,14 +80,14 @@ func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq([card.card_name, card.card_type, card.rarity, card.removal_scope, card.offer, card.card_class], ["Not So", CardData.CardType.SKILL, CardData.CardRarity.RARE, CardData.RemovalScope.SPENT, CardData.OfferScope.REWARDABLE, &"wanderer"], "Not So: a Rare Skill, Spent, rewardable, the Wanderer's")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.UNDO_LAST_ATTACK, "...SPEND_TOLL, then UNDO_LAST_ATTACK")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\n{battle}Undo {undo_hp} ({undo_attack}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}\nSpent.", "...its text")
-	_expect(card.hover_note.contains("deal that much to its attacker"), "...its hover note spells out 'return it'")
+	_expect_eq(card.description, "Spend {toll_cost} Toll.\n{battle}Undo {undo_attack} ({undo_hp}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}\nSpent.", "...its text")
+	_expect(not card.keyword_slips, "...no keyword slips")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...carrying its art")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Not So+")
 	_expect(tempered.art == card.art, "...which carries the same art")
-	_expect_eq([tempered.card_name, tempered.description], ["Not So+", card.description], "Not So+: the same text")
+	_expect_eq([tempered.card_name, tempered.description, tempered.keyword_slips], ["Not So+", card.description, false], "Not So+: the same text, no slips")
 	_completed += 1
 
 # An attack of 9 through 3 Block: on the record, 6, the Scissor, its
@@ -234,8 +236,8 @@ func _check_sentence_and_critical() -> void:
 	_completed += 1
 
 # Outside a fight, the rule; in a battle hand with the Scissor's 6 on the
-# record, the live undo; with nothing to undo, the rule again. The rules
-# text answers the hover with the card's note.
+# record, the live undo; with nothing to undo, the rule again. Inspected,
+# it still shows no keyword slips.
 func _check_face() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(view)
@@ -250,10 +252,10 @@ func _check_face() -> void:
 	player.block = 3
 	EnemyTurn.take_turn(_sputter(2), load(SPUTTER_PATH), player)
 	view.set_bonus_context(_ctx(player))
-	_expect_eq(view.rules_text.get_parsed_text(), "Spend 10 Toll.\nUndo 6 (Scissor); return it.\nSpent.", "...the Scissor's 6 on the record: the live undo")
+	_expect_eq(view.rules_text.get_parsed_text(), "Spend 10 Toll.\nUndo Scissor (6); return it.\nSpent.", "...the Scissor's 6 on the record: the live undo")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
-	var centre: Vector2 = view.rules_text.position + view.rules_text.size / 2.0
-	_expect_eq(view.keyword_at(centre), "Not So", "Hovering the rules text: the card's note")
+	view.set_keyword_inspect(true)
+	_expect(not view.keyword_hover_allowed(), "Inspected: no keyword slips")
 	view.free()
 	_completed += 1
 
@@ -293,9 +295,18 @@ func _check_fight() -> void:
 				if candidate.card_data == card:
 					view = candidate
 			_expect(view != null, "Not So dealt into the hand")
+			# The hand's focus on it: its heal, previewed over the Wanderer.
+			var overlay: Node = _field.get_node("BattleLayer").get_child(0)
+			var heal: int = UndoLastAttackEffect.restore_for(player, entry)
+			overlay.call("_on_cost_focus_changed", card)
+			var preview: FloatingNumber = overlay.call("get_heal_preview")
+			_expect(preview != null and preview.visible and preview.text == FloatingNumber.text_for(FloatingNumber.KIND_HEAL, heal), "Not So the focus: its +%d previewed" % heal)
+			if preview != null:
+				_expect(preview.modulate.a < 1.0, "...faint (%.2f)" % preview.modulate.a)
 			if view != null:
 				controller.call("request_play", view)
 				await ProbePlay.settle(self, controller)
+			_expect(preview == null or not preview.visible, "...gone on the play")
 			_expect_eq(player.hp - before, int(entry["hp"]), "Not So: the %s's %d back" % [entry["intent"], int(entry["hp"])])
 			_expect_eq(attacker_hp - attacker.hp, int(entry["hp"]), "...as much to its attacker")
 			_expect((deck.get("exhaust_pile") as Array).has(card), "...and Not So Spent")

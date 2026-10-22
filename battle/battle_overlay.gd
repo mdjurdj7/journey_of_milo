@@ -28,6 +28,19 @@ signal battle_finished(outcome: Outcome)
 # The Wanderer's numbers sit this far, in pixels, over the top of his
 # model (Wanderer.get_head_height()) - clear of his HP bar under his feet.
 @export var wanderer_number_over_head_px: float = 10.0
+# While Not So is the hand's focus (armed, else hovered) and can be played
+# with an attack to undo: the heal it would give, a still "+N" in the
+# floating numbers' own heal style (FloatingNumber.KIND_HEAL), where his
+# numbers land, moved by heal_preview_offset_px, at heal_preview_alpha -
+# no pop, no rise. Gone on unhover and on the play. Both re-apply live.
+@export_range(0.0, 1.0) var heal_preview_alpha: float = 0.35:
+	set(value):
+		heal_preview_alpha = value
+		_refresh_heal_preview()
+@export var heal_preview_offset_px: Vector2 = Vector2.ZERO:
+	set(value):
+		heal_preview_offset_px = value
+		_refresh_heal_preview()
 # Every card's own shared "played" cue (see _on_card_played()) - fires the
 # instant a card commits to play, independent of that card's own
 # impact_time delay (the swing and the enemy's contact crack are the
@@ -322,6 +335,11 @@ var _cost_preview_held: bool = false
 # (BattleController.play_resolved) - later than the pips, whose Energy is
 # spent at the commit. See _refresh_hp_cost_preview().
 var _hp_preview_held: bool = false
+# Not So's heal preview (heal_preview_alpha), made on first use; held off
+# from a play until the focus next moves.
+var _heal_preview: FloatingNumber = null
+var _heal_preview_held: bool = false
+var _heal_preview_value: int = -1
 var _card_draw_players: Array[AudioStreamPlayer] = []
 var _card_draw_next: int = 0
 # The per-card override's player, made on first use - see _on_card_played().
@@ -491,6 +509,10 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	# A play holds the outlined pips until its energy_changed turns them
 	# spent.
 	battle_controller.card_played.connect(func(_card: CardData, _target: FieldEnemy) -> void: _cost_preview_held = true)
+	# A play takes the heal preview down - its own heal number lands instead.
+	battle_controller.card_played.connect(func(_card: CardData, _target: FieldEnemy) -> void:
+		_heal_preview_held = true
+		_refresh_heal_preview())
 	battle_controller.card_played.connect(func(_card: CardData, _target: FieldEnemy) -> void:
 		_hp_preview_held = true
 		if _field_hp_bar != null:
@@ -838,6 +860,7 @@ func _on_energy_changed(current: int) -> void:
 
 func _on_cost_focus_changed(card: CardData) -> void:
 	_cost_focus = card
+	_heal_preview_held = false
 	_refresh_cost_preview()
 
 # The focused card's cost as outlined pips - the fight's own reading of
@@ -846,6 +869,7 @@ func _on_cost_focus_changed(card: CardData) -> void:
 # play holds what it showed until its energy_changed.
 func _refresh_cost_preview() -> void:
 	_refresh_hp_cost_preview()
+	_refresh_heal_preview()
 	if _resources == null or battle_controller == null or battle_controller.player == null:
 		return
 	if _cost_preview_held:
@@ -873,6 +897,55 @@ func _refresh_hp_cost_preview() -> void:
 	if _cost_focus != null and not battle_controller.is_armed_for_devour_only() and battle_controller.player.can_pay(_cost_focus):
 		loss = CardBonus.predicted_self_loss(_cost_focus, battle_controller.preview_context())
 	_field_hp_bar.set_cost_preview(loss)
+
+# Not So's heal over the Wanderer, while it is the focus and playable now
+# (Combatant.can_pay(), EffectResolver.card_blocked() - which holds it
+# back with nothing to undo): UndoLastAttackEffect.restore_for() of the
+# attack it would undo, "+N" when that is above 0. Re-read with the focus
+# and the hand's faces; placed each frame while it shows (_process()).
+func _refresh_heal_preview() -> void:
+	var heal: int = _heal_preview_amount()
+	if heal <= 0:
+		if _heal_preview != null:
+			_heal_preview.visible = false
+		return
+	if _heal_preview == null:
+		_heal_preview = (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
+		_heal_preview.name = "HealPreview"
+		add_child(_heal_preview)
+	if heal != _heal_preview_value:
+		_heal_preview_value = heal
+		_heal_preview.measure(FloatingNumber.KIND_HEAL, heal)
+	_heal_preview.modulate.a = clampf(heal_preview_alpha, 0.0, 1.0)
+	_heal_preview.visible = true
+	_place_heal_preview()
+
+# The preview's bottom centre where his numbers land, moved by heal_
+# preview_offset_px - re-placed each frame it shows, as he moves.
+func _place_heal_preview() -> void:
+	if _heal_preview == null or not _heal_preview.visible:
+		return
+	_heal_preview.position = _screen_pos_for_damage_target("player") - Vector2(_heal_preview.size.x / 2.0, _heal_preview.size.y) + heal_preview_offset_px
+
+# What the focus card would heal now as Not So - 0 for any other card,
+# one that can't be played, or while a play holds it off.
+func _heal_preview_amount() -> int:
+	if _heal_preview_held or _cost_focus == null or battle_controller == null or battle_controller.player == null:
+		return 0
+	if not is_inside_tree() or battle_controller.is_armed_for_devour_only():
+		return 0
+	var undoes: bool = false
+	for effect in _cost_focus.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.UNDO_LAST_ATTACK:
+			undoes = true
+	var player: Combatant = battle_controller.player
+	if not undoes or not player.can_pay(_cost_focus) or EffectResolver.card_blocked(_cost_focus, player):
+		return 0
+	return UndoLastAttackEffect.restore_for(player, player.last_undoable_hit())
+
+# For probes: Not So's heal preview, or null before the first.
+func get_heal_preview() -> FloatingNumber:
+	return _heal_preview
 
 func _on_toll_changed(new_toll: int) -> void:
 	# A gain counts up and shows its "+N" at the readout (HPBar.update_toll()).
@@ -1017,6 +1090,7 @@ func _push_bonus_context() -> void:
 		return
 	hand_container.set_bonus_context(battle_controller.preview_context())
 	_refresh_hp_cost_preview()
+	_refresh_heal_preview()
 
 # The hand back to the battle as it stands, then - while a card is armed
 # and the cursor is over an enemy - that card's face aimed at it. Over no
@@ -1107,6 +1181,7 @@ func _place_choice_prompt() -> void:
 		_choice_done.global_position = Vector2(left + _choice_prompt.size.x + choice_done_gap_px, _choice_prompt.global_position.y + (_choice_prompt.size.y - _choice_done.size.y) / 2.0)
 
 func _process(_delta: float) -> void:
+	_place_heal_preview()
 	_place_choice_prompt()
 	_sync_mound_plates()
 	_lay_out_readouts()
@@ -1808,6 +1883,8 @@ func _on_debug_add_energy_pressed() -> void:
 # battle style (and the field DeckPanel come back) before region_field.gd
 # reacts to battle_finished and frees this overlay.
 func _finish_battle(outcome: Outcome) -> void:
+	_heal_preview_held = true
+	_refresh_heal_preview()
 	# No Dig spray outlives the fight.
 	if battle_controller != null:
 		for enemy in battle_controller.enemies:

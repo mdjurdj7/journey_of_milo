@@ -21,10 +21,10 @@ card_type = 1
 rarity = 3
 target_type = 1
 description = "Spend {toll_cost} Toll.
-{battle}Undo {undo_hp} ({undo_attack}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}
+{battle}Undo {undo_attack} ({undo_hp}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_undo")])
 removal_scope = 1
 art = ExtResource("9_art")
 card_class = &"wanderer"
-hover_note = "Undo: the HP the last enemy attack that hit you took - every hit of it, past your Block; not one undone before - comes back, and that attack's Grace closes. Return it: deal that much to its attacker. Not an Attack: it meets the attacker's Block, and nothing adds to it."
+keyword_slips = false

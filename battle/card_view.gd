@@ -125,10 +125,11 @@ const TOKEN_REDUCTION := "{reduction}"
 # Sentence): the turns it starts at and what it deals.
 const TOKEN_COUNTDOWN_TURNS := "{countdown_turns}"
 const TOKEN_COUNTDOWN_DAMAGE := "{countdown_damage}"
-# What an UNDO_LAST_ATTACK (Not So) would undo now: the HP and the move of
-# the newest enemy attack on the player's record not yet undone (Combatant.
-# last_undoable_hit()). With none, the face shows its {outside} rule (it
-# has no {none} block).
+# What an UNDO_LAST_ATTACK (Not So) would undo now: the HP it would restore
+# (UndoLastAttackEffect.restore_for()) and the move of the newest enemy
+# attack on the player's record not yet undone (Combatant.last_undoable_
+# hit()). With none, the face shows its {outside} rule (it has no {none}
+# block).
 const TOKEN_UNDO_HP := "{undo_hp}"
 const TOKEN_UNDO_ATTACK := "{undo_attack}"
 # The Attack a REPLAY_LAST_ATTACK (Second Swing) would replay now - the
@@ -906,7 +907,7 @@ func _resolve_tokens(description: String) -> String:
 	if text.contains(TOKEN_UNDO_HP) or text.contains(TOKEN_UNDO_ATTACK):
 		var undo: Dictionary = _undo_preview()
 		if not undo.is_empty():
-			text = text.replace(TOKEN_UNDO_HP, str(int(undo["hp"]))).replace(TOKEN_UNDO_ATTACK, str(undo["intent"]))
+			text = text.replace(TOKEN_UNDO_HP, str(UndoLastAttackEffect.restore_for(_bonus_context.player, undo))).replace(TOKEN_UNDO_ATTACK, str(undo["intent"]))
 	if text.contains(TOKEN_COUNTDOWN_TURNS) or text.contains(TOKEN_COUNTDOWN_DAMAGE):
 		for effect in card_data.effects:
 			if effect != null and effect.status_data != null and effect.status_data.countdown_damage > 0:
@@ -1687,7 +1688,7 @@ func get_screen_rect_now() -> Rect2:
 # nothing is armed, or on a card a host has up for inspection - never on
 # an armed card.
 func keyword_hover_allowed() -> bool:
-	if card_data == null or _armed or _keyword_hover_blocked:
+	if card_data == null or not card_data.keyword_slips or _armed or _keyword_hover_blocked:
 		return false
 	if _keyword_inspect:
 		return true
@@ -1748,10 +1749,6 @@ func keyword_at(local_pos: Vector2) -> String:
 			return SHEATHED_KEYWORD if _kept_once else KEEP_KEYWORD
 	if strike_label_rect().has_point(local_pos):
 		return STRIKE_LABEL_WORD
-	# A card with a hover note (CardData.hover_note - Not So): anywhere on
-	# its rules text, the note, under the card's name.
-	if card_data != null and not card_data.hover_note.is_empty() and rules_text != null and Rect2(rules_text.position, rules_text.size).has_point(local_pos):
-		return card_data.card_name
 	return ""
 
 # The STRIKE type label's drawn word and the hit pad round it, in this
@@ -1882,8 +1879,6 @@ func _show_keyword(word: String) -> void:
 	var definition: String = strike_label_definition if word == STRIKE_LABEL_WORD else (copy_label_definition if word == COPY_KEYWORD else KeywordTable.shared().definition(word))
 	if word == SHEATHED_KEYWORD:
 		definition = sheathed_label_definition
-	if card_data != null and word == card_data.card_name and not card_data.hover_note.is_empty():
-		definition = card_data.hover_note
 	_keyword_reveal.set_bone(field_color)
 	_keyword_reveal.set_max_width(keyword_reveal_max_width())
 	_keyword_reveal.set_lines(PackedStringArray([word]), PackedStringArray([definition]))

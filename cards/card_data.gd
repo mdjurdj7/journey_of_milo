@@ -152,10 +152,10 @@ var battle_copy: bool = false
 # the F1 card pickers. A deck that already holds it keeps it; card_smoke
 # still plays it so it doesn't rot.
 @export var benched: bool = false
-# What hovering this card's rules text says, under its name, when its
-# face is too short to spell out a rule (Not So's "return it": deal that
-# much to its attacker). Empty: the rules text answers only its keywords.
-@export_multiline var hover_note: String = ""
+# Whether hovering this card's face shows keyword definitions (CardView.
+# keyword_hover_allowed()). Off: none at all, in hand or inspected - Not
+# So, whose face names what it undoes instead.
+@export var keyword_slips: bool = true
 
 # Whether this card carries `tag`.
 func has_tag(tag: StringName) -> bool:
