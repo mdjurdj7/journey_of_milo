@@ -6,7 +6,7 @@
 [sub_resource type="Resource" id="E_block"]
 script = ExtResource("2_card_effect")
 effect_type = 1
-value = 12
+value = 8
 
 [resource]
 script = ExtResource("1_card_data")
@@ -17,3 +17,4 @@ card_type = 1
 target_type = 1
 description = "Gain {block} block."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_block")])
+offer = 1

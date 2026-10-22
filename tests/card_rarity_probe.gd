@@ -105,7 +105,7 @@ const EXPECTED_POOL: Array[String] = [
 	"Gnaw", "Settled Account", "Reckoning", "In the Red", "Go Under", "Twice Over",
 	"Not So", "Take In", "On the Brink", "Nothing Left", "Owed Time", "Wrest", "Thick Skin",
 ]
-const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment",
+const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment", "Endure",
 	"Cut", "Guard", "Step Back", "Measured Cut", "Severance"]
 
 var _failures: int = 0
