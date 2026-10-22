@@ -964,9 +964,15 @@ func _resolve_tokens(description: String) -> String:
 		var bonus_damage: int = _bonus_effect_value(card_data, DAMAGE_EFFECT_TYPES)
 		if bonus_damage >= 0:
 			# The {if} half's bonus - on a Critical card, as if Critical.
-			if card_data.card_type == CardData.CardType.ATTACK:
-				bonus_damage += _attack_bonus_for_half(true)
-			bonus_damage = _landed(bonus_damage, _damage_reaches_all(true))
+			var attack_bonus: int = _attack_bonus_for_half(true) if card_data.card_type == CardData.CardType.ATTACK else 0
+			if _bonus_effect_adds(card_data, DAMAGE_EFFECT_TYPES):
+				# An ADD's number is what it puts on the hit as it lands: the
+				# whole hit with it, less the hit without - never the attack
+				# bonus a second time.
+				var base: int = _effect_value(card_data, DAMAGE_EFFECT_TYPES) + attack_bonus + _chain_bonus(DAMAGE_EFFECT_TYPES) + _energy_bonus(DAMAGE_EFFECT_TYPES)
+				bonus_damage = _landed(base + bonus_damage, _damage_reaches_all(true)) - _landed(base, _damage_reaches_all(true))
+			else:
+				bonus_damage = _landed(bonus_damage + attack_bonus, _damage_reaches_all(true))
 			text = text.replace(TOKEN_ALT_DAMAGE, str(bonus_damage)).replace(TOKEN_BONUS_DAMAGE, str(bonus_damage))
 	# Under a stance that forbids Block (Last Resort, while Critical at the
 	# HP this card leaves - as _attack_bonus_preview() judges it) every
@@ -1262,6 +1268,16 @@ func _bonus_effect_value(data: CardData, types: Array) -> int:
 			continue
 		return CardBonus.bonus_value(effect)
 	return -1
+
+# Whether that first conditional effect is an ADD (CardBonus.Mode.ADD).
+func _bonus_effect_adds(data: CardData, types: Array) -> bool:
+	for effect in data.effects:
+		if effect == null or not types.has(effect.effect_type):
+			continue
+		if effect.condition == CardEffect.Condition.NONE:
+			continue
+		return CardBonus.mode(effect) == CardBonus.Mode.ADD
+	return false
 
 # Whether any previewable conditional on this card is a REPLACE - the
 # one mode where the base sentence itself stops applying when the
