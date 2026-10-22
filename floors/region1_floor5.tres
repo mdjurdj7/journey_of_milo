@@ -20,8 +20,8 @@ enemy_data = ExtResource("7_greyshelf")
 height_offset_m = 0.85
 stance_gap_m = 2.635
 holds_facing = true
-phase_drop_offset = Vector2(5.013, 1.334)
-phase_drop_frame_offset = Vector2(5.174, -0.53)
+phase_drop_offset = Vector2(4.681, 1.285)
+phase_drop_frame_offset = Vector2(4.842, -0.579)
 battle_frame_screen = Vector2(0.3, 0.55)
 yaw_degrees = -174.13
 card_reward = 1
@@ -33,7 +33,7 @@ position = Vector3(0.071, 0, 0.686)
 yaw_degrees = 95.87
 overrides = {
 "colour_map_path": "res://assets/models/props/crest rock/crest_rock_albedo.png",
-"model_scale": Vector3(1.2, 1, 1.6),
+"model_scale": Vector3(1.056, 1, 1.408),
 "model_scene_path": "res://assets/models/props/crest rock/crest_rock.glb",
 "sink_depth": 0.1
 }

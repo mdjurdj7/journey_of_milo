@@ -39,4 +39,4 @@ model_scale = 1.197
 attachment_scene_path = "res://field/greyshelf_pose.tscn"
 painted_albedo_path = "res://assets/models/enemies/Greyshelf/Greyshelf_colour.png"
 sink_m = 0.05
-contact_radius_m = 4.4
+contact_radius_m = 3.98
