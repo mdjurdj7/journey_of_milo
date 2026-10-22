@@ -126,7 +126,7 @@ var _ink: Color = Color.BLACK
 var _label_font_tracked: Font = null
 
 # The DeckView this line currently has open, if any - see
-# _toggle_deck_view()'s own doc. Cleared via DeckView.closed, not just by
+# toggle_deck_view()'s own doc. Cleared via DeckView.closed, not just by
 # this line's own toggle-close, so it stays accurate whether the view
 # closed via this line, a scrim click, or Escape.
 var _deck_view_instance: DeckView = null
@@ -337,13 +337,14 @@ func _draw_backing() -> void:
 
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_toggle_deck_view()
+		toggle_deck_view()
 		get_viewport().set_input_as_handled()
 
 # Toggle, not always-open: clicking while a view from this line is
 # already open closes that one instead of stacking a second on top of it
-# (each with its own scrim, needing its own Escape).
-func _toggle_deck_view() -> void:
+# (each with its own scrim, needing its own Escape). The field's deck key
+# (RegionField.deck_view_key) toggles the same way.
+func toggle_deck_view() -> void:
 	if _deck_view_instance != null and is_instance_valid(_deck_view_instance):
 		_deck_view_instance.close()
 		return

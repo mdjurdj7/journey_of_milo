@@ -463,6 +463,14 @@ static func reset_hold_line_spoken() -> void:
 @export var wade_drain_rate_per_metre: float = 30.0
 @export var wade_drain_max_per_second: float = 15.0
 
+@export_group("Deck View")
+# Toggles the whole deck, grouped, as the HUD's DECK line opens it
+# (DeckPanel.toggle_deck_view()); Escape closes it too (DeckView). Only out
+# of a fight with the HUD row showing - and never under a screen or a
+# plate, which freeze this node and its input with it.
+@export var deck_view_key: Key = KEY_C
+@export_group("")
+
 @export_group("Point To Move")
 # A click on the field sends the Wanderer walking (see Wanderer.
 # set_move_target()). An enemy is picked first, by its projected model
@@ -1015,6 +1023,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_debug_row.visible = not _debug_row.visible
 		if _debug_row.visible and _debug_card_picker.item_count == 0:
 			_fill_debug_card_picker()
+		get_viewport().set_input_as_handled()
+		return
+	if key != null and key.pressed and not key.echo and key.keycode == deck_view_key and not _battle_open and deck_panel != null and deck_panel.is_visible_in_tree():
+		deck_panel.toggle_deck_view()
 		get_viewport().set_input_as_handled()
 		return
 	if not (event is InputEventMouseButton):
