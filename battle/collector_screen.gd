@@ -434,12 +434,14 @@ enum Kind { WORN, KEEPSAKE, WEAPON, REMOVAL, BEDROLL }
 	set(value):
 		back_text = value
 		_refresh_inspect()
-# A card looked at: the fog's veil deepened to this, the card at
-# inspect_card_scale centred on the column, its centre at inspect_centre_
-# fraction of the height, TAKE FOR and BACK under it.
-@export_range(0.0, 1.0) var inspect_veil_alpha: float = 0.6:
+# Anything looked at - a card, or a good's plate (ArmorExamine) - is
+# alone at full contrast: the rest of the shop sits under a scrim of the
+# fog's own colour at this alpha. A card is then at inspect_card_scale
+# centred on the column, its centre at inspect_centre_fraction of the
+# height, TAKE FOR and BACK under it.
+@export_range(0.0, 1.0) var examine_scrim_alpha: float = 0.7:
 	set(value):
-		inspect_veil_alpha = value
+		examine_scrim_alpha = value
 		_apply_veil()
 @export var inspect_card_scale: float = 1.0:
 	set(value):
@@ -973,9 +975,15 @@ func _apply_veil() -> void:
 	_gradient.offsets = PackedFloat32Array([0.0, start, end, 1.0])
 	_gradient.colors = PackedColorArray([left, left, right, right])
 	if _inspect_veil != null:
-		var deep: Color = _fog
-		deep.a = inspect_veil_alpha
-		_inspect_veil.color = deep
+		_inspect_veil.color = _examine_scrim()
+	if _offer_open():
+		_offer.scrim_color = _examine_scrim()
+
+# The scrim under whatever is looked at: the fog at examine_scrim_alpha.
+func _examine_scrim() -> Color:
+	var scrim: Color = _fog
+	scrim.a = examine_scrim_alpha
+	return scrim
 
 func _text(canvas: CanvasItem, font: Font, text: String, origin: Vector2, size_px: int, color: Color) -> float:
 	if font == null or text.is_empty():
@@ -1554,6 +1562,7 @@ func _open_offer(line: Dictionary) -> void:
 	var price: int = _line_price(line)
 	_offer = ArmorExamine.new()
 	_offer.name = "GoodOffer"
+	_offer.scrim_color = _examine_scrim()
 	match kind:
 		Kind.BEDROLL:
 			_offer.setup_bedroll(line["bedroll"], true)

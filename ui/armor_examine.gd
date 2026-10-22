@@ -36,7 +36,12 @@ signal closed(taken: bool)
 
 @export var examine_scale: float = 1.0
 @export var inspect_duration_sec: float = 0.15
-@export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)
+# A host may set its own (the collector's: its fog) - re-applied live.
+@export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35):
+	set(value):
+		scrim_color = value
+		if _scrim != null:
+			_scrim.color = value
 @export var reveal_scale: float = 1.6
 @export var reveal_duration_sec: float = 0.3
 
