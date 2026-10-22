@@ -5,3 +5,4 @@
 [node name="HPBar" type="Control"]
 mouse_filter = 2
 script = ExtResource("1_hp_bar")
+battle_bar_height = 6.0
