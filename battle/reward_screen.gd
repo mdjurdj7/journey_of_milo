@@ -59,14 +59,35 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 # actions sit; the whole list lifts clear of the Wanderer rather than
 # cross him (see _above_wanderer()).
 @export_group("Column")
-@export var column_width: float = 300.0
+# Wide enough for the Greyshelf's Tail's line on one row - its art, its
+# name and CHOOSE in its column.
+@export var column_width: float = 420.0:
+	set(value):
+		column_width = value
+		_redraw()
 @export var header_text: String = "LEFT BEHIND"
 @export var header_size_px: int = 22
 @export_range(0.0, 1.0) var header_tracking_em: float = 0.16
 @export var header_gap_px: float = 28.0
 # Each line: Spectral item text on the left, a tracked caps action on the
-# right, a hairline under both.
-@export var line_height_px: float = 44.0
+# right, a hairline under both. The action has a column of its own,
+# action_column_px wide at the column's right (its label right-aligned in
+# it, the focus hairline's room included), that the item text never
+# enters: the text wraps in what is left, to item_max_lines and then an
+# ellipsis, and a wrapped line's row grows by its extra lines - nothing
+# overlaps, nothing is squeezed.
+@export var line_height_px: float = 44.0:
+	set(value):
+		line_height_px = value
+		_redraw()
+@export var action_column_px: float = 152.0:
+	set(value):
+		action_column_px = value
+		_redraw()
+@export var item_max_lines: int = 2:
+	set(value):
+		item_max_lines = value
+		_redraw()
 @export var item_size_px: int = 26
 @export var action_size_px: int = 22
 @export_range(0.0, 1.0) var action_tracking_em: float = 0.16
@@ -487,7 +508,7 @@ func _column_left() -> float:
 # Centred on the window, header to WALK ON's row - lifted clear of the
 # Wanderer where it would cross him.
 func _column_top() -> float:
-	var rows_height: float = float(_lines.size() + 1) * line_height_px
+	var rows_height: float = _rows_height() + line_height_px
 	var total: float = float(header_size_px) + header_gap_px + rows_height
 	return _above_wanderer((_draw_layer.size.y - total) / 2.0, total)
 
@@ -499,7 +520,7 @@ func _dismiss_rect() -> Rect2:
 	return _walk_on_rect()
 
 func _last_line_bottom() -> float:
-	return _column_top() + float(header_size_px) + header_gap_px + float(_lines.size()) * line_height_px
+	return _column_top() + float(header_size_px) + header_gap_px + _rows_height()
 
 # WALK ON's label, right-aligned on the column as the lines' actions are.
 func _walk_on_label_left() -> float:
@@ -548,34 +569,48 @@ func _draw_column() -> void:
 	var y: float = top + float(header_size_px) + header_gap_px
 	for index in _lines.size():
 		var line: RewardLine = _lines[index]
-		line.rect = Rect2(left, y, column_width, line_height_px)
+		var paragraph: TextParagraph = _item_paragraph(line)
+		var row_height: float = _row_height(paragraph)
+		line.rect = Rect2(left, y, column_width, row_height)
 		var text_baseline: float = y + line_height_px * 0.62
 		var color: Color = bone
 		if line.taken:
 			color.a = taken_alpha
 		var item_left: float = left + _draw_line_icon(line, left, text_baseline, color)
-		_text(_item_font, line.item, Vector2(item_left, text_baseline), item_size_px, color)
+		var item_origin := Vector2(item_left, text_baseline - paragraph.get_line_ascent(0))
+		if text_outline_px > 0:
+			var outline: Color = ink
+			outline.a = ink.a * color.a
+			paragraph.draw_outline(_draw_layer.get_canvas_item(), item_origin, text_outline_px, outline)
+		paragraph.draw(_draw_layer.get_canvas_item(), item_origin, color)
+		# The action centred on the row - on the text's baseline when it is
+		# one line.
+		var action_baseline: float = y + (row_height - line_height_px) * 0.5 + line_height_px * 0.62
 		var action_width: float = InkType.width(_action_font, line.action, action_size_px)
 		var action_left: float = left + column_width - action_width
 		var focused: bool = _hovered == index and not line.taken
 		var action_color: Color = color
 		if not line.taken:
 			action_color = bone if focused else choice_unfocused_color
-		_text(_action_font, line.action, Vector2(action_left, text_baseline), action_size_px, action_color)
+		_text(_action_font, line.action, Vector2(action_left, action_baseline), action_size_px, action_color)
 		if focused:
-			_draw_hairline(action_left, text_baseline, action_size_px)
+			_draw_hairline(action_left, action_baseline, action_size_px)
 
 		var rule_color: Color = bone
 		rule_color.a = rule_alpha * (taken_alpha if line.taken else 1.0)
 		var thickness: float = rule_hover_px if (_hovered == index and not line.taken) else rule_px
-		_draw_layer.draw_rect(Rect2(left, y + line_height_px - thickness, column_width, thickness), rule_color)
+		_draw_layer.draw_rect(Rect2(left, y + row_height - thickness, column_width, thickness), rule_color)
 
 		if line.taken:
 			# Struck through the text itself, not the rule - the offer is
-			# crossed off, the line it sat on is still there.
-			var strike_y: float = text_baseline - float(item_size_px) * 0.3
-			_draw_layer.draw_rect(Rect2(left, strike_y, column_width, strike_px), color)
-		y += line_height_px
+			# crossed off, the line it sat on is still there. A strike for
+			# each line of a wrapped one.
+			var line_top: float = item_origin.y
+			for text_line in _shown_lines(paragraph):
+				var strike_y: float = line_top + paragraph.get_line_ascent(text_line) - float(item_size_px) * 0.3
+				_draw_layer.draw_rect(Rect2(left, strike_y, column_width, strike_px), color)
+				line_top += paragraph.get_line_size(text_line).y
+		y += row_height
 
 	var walk_on_focused: bool = _hovered == _walk_on_index()
 	var walk_on_left: float = _walk_on_label_left()
@@ -613,6 +648,48 @@ func _draw_line_icon(line: RewardLine, left: float, baseline: float, color: Colo
 	])
 	_draw_layer.draw_polyline(points, color, glassbone_glyph_width_px, true)
 	return width + glassbone_icon_gap_px
+
+# How far a line's text sits right of the column's left for its icon or
+# shard - _draw_line_icon()'s return, without drawing.
+func _icon_advance(line: RewardLine) -> float:
+	var height: float = float(item_size_px) * glassbone_icon_size_em
+	if line.icon != null:
+		var icon_size: Vector2 = line.icon.get_size()
+		return height * (icon_size.x / maxf(icon_size.y, 1.0)) + glassbone_icon_gap_px
+	if line.shard_glyph:
+		return height * 0.5 + glassbone_icon_gap_px
+	return 0.0
+
+# A line's item text, wrapped in the room its icon and the action column
+# leave, to item_max_lines and then an ellipsis.
+func _item_paragraph(line: RewardLine) -> TextParagraph:
+	var paragraph := TextParagraph.new()
+	paragraph.width = maxf(column_width - action_column_px - _icon_advance(line), 1.0)
+	paragraph.max_lines_visible = maxi(item_max_lines, 1)
+	paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
+	paragraph.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	paragraph.add_string(line.item, _item_font, item_size_px)
+	return paragraph
+
+func _shown_lines(paragraph: TextParagraph) -> int:
+	return maxi(mini(paragraph.get_line_count(), paragraph.max_lines_visible), 1)
+
+# A row: line_height_px, grown by each line its text wraps onto.
+func _row_height(paragraph: TextParagraph) -> float:
+	var height: float = line_height_px
+	for text_line in range(1, _shown_lines(paragraph)):
+		height += paragraph.get_line_size(text_line).y
+	return height
+
+func _rows_height() -> float:
+	var height: float = 0.0
+	for line in _lines:
+		height += _row_height(_item_paragraph(line))
+	return height
+
+func _redraw() -> void:
+	if _draw_layer != null:
+		_draw_layer.queue_redraw()
 
 # The focus hairline: choice_hairline_length_px long, choice_hairline_
 # gap_px left of a label starting at label_left, at the caps' middle.
