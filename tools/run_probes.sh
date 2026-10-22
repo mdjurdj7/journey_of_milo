@@ -1,22 +1,21 @@
 #!/usr/bin/env bash
-# Runs the headless probes (tests/*_probe.gd) - all of them, an area's, or
-# the ones a change touches - as parallel headless Godot processes, and
+# Runs the headless probes (tests/*_probe.gd) - the core set, all of them,
+# an area's, or named ones - as parallel headless Godot processes, and
 # says which passed. See CLAUDE.md's Probes section for when to run what.
 #
-#   tools/run_probes.sh --full                    every probe
-#   tools/run_probes.sh --smoke                   before a push: a fixed six
-#                                                 (SMOKE_PROBES) across the field, a
-#                                                 fight, the floors and the cards
+#   tools/run_probes.sh --core                    every change: the core set
+#                                                 (CORE_PROBES) - a run, the rules,
+#                                                 every card, every encounter, every
+#                                                 floor, the economy
+#   tools/run_probes.sh --full                    every probe (the nightly's)
 #   tools/run_probes.sh --fast                    the fast tier (tools/probe_times.txt)
-#   tools/run_probes.sh --prepush                 on request: the probes for the files
-#                                                 changed in origin/main..HEAD, plus the
-#                                                 fast tier - listed first
 #   tools/run_probes.sh --area keywords,face      an area's probes (--list-areas)
-#   tools/run_probes.sh --changed [BASE]          the probes for the files changed
-#                                                 since BASE (default HEAD)
 #   tools/run_probes.sh --probe kill_order,floor4 named probes ("_probe" optional);
 #                                                 repeat --probe or comma-separate,
 #                                                 or both - every name runs
+#   tools/run_probes.sh --smoke | --prepush | --changed [BASE]
+#                                                 the old per-change modes: each says
+#                                                 so and runs --core
 #
 # Options:
 #   -j N             parallel probes (default: 1 while under JOBS_TWO_MIN_FREE_MB,
@@ -30,8 +29,7 @@
 #   --ref REF        what the worktree checks out (default: this tree's HEAD)
 #   --files a,b      with --worktree: these working-tree files are copied
 #                    over the checkout (a deleted one is deleted there) - the
-#                    uncommitted change under test. With --changed and no
-#                    --files, the changed files are copied.
+#                    uncommitted change under test.
 #   --wait MIN       how long to wait for a busy worktree (default 30)
 #   --path DIR       run in DIR instead of this tree (no worktree handling)
 #   --import         run Godot's --import first (--path or this tree)
@@ -256,15 +254,23 @@ probe_tier() {
 	fi
 }
 
-# --- The smoke tier: the pre-push run, a fixed six (~4 min at -j 1) ---
-# kill_order: the field on floors 1 and 2, a real fight, its win and the
-#   cleanup back to the field - the documented gate for both scenes.
-# devour: a fight played through the battle overlay, its hand and the HUD.
-# pathing: every floor loaded and walked from spawn to exit.
-# hold_line: floor 2's LINE exit and the Wanderer stopping at it.
-# wanderer_rig: his model, clips, sword and materials.
-# starter_cards: the cards' rules layer and their .tres data, no scene.
-SMOKE_PROBES="kill_order devour pathing hold_line wanderer_rig starter_cards"
+# --- The core set: what every change runs (CLAUDE.md, Probes) ---
+# Systems, never content - each reads its numbers from the data:
+# run_flow: a run start to finish - a fight won, the reward, the floor
+#   exit, a fight lost, the end screen, NEW RUN - and its log read back.
+# combat_rules: the rules layer - every enemy's loop previewed as it
+#   lands, Energy, Block, statuses, the intent marks, Delay, Keep, copies,
+#   extra turns, Toll paying damage, the Critical line.
+# card_smoke: every card in every pool, every starter and every tempered
+#   copy played once in a real fight.
+# enemy_smoke: every encounter option on every floor fought three turns,
+#   its previews equal to what lands.
+# floor_smoke: every floor loads, walks spawn to exit, its enemies and
+#   props on the ground - alone, it is a floor-data change's run.
+# economy: the reward, the collector's card, goods, Bedroll and removal,
+#   replacing what's held, a temper.
+# Everything else runs in the nightly (tools/nightly_probes.sh, --full).
+CORE_PROBES="run_flow combat_rules card_smoke enemy_smoke floor_smoke economy"
 
 # --- Areas: which probes guard which part of the game ---
 area_probes() {
@@ -500,7 +506,6 @@ die() { echo "run_probes: $*" >&2; exit 2; }
 MODE=""
 AREAS=""
 NAMES=""
-BASE=""
 JOBS=""
 WORKTREE=""
 REF=""
@@ -515,13 +520,18 @@ BATCH=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
+		--core) MODE=core ;;
 		--full) MODE=full ;;
 		--fast) MODE=fast ;;
-		--smoke) MODE=smoke ;;
-		--prepush) MODE=prepush ;;
+		# The old per-change modes: every change runs the core set now.
+		--smoke|--prepush)
+			echo "run_probes: $1 is retired - every change runs the core set; running --core"
+			MODE=core ;;
 		--area) MODE=area; AREAS="${2:?--area needs a list}"; shift ;;
-		--changed) MODE=changed
-			if [ $# -gt 1 ] && [ "${2#-}" = "$2" ]; then BASE="$2"; shift; fi ;;
+		--changed)
+			echo "run_probes: --changed is retired - every change runs the core set; running --core"
+			MODE=core
+			if [ $# -gt 1 ] && [ "${2#-}" = "$2" ]; then shift; fi ;;
 		--probe) MODE=probe; NAMES="$NAMES,${2:?--probe needs a list}"; shift ;;
 		-j) JOBS="${2:?-j needs a number}"; shift ;;
 		--worktree)
@@ -544,7 +554,7 @@ while [ $# -gt 0 ]; do
 	esac
 	shift
 done
-[ -n "$MODE" ] || die "say what to run: --full, --smoke, --fast, --prepush, --area, --changed or --probe (--help)"
+[ -n "$MODE" ] || die "say what to run: --core, --full, --fast, --area or --probe (--help)"
 # No -j: 1 on a machine short of memory, 2 with room for two.
 if [ -z "$JOBS" ]; then
 	FREE_AT_START=$(free_mb)
@@ -560,7 +570,7 @@ if [ -n "$BATCH" ]; then
 	[ "${BATCH%/*}" -le "${BATCH#*/}" ] 2>/dev/null || die "--batch takes K/N, 1 <= K <= N"
 fi
 
-# --- What changed (for --changed, and for the HEAD-moved check) ---
+# --- What changed (for --files, and for the HEAD-moved check) ---
 # Every path list below is one path per line - never split on spaces, so
 # a path with one ("cards/art/Wanderer/Hold Fast.png") stays whole: read
 # with `while IFS= read -r`, never `for f in $LIST`. git is asked not to
@@ -568,13 +578,6 @@ fi
 gitq() { git -c core.quotePath=false "$@"; }
 START_HEAD=$(git -C "$REPO" rev-parse HEAD)
 CHANGED=""
-if [ "$MODE" = changed ]; then
-	CHANGED=$( { gitq -C "$REPO" diff --name-only "${BASE:-HEAD}"; gitq -C "$REPO" ls-files --others --exclude-standard; } | sort -u)
-elif [ "$MODE" = prepush ]; then
-	# What a push would carry: the commits on HEAD not yet on origin/main.
-	git -C "$REPO" rev-parse -q --verify origin/main > /dev/null || die "--prepush: no origin/main to compare with (git fetch?)"
-	CHANGED=$(gitq -C "$REPO" diff --name-only origin/main...HEAD | sort -u)
-fi
 if [ -n "$FILES" ]; then
 	CHANGED=$(printf '%s\n%s\n' "$CHANGED" "$(echo "$FILES" | tr ',' '\n')" | sed '/^$/d' | sort -u)
 fi
@@ -609,8 +612,8 @@ map_paths() {
 
 SELECTED=""
 case "$MODE" in
+	core) SELECTED="$CORE_PROBES" ;;
 	full) SELECTED="$ALL_PROBES" ;;
-	smoke) SELECTED="$SMOKE_PROBES" ;;
 	area)
 		for a in $(echo "$AREAS" | tr ',' ' '); do
 			p=$(area_probes "$a") || die "no area '$a' (--list-areas)"
@@ -621,23 +624,6 @@ case "$MODE" in
 		for p in $ALL_PROBES; do
 			[ "$(probe_tier "$p")" = fast ] && SELECTED="$SELECTED $p"
 		done ;;
-	prepush)
-		map_paths "$CHANGED"
-		FAST=""
-		for p in $ALL_PROBES; do
-			[ "$(probe_tier "$p")" = fast ] && FAST="$FAST $p"
-		done
-		echo "run_probes: prepush - changed in origin/main..HEAD:"
-		if [ -n "$CHANGED" ]; then echo "$CHANGED" | sed 's/^/    /'; else echo "    (nothing)"; fi
-		[ -n "$MAPPED_FULL" ] && echo "run_probes: $MAPPED_FULL is in no area - the full suite"
-		echo "run_probes: mapped to them:" $MAPPED
-		echo "run_probes: and the fast tier:" $FAST
-		SELECTED="$MAPPED $FAST" ;;
-	changed)
-		[ -n "$CHANGED" ] || { echo "run_probes: nothing changed since ${BASE:-HEAD} - no probes to run"; exit 0; }
-		map_paths "$CHANGED"
-		[ -n "$MAPPED_FULL" ] && echo "run_probes: $MAPPED_FULL is in no area - running the full suite"
-		SELECTED="$MAPPED" ;;
 esac
 # Normalise to *_probe names, drop duplicates, check each exists.
 SELECTED=$(normalise_probes $SELECTED)
@@ -658,6 +644,11 @@ report_head_moved() {
 	echo "$new_files" | sed 's/^/    /'
 	map_paths "$new_files"
 	hit=$(comm -12 <(echo "$SELECTED" | sed '/^$/d') <(echo "$MAPPED" | sed '/^$/d'))
+	# The core set covers every change: anything a probe can see asks for
+	# it again.
+	if [ "$MODE" = core ] && [ -n "$MAPPED" ]; then
+		hit="$SELECTED"
+	fi
 	if [ -z "$hit" ]; then
 		echo "run_probes: none of them map to a probe in this run - no rerun needed"
 	else
@@ -697,8 +688,6 @@ done
 if [ -n "$WORKTREE" ]; then
 	PROJECT="$WORKTREE"
 	REF="${REF:-$START_HEAD}"
-	# With --changed and no --files, the change under test is what changed.
-	[ -z "$FILES" ] && [ "$MODE" = changed ] && FILES=$(echo "$CHANGED" | grep -vx 'default_bus_layout.tres' | tr '\n' ',')
 fi
 PROJECT="${PROJECT:-$REPO}"
 
