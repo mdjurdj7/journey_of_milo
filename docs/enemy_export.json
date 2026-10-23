@@ -816,7 +816,7 @@
                   "member": 0,
                   "name": "Nettlebasket",
                   "enemy_file": "res://battle/rules/enemies/nettlebasket.tres",
-                  "hp": 36,
+                  "hp": 48,
                   "anchor": true,
                   "card_reward": "ROLLED",
                   "position": [
@@ -1982,7 +1982,7 @@
     {
       "name": "Nettlebasket",
       "file": "res://battle/rules/enemies/nettlebasket.tres",
-      "hp": 36,
+      "hp": 48,
       "elite": false,
       "mechanic_summary": "A scorpion carrying three Nettles in the cradle on her back. Pinches for 6, then Signals - every Nettle comes off the basket and strikes at once, out of turn - then Stings for 12, in a loop; with the Nettles gone the Signal drops out and she alternates Pinch and Sting. Until the Signal the fight is her alone: the Nettles can't be hit. Teaches bursting a caller before it brings its pack in: kill her before the Signal and the Nettles never come out.",
       "starts_dormant": false,
