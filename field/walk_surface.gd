@@ -27,6 +27,16 @@ func get_top_normal_at(_world_xz: Vector2) -> Vector3:
 func get_world_outline() -> PackedVector2Array:
 	return PackedVector2Array()
 
+# Whether it keeps him on with rails rather than its drops (a Pier): the
+# walk grid then doesn't close its cells for the drop at its edge, and
+# stamps get_rail_shapes() instead (NavGrid).
+func is_railed() -> bool:
+	return false
+
+# Its rails' collision, for the walk grid; empty for none.
+func get_rail_shapes() -> Array[CollisionShape3D]:
+	return []
+
 # Whether his steps print on it (FootprintSpawner) - stone takes them,
 # planks don't.
 func takes_footprints() -> bool:

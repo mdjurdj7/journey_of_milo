@@ -23,6 +23,12 @@ class_name NavGrid
 # margin), so a path never brushes them; deep water isn't (he can wade
 # into it - it is only never planned through).
 #
+# A railed walk surface (WalkSurface.is_railed() - a Pier) is kept by its
+# rails, not its drops: its own cells are never closed by the drop at its
+# edge, nor by that drop's inflation, and its rails (`edge_shapes`) are
+# stamped as they stand, uninflated - so a narrow railed deck or flight
+# of steps stays open, and nothing plans across a rail.
+#
 # Per query (find_path()), the contact zones of the enemies in the way are
 # stamped solid and lifted again after - they move (patrols) and die, so
 # they never live in the base grid. So is a dynamic obstacle (the closed
@@ -69,7 +75,7 @@ var _stamped: Array[Vector2i] = []
 
 # `shapes`: every static collision shape to stamp (RegionField picks them -
 # the ground, walk surfaces and the boundary walls left out).
-func build(ground: Ground, sea: float, rect: Rect2, shapes: Array[CollisionShape3D]) -> void:
+func build(ground: Ground, sea: float, rect: Rect2, shapes: Array[CollisionShape3D], edge_shapes: Array[CollisionShape3D] = []) -> void:
 	var started: int = Time.get_ticks_msec()
 	sea_level = sea
 	origin = rect.position
@@ -81,6 +87,9 @@ func build(ground: Ground, sea: float, rect: Rect2, shapes: Array[CollisionShape
 	base_solid.resize(count)
 	water.fill(0)
 	base_solid.fill(0)
+	var railed := PackedByteArray()
+	railed.resize(count)
+	railed.fill(0)
 	for z in rows:
 		for x in cols:
 			var centre: Vector2 = cell_centre(Vector2i(x, z))
@@ -89,6 +98,9 @@ func build(ground: Ground, sea: float, rect: Rect2, shapes: Array[CollisionShape
 			var height: float = ground.to_global(Vector3(local.x, local_height, local.z)).y
 			var i: int = z * cols + x
 			heights[i] = height
+			var surface: WalkSurface = ground.get_walk_surface_at(Vector2(local.x, local.z))
+			if surface != null and surface.is_railed():
+				railed[i] = 1
 			# Water only past the drawn shoreline (Ground's own line, channels
 			# included) - a floor with no sea has ground below sea level and
 			# nothing on it.
@@ -99,7 +111,8 @@ func build(ground: Ground, sea: float, rect: Rect2, shapes: Array[CollisionShape
 				water[i] = 2
 			elif depth > 0.0:
 				water[i] = 1
-	# What he can't stand on or next to, before inflation.
+	# What he can't stand on or next to, before inflation: 1 a drop, 2 a
+	# body's footprint.
 	var blocked := PackedByteArray()
 	blocked.resize(count)
 	blocked.fill(0)
@@ -108,25 +121,32 @@ func build(ground: Ground, sea: float, rect: Rect2, shapes: Array[CollisionShape
 		for x in cols:
 			var i: int = z * cols + x
 			if x + 1 < cols and absf(heights[i] - heights[i + 1]) > max_rise:
-				blocked[i] = 1
-				blocked[i + 1] = 1
+				_block_drop(blocked, railed, i)
+				_block_drop(blocked, railed, i + 1)
 			if z + 1 < rows and absf(heights[i] - heights[i + cols]) > max_rise:
-				blocked[i] = 1
-				blocked[i + cols] = 1
+				_block_drop(blocked, railed, i)
+				_block_drop(blocked, railed, i + cols)
 	for shape in shapes:
 		for cell in footprint_cells(shape):
-			blocked[cell.y * cols + cell.x] = 1
+			blocked[cell.y * cols + cell.x] = 2
 	# Inflated by his radius and a margin.
 	var offsets: Array[Vector2i] = _disc(inflation)
 	for z in rows:
 		for x in cols:
-			if blocked[z * cols + x] == 0:
+			var source: int = blocked[z * cols + x]
+			if source == 0:
 				continue
 			for offset in offsets:
 				var cx: int = x + offset.x
 				var cz: int = z + offset.y
 				if cx >= 0 and cz >= 0 and cx < cols and cz < rows:
-					base_solid[cz * cols + cx] = 1
+					var target: int = cz * cols + cx
+					if source == 1 and railed[target] == 1:
+						continue
+					base_solid[target] = 1
+	for shape in edge_shapes:
+		for cell in footprint_cells(shape):
+			base_solid[cell.y * cols + cell.x] = 1
 	for i in count:
 		if water[i] == 2:
 			base_solid[i] = 1
@@ -145,6 +165,11 @@ func build(ground: Ground, sea: float, rect: Rect2, shapes: Array[CollisionShape
 			elif water[i] == 1:
 				astar.set_point_weight_scale(Vector2i(x, z), shallows_cost)
 	build_msec = Time.get_ticks_msec() - started
+
+# A drop at cell `i` closes it - unless it is on a railed walk surface.
+static func _block_drop(blocked: PackedByteArray, railed: PackedByteArray, i: int) -> void:
+	if railed[i] == 0 and blocked[i] == 0:
+		blocked[i] = 1
 
 # The cells a collision shape stands on: its debug mesh's box through the
 # shape's transform, flattened to XZ - the hull of the eight corners.

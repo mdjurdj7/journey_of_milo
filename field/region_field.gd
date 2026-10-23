@@ -4770,7 +4770,12 @@ func _build_nav_grid() -> void:
 	if wanderer != null:
 		grid.step_height = wanderer.step_height
 		grid.max_slope_degrees = rad_to_deg(wanderer.floor_max_angle)
-	grid.build(ground, sea_level, rect, _nav_static_shapes(ground))
+	var rails: Array[CollisionShape3D] = []
+	for node in get_tree().get_nodes_in_group(WalkSurface.WALK_SURFACE_GROUP):
+		var surface := node as WalkSurface
+		if surface != null and is_ancestor_of(surface):
+			rails.append_array(surface.get_rail_shapes())
+	grid.build(ground, sea_level, rect, _nav_static_shapes(ground), rails)
 	grid.compute_reachable(_floor_spawn_xz())
 	_nav = grid
 	print("RegionField: walk grid %d x %d at %.2f m (%.0f x %.0f m) in %d ms" % [grid.cols, grid.rows, grid.cell_size, rect.size.x, rect.size.y, grid.build_msec])

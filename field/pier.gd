@@ -19,8 +19,8 @@ class_name Pier
 # by his ground hold and the walk grid (WalkSurface). The rails are boxes
 # too - rail_height_m tall on the lines in `rails` at deck height, and on
 # both sides of the steps steps_rail_inset_m in from their edges, sloped
-# with them - drawn by nothing: invisible to the walk grid like the rest
-# of a walk surface, which keeps him on the planks by the drop alone.
+# with them - drawn by nothing. A railed walk surface: the walk grid keeps
+# its cells open at its drops and stamps the rails instead (NavGrid).
 #
 # Drawn by model_path, a glb in the same frame on the same height scale,
 # set at the land level - or, with none, by graybox boxes over the
@@ -143,6 +143,7 @@ var _fog: ShaderMaterial = null
 var _deck_top: float = 0.0
 var _built: bool = false
 var _generated: Array[Node] = []
+var _rail_shapes: Array[CollisionShape3D] = []
 
 func _ready() -> void:
 	add_to_group(WALK_SURFACE_GROUP)
@@ -185,6 +186,12 @@ func get_top_normal_at(world_xz: Vector2) -> Vector3:
 
 func takes_footprints() -> bool:
 	return false
+
+func is_railed() -> bool:
+	return true
+
+func get_rail_shapes() -> Array[CollisionShape3D]:
+	return _rail_shapes
 
 # --- the shape, in the pier's own XZ ---
 
@@ -243,6 +250,7 @@ func _rebuild() -> void:
 	for node in _generated:
 		node.free()
 	_generated.clear()
+	_rail_shapes.clear()
 	_fog = null
 	# The land level is Ground's local Y; the pier's own frame is only
 	# ever turned about Y, so the offset carries over.
@@ -278,7 +286,7 @@ func _rebuild() -> void:
 		var across := Vector2(-dir.y, dir.x)
 		for side: float in [-1.0, 1.0]:
 			var offset: Vector2 = across * side * (steps_width_m * 0.5 - steps_rail_inset_m)
-			_add_box(Vector3(rail_length, rail_height_m, rail_thickness_m), steps_basis, rail_mid + Vector3(offset.x, 0.0, offset.y) + steps_basis * Vector3(0.0, rail_height_m * 0.5, 0.0), false)
+			_rail_shapes.append(_add_box(Vector3(rail_length, rail_height_m, rail_thickness_m), steps_basis, rail_mid + Vector3(offset.x, 0.0, offset.y) + steps_basis * Vector3(0.0, rail_height_m * 0.5, 0.0), false))
 	# The level rails.
 	for line in rails:
 		for i in range(1, line.size()):
@@ -287,7 +295,7 @@ func _rebuild() -> void:
 			if a.distance_to(b) < 0.01:
 				continue
 			var centre: Vector2 = (a + b) * 0.5
-			_add_box(Vector3(a.distance_to(b) + rail_thickness_m, rail_height_m, rail_thickness_m), _flat_basis(b - a), Vector3(centre.x, _deck_top + rail_height_m * 0.5, centre.y), false)
+			_rail_shapes.append(_add_box(Vector3(a.distance_to(b) + rail_thickness_m, rail_height_m, rail_thickness_m), _flat_basis(b - a), Vector3(centre.x, _deck_top + rail_height_m * 0.5, centre.y), false))
 	if drawn:
 		_apply_graybox_material()
 	else:
@@ -301,8 +309,8 @@ func _flat_basis(axis: Vector2) -> Basis:
 func _sloped_basis(axis: Vector2, slope: float) -> Basis:
 	return _flat_basis(axis) * Basis(Vector3(0.0, 0.0, 1.0), -slope)
 
-# A box collided with, and - `drawn` - drawn as graybox.
-func _add_box(size: Vector3, basis: Basis, centre: Vector3, drawn: bool) -> void:
+# A box collided with, and - `drawn` - drawn as graybox. Its shape.
+func _add_box(size: Vector3, basis: Basis, centre: Vector3, drawn: bool) -> CollisionShape3D:
 	var xform := Transform3D(basis, centre)
 	var shape := BoxShape3D.new()
 	shape.size = size
@@ -320,6 +328,7 @@ func _add_box(size: Vector3, basis: Basis, centre: Vector3, drawn: bool) -> void
 		mesh_instance.layers = 1 | standable_layers
 		add_child(mesh_instance)
 		_generated.append(mesh_instance)
+	return collision
 
 func _add_model(land: float) -> void:
 	var scene := load(model_path) as PackedScene if ResourceLoader.exists(model_path) else null
