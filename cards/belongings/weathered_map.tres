@@ -20,6 +20,7 @@ card_type = 1
 rarity = 2
 target_type = 1
 removal_scope = 1
-description = "Draw {draw}. Put a card from your hand on top of your draw pile.
+description = "Draw {draw}.
+Put a card back on top.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_draw"), SubResource("E_top")])
