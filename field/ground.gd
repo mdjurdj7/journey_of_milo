@@ -1215,14 +1215,20 @@ func _push_sea_level_uniform() -> void:
 	_apply_uniform("sea_level", sea.sea_level if sea else 0.0)
 	_push_basin_heights()
 
+# The floor's own land level, local Y: the Sea's sea_level (0 without a
+# Sea) plus landmass_interior_height - where the flat interior sits and
+# what an elevation painting's heights are measured over.
+func get_land_level() -> float:
+	var sea: Sea = null
+	if is_inside_tree():
+		sea = get_node_or_null(sea_path) as Sea
+	return (sea.sea_level if sea else 0.0) + landmass_interior_height
+
 # basin_tint_heights, crest_min_height and slope_tint_fade_height onto
 # the shader as world heights: over the floor's own land level, which needs the Sea's
 # sea_level (0 without a Sea).
 func _push_basin_heights() -> void:
-	var sea: Sea = null
-	if is_inside_tree():
-		sea = get_node_or_null(sea_path) as Sea
-	var land_level: float = (sea.sea_level if sea else 0.0) + landmass_interior_height
+	var land_level: float = get_land_level()
 	_apply_uniform("basin_height_low", land_level + basin_tint_heights.x)
 	_apply_uniform("basin_height_high", land_level + basin_tint_heights.y)
 	_apply_uniform("crest_min_height", land_level + crest_min_height)

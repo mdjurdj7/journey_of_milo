@@ -17,13 +17,16 @@
 [sub_resource type="Resource" id="FloorProp_pier"]
 script = ExtResource("6_floor_prop")
 scene = ExtResource("7_pier")
-position = Vector3(-15.5, 0, -12.5)
-yaw_degrees = 45.0
 overrides = {
-"deck_length_m": 12.0,
-"root_rise_m": 0.12,
-"steps_slope_degrees": 32.0,
-"width_m": 2.0
+"deck_end": Vector2(-7.015, -20.985),
+"deck_height_m": 3.02,
+"deck_root": Vector2(-15.500, -12.500),
+"deck_width_m": 2.0,
+"rails": Array[PackedVector2Array]([PackedVector2Array(-14.793, -11.793, -6.308, -20.278), PackedVector2Array(-16.207, -13.207, -7.722, -21.692)]),
+"steps_foot_height_m": 0.0,
+"steps_from": Vector2(-7.015, -20.985),
+"steps_to": Vector2(-3.600, -24.400),
+"steps_width_m": 2.0
 }
 
 [sub_resource type="Resource" id="FloorEnemy_clearing"]
