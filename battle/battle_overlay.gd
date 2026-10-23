@@ -2,6 +2,8 @@ extends Control
 class_name BattleOverlay
 
 const FLOATING_NUMBER_SCENE_PATH := "res://battle/floating_number.tscn"
+# The fight's hit feedback (BattleFeedback), its tunables set there.
+const BATTLE_FEEDBACK_SCENE_PATH := "res://battle/battle_feedback.tscn"
 # A mound's plate is an enemy plate in its mound mode (EnemyStatus.set_mound()).
 const MOUND_PLATE_SCENE_PATH := "res://battle/enemy_status.tscn"
 const CARD_PLAY_SFX_PATH := "res://assets/audio/ui/card_played.mp3"
@@ -163,7 +165,7 @@ signal battle_finished(outcome: Outcome)
 # eaten.
 @export var devour_keyword_volume_db: float = -16.0
 # The battle sand puffs' tint (BattleFeedback.sand_puff_tint), set here as
-# BattleFeedback is built in code (enter_battle()); passed on live.
+# BattleFeedback is made in enter_battle(); passed on live.
 @export var sand_puff_tint: float = 0.75:
 	set(value):
 		sand_puff_tint = value
@@ -663,7 +665,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_push_bonus_context()
 	get_tree().create_timer(battle_transition_time).timeout.connect(_reveal_enemy_intents)
 
-	_battle_feedback = BattleFeedback.new()
+	_battle_feedback = (load(BATTLE_FEEDBACK_SCENE_PATH) as PackedScene).instantiate() as BattleFeedback
 	_battle_feedback.sand_puff_tint = sand_puff_tint
 	add_child(_battle_feedback)
 	_battle_feedback.setup(wanderer, on_dark_world)
