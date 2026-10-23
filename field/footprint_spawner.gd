@@ -203,6 +203,8 @@ func _spawn_footprint(bone_world: Vector3) -> void:
 	var height: float
 	var normal: Vector3
 	if surface != null:
+		if not surface.takes_footprints():
+			return
 		height = surface.get_top_height_at(Vector2(bone_world.x, bone_world.z))
 		normal = surface.get_top_normal_at(Vector2(bone_world.x, bone_world.z))
 	else:

@@ -26,3 +26,8 @@ func get_top_normal_at(_world_xz: Vector2) -> Vector3:
 # Its edge as world XZ, in order, for scatter's keep-out; empty for none.
 func get_world_outline() -> PackedVector2Array:
 	return PackedVector2Array()
+
+# Whether his steps print on it (FootprintSpawner) - stone takes them,
+# planks don't.
+func takes_footprints() -> bool:
+	return true
