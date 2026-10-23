@@ -33,8 +33,9 @@ class_name FieldScatter
 #   - every static body's footprint (props, ledges) grown by prop_margin_m
 #     - his walk-up to anything stops at that edge - or a ledge's by the
 #     entry's own ledge_margin_m, when it has one; the gate's shapes by
-#     gate_margin_m; a rock shelf's outline by shelf_margin_m; an empty
-#     Siltjaw spot's old mounds and trails (SiltjawSigns) by prop_margin_m;
+#     gate_margin_m; a walk surface's outline (a rock shelf's) by
+#     shelf_margin_m; an empty Siltjaw spot's old mounds and trails
+#     (SiltjawSigns) by prop_margin_m;
 #     the spawn by spawn_clear_m;
 #   - the floor's own keep-outs (FloorData.scatter_keep_outs), but for an
 #     entry with an area of its own, which places inside it regardless;
@@ -824,12 +825,11 @@ func _build_keepouts() -> void:
 	if gate != null:
 		for shape in gate.find_children("*", "CollisionShape3D", true, false):
 			_add_footprint(shape as CollisionShape3D, gate_margin_m)
-	for node in _field.find_children("*", "RockShelf", true, false):
-		var shelf := node as RockShelf
-		var outline := PackedVector2Array()
-		for point in shelf.outline:
-			var world: Vector3 = shelf.global_transform * Vector3(point.x, 0.0, point.y)
-			outline.append(Vector2(world.x, world.z))
+	for node in _field.find_children("*", "StaticBody3D", true, false):
+		var surface := node as WalkSurface
+		if surface == null:
+			continue
+		var outline: PackedVector2Array = surface.get_world_outline()
 		if outline.size() >= 3:
 			_keepouts.append(_polygon(outline, shelf_margin_m))
 	# A Siltjaw's spot rolled empty: its old mounds and trails, each

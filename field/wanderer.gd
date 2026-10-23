@@ -3059,7 +3059,8 @@ func _hold_above_visible_ground() -> void:
 		_ground_hold_active = false
 		return
 	var local: Vector3 = _ground.to_local(Vector3(global_position.x, 0.0, global_position.z))
-	# The sand as drawn, or a RockShelf's top where he stands on one.
+	# The sand as drawn, or a walk surface's top (a RockShelf's) where he
+	# stands on one.
 	var surface: float = _ground.get_walk_height_at(Vector2(local.x, local.z))
 	var gap: float = global_position.y - surface
 	if gap < -ground_penetration_tolerance_m:

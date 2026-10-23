@@ -1,4 +1,4 @@
-extends StaticBody3D
+extends WalkSurface
 class_name RockShelf
 
 # A slab of stone standing in the sand - planes, not a painted bump. A
@@ -41,16 +41,14 @@ class_name RockShelf
 # wear, caustics, grain) touch it - only the light, its shadow and fog.
 #
 # Collision is the same triangles (a trimesh). What he stands on is also
-# what his ground hold and his footprints read: it joins WALK_SURFACE_
-# GROUP, and Ground.get_walk_height_at()/get_walk_surface_at() take the
-# highest walk surface over the sand at an XZ.
+# what his ground hold and his footprints read: a WalkSurface, it joins
+# WALK_SURFACE_GROUP, and Ground.get_walk_height_at()/get_walk_surface_
+# at() take the highest walk surface over the sand at an XZ.
 #
 # Placed from FloorData.props at the outline's centre (its node origin,
 # never rotated); the outline is local XZ around it. Built on entering
 # the tree, rebuilt with the relief (Ground.relief_rebuilt) and on any
 # export change. The layout is fixed by layout_seed.
-
-const WALK_SURFACE_GROUP := &"walk_surfaces"
 
 @export_group("Shape")
 # The slab's edge, local XZ (x = X, y = Z) around this node, in order.
@@ -215,6 +213,14 @@ func get_top_normal_at(world_xz: Vector2) -> Vector3:
 		return Vector3.UP
 	var g: Vector2 = _gradients[_nearest_site(p)]
 	return Vector3(-g.x, 1.0, -g.y).normalized()
+
+# The outline in world XZ, in order.
+func get_world_outline() -> PackedVector2Array:
+	var world_outline := PackedVector2Array()
+	for point in outline:
+		var world: Vector3 = global_transform * Vector3(point.x, 0.0, point.y)
+		world_outline.append(Vector2(world.x, world.z))
+	return world_outline
 
 func _get_ground() -> Ground:
 	if _ground == null and is_inside_tree():

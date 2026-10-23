@@ -1141,7 +1141,7 @@ func _ground_point_under(camera: Camera3D, screen_pos: Vector2) -> Vector3:
 # the spawn slab.
 func _is_nav_obstacle(collider: Variant) -> bool:
 	var body := collider as StaticBody3D
-	if body == null or body == get_node_or_null(ground_path) or body is RockShelf or body.name == &"SpawnSlabBody":
+	if body == null or body == get_node_or_null(ground_path) or body is WalkSurface or body.name == &"SpawnSlabBody":
 		return false
 	return true
 
@@ -4880,7 +4880,7 @@ func _nav_static_shapes(ground: Ground) -> Array[CollisionShape3D]:
 		skip.append(gate.get_node_or_null(^"Blocker"))
 	for node in find_children("*", "StaticBody3D", true, false):
 		# A one-way ledge is the queries' own (_nav_dynamic_shapes()).
-		if skip.has(node) or node is RockShelf or node is OneWayLedge or node.name == &"SpawnSlabBody":
+		if skip.has(node) or node is WalkSurface or node is OneWayLedge or node.name == &"SpawnSlabBody":
 			continue
 		for child in node.find_children("*", "CollisionShape3D", true, false):
 			shapes.append(child as CollisionShape3D)
