@@ -50,6 +50,14 @@ var _resolved_ready: bool = false
 @export var enemy_bias: Dictionary = {}
 @export var enemy_bias_multiplier: float = 2.0
 
+# On: every roll from this pool is flat - roll_by_rarity() and roll_top_
+# tier() hand off to roll(): distinct cards, each by its weight (1.0 for
+# all unless weights says otherwise), with no rarity tier and no rate
+# table (this pool's own, a floor's FightRarityTable, the elite rates) -
+# a curated pool where every card is as likely as the next (floor 1's
+# first offer). Off for every pool that doesn't set it.
+@export var roll_flat: bool = false
+
 # Per-slot odds of each CardData.CardRarity tier in roll_by_rarity() -
 # what a roll by rarity uses when it's handed no RarityRates (the
 # collector's stock; a normal fight's offer takes its floor's from the
@@ -122,6 +130,8 @@ func roll(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, chara
 # never take it. `class_only` leaves out every neutral card (no card_
 # class) - the collector's class slot, from a pool that holds both.
 func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, elite: bool = false, character: CharacterData = null, rates: RarityRates = null, class_only: bool = false) -> Array[CardData]:
+	if roll_flat:
+		return roll(count, rng, enemy, character)
 	var picked: Array[CardData] = []
 	var remaining: Array[int] = _rarity_eligible(enemy, character, class_only)
 	while picked.size() < count and not remaining.is_empty():
@@ -146,6 +156,8 @@ func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = n
 # the rule. Fewer than `count` only when the pool itself runs out; an
 # UNSET card is never offered. `character` as in roll().
 func roll_top_tier(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, character: CharacterData = null) -> Array[CardData]:
+	if roll_flat:
+		return roll(count, rng, enemy, character)
 	var picked: Array[CardData] = []
 	var eligible: Array[int] = _rarity_eligible(enemy, character)
 	var tiers: Array[CardData.CardRarity] = CardData.rarity_tiers()
