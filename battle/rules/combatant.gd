@@ -188,13 +188,16 @@ var first_hit_spent: bool = false
 var big_hit_threshold: int = 0
 var big_hit_reduction: int = 0
 var big_hit_spent: bool = false
-# The weapon's self-loss bonus (WeaponData.self_loss_attack_bonus): armed
-# by a self-inflicted loss (gain_self_loss_toll()), spent by the next card
-# carrying self_loss_attack_tag (the basic attack) as its attack bonus is
-# taken, disarmed as each turn starts. 0 = none.
+# The weapon's self-loss bonus (WeaponData.self_loss_attack_bonus): each
+# self-inflicted loss (gain_self_loss_toll() - one per loss, whatever its
+# size) stores one more, across turns; the next card carrying self_loss_
+# attack_tag (the basic attack - Slash, or Second Swing's replay of it)
+# takes every one stored as its attack bonus is taken, and the store is
+# empty again. A fight's Combatant is its own, so the store ends with the
+# fight. 0 bonus = none.
 var self_loss_attack_bonus: int = 0
 var self_loss_attack_tag: StringName = &""
-var self_loss_attack_armed: bool = false
+var self_loss_attack_stacks: int = 0
 # The worn piece's damage back (TrinketData.hit_back_damage): this much
 # to an enemy, through its Block, once for each of its attacks that lands
 # on this fighter (EnemyTurn.land_attack()). 0 = none.
@@ -285,7 +288,7 @@ func gain_self_loss_toll(lost: int) -> void:
 	if has_toll:
 		toll += lost
 	if self_loss_attack_bonus > 0:
-		self_loss_attack_armed = true
+		self_loss_attack_stacks += 1
 	pending_drain += Status.count_self_loss(statuses)
 
 # `card` has been played this turn: once for each of its tags.
@@ -321,19 +324,20 @@ func last_undoable_hit() -> Dictionary:
 			return hits_taken[i]
 	return {}
 
-# What the weapon's self-loss bonus adds to `card` now: its bonus when it
-# is armed - or `arming`, a loss the card's own price is about to pay
-# (a face's preview) - and the card carries the tag; else 0.
+# What the weapon's self-loss bonus adds to `card` now: its bonus for
+# every loss stored - and one more for `arming`, a loss the card's own
+# price is about to pay (a face's preview) - when the card carries the
+# tag; else 0.
 func self_loss_attack_bonus_for(card: CardData, arming: bool = false) -> int:
 	if self_loss_attack_bonus <= 0 or card == null or self_loss_attack_tag == &"" or not card.has_tag(self_loss_attack_tag):
 		return 0
-	return self_loss_attack_bonus if self_loss_attack_armed or arming else 0
+	return self_loss_attack_bonus * (self_loss_attack_stacks + (1 if arming else 0))
 
-# The same, spent: the card takes it and it is disarmed.
+# The same, spent: the card takes all of it and the store is empty.
 func take_self_loss_attack_bonus(card: CardData) -> int:
 	var bonus: int = self_loss_attack_bonus_for(card)
 	if bonus > 0:
-		self_loss_attack_armed = false
+		self_loss_attack_stacks = 0
 	return bonus
 
 func clear_last_attack() -> void:

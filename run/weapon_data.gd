@@ -38,10 +38,11 @@ class_name WeaponData
 # What marks a card as the class's basic attack (CardData.tags) - Slash
 # and Slash+ carry it.
 @export var basic_attack_tag: StringName = &"basic_attack"
-# Above 0 (Gaff Hook): after the Wanderer loses HP to his own effect - the
-# self-inflicted loss Toll counts (Combatant.gain_self_loss_toll()) - his
-# next basic attack this turn deals this much more. Armed again by a
-# later loss once spent; two losses before one Slash still give it once.
+# Above 0 (Gaff Hook): each time the Wanderer loses HP to his own effect -
+# the self-inflicted loss Toll counts (Combatant.gain_self_loss_toll()),
+# one per loss whatever its size - his next basic attack deals this much
+# more. It stacks and waits, across turns, for that attack (or Second
+# Swing's replay of it), which spends it all; it ends with the fight.
 # Copied onto the fight's Combatant by BattleController.setup().
 @export var self_loss_attack_bonus: int = 0
 # The class this weapon is for (CharacterData.card_class); empty = any. A

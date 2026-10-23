@@ -2925,7 +2925,6 @@ func _start_player_turn() -> void:
 	player.damage_taken_this_turn = 0
 	player.toll_spent_this_turn = false
 	player.tagged_plays_this_turn.clear()
-	player.self_loss_attack_armed = false
 	Skillchain.reset(player)
 	player.clear_last_attack()
 	_last_attack_enemy = null

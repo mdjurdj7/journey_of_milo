@@ -308,6 +308,15 @@ func _check_toll_pays() -> void:
 		EnemyTurn.take_turn(enemy, data, player)
 		_expect_eq(player.toll, maxi(toll - total, 0), "%s: the Toll pays first" % payer.display_name)
 		_expect_eq(hp_before - player.hp, maxi(total - toll, 0), "...the rest reaches HP")
+	# The weapon's self-loss bonus (Gaff Hook): each self-inflicted loss -
+	# the one Toll counts - stores one more; the next Slash takes them all.
+	var wielder := Combatant.new(PLAYER_HP)
+	wielder.self_loss_attack_bonus = 3
+	wielder.self_loss_attack_tag = &"basic_attack"
+	wielder.gain_self_loss_toll(1)
+	wielder.gain_self_loss_toll(5)
+	var slash: CardData = load("res://cards/data/slash.tres")
+	_expect_eq([wielder.take_self_loss_attack_bonus(slash), wielder.take_self_loss_attack_bonus(slash)], [6, 0], "Two self-losses: the next Slash takes both, the one after none")
 	_cases += 1
 
 # --- critical ---
