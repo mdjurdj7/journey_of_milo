@@ -1,8 +1,8 @@
 extends SceneTree
 
-# Headless probe for Owed Time - Rare 3-Energy Skill, Spent: spend 20 Toll
-# (Owed Time+ 16) and take another turn after this one. It applies the
-# Owed Time status (StatusData.grants_extra_turn, a charge per play); when
+# Headless probe for Owed Time - Rare 1-Energy Skill, Spent: spend 20 Toll
+# (Owed Time+ 0 Energy, 15 Toll) and take another turn after this one. It
+# applies the Owed Time status (StatusData.grants_extra_turn, a charge per play); when
 # the player's turn ends with a charge up, one goes and the enemy turn is
 # skipped (Status.take_extra_turn(), BattleController._finish_turn()): the
 # turn ends as any does - hand discarded, this-turn statuses gone - the
@@ -78,7 +78,7 @@ func _check_data() -> void:
 	_expect_eq([card.card_name, card.card_type, card.rarity, card.removal_scope, card.card_class], ["Owed Time", CardData.CardType.SKILL, CardData.CardRarity.RARE, CardData.RemovalScope.SPENT, &"wanderer"], "Owed Time: a Rare Spent Skill")
 	_expect_eq([card.target_type, card.offer], [CardData.TargetType.SELF, CardData.OfferScope.REWARDABLE], "...no target, rewardable")
 	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Owed Time.png", "...with its art")
-	_expect_eq(card.description, "Take another turn after this.\nSpent.", "...its text")
+	_expect_eq(card.description, "Take another turn after this one.\nSpent.", "...its text")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL, "...spends Toll")
 	_expect(card.effects.size() == 2 and card.effects[1].effect_type == CardEffect.EffectType.APPLY_STATUS and card.effects[1].status_data == status, "...then owes a turn")
 	_expect_eq([status.display_name, status.grants_extra_turn, status.stack_rule, status.default_charges, status.ends_at_turn_end], ["Owed Time", true, StatusData.StackRule.ADD_CHARGES, 1, false], "The status: a charge per play, kept past the turn's end")
@@ -92,7 +92,8 @@ func _check_data() -> void:
 
 # --- Rules ---
 
-# Unplayable on 19 Toll, playable on 20 (Owed Time+ on 16); played: the
+# Unplayable on 19 Toll, playable on 20 (Owed Time+ on its own Toll, not
+# one less); played: the
 # Toll gone and a charge owed; a second play owes two; each turn's end
 # takes one.
 func _check_rules() -> void:
@@ -104,10 +105,11 @@ func _check_rules() -> void:
 	player.toll = 20
 	_expect(not EffectResolver.card_blocked(card, player), "On 20: playable")
 	var plus := Combatant.new(MAX_HP)
-	plus.toll = 16
-	_expect(not EffectResolver.card_blocked(load(TEMPERED_PATH), plus), "Owed Time+ on 16: playable")
-	plus.toll = 15
-	_expect(EffectResolver.card_blocked(load(TEMPERED_PATH), plus), "...on 15: not")
+	var plus_toll: int = (load(TEMPERED_PATH) as CardData).effects[0].toll_cost
+	plus.toll = plus_toll
+	_expect(not EffectResolver.card_blocked(load(TEMPERED_PATH), plus), "Owed Time+ on %d: playable" % plus_toll)
+	plus.toll = plus_toll - 1
+	_expect(EffectResolver.card_blocked(load(TEMPERED_PATH), plus), "...on %d: not" % (plus_toll - 1))
 	_play(card, player)
 	_expect_eq(player.toll, 0, "Played: 20 Toll spent")
 	var owed: Status = Status.find_in(player.statuses, status)

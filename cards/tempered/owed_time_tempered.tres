@@ -8,7 +8,7 @@
 [sub_resource type="Resource" id="E_spend"]
 script = ExtResource("2_card_effect")
 effect_type = 21
-toll_cost = 16
+toll_cost = 15
 
 [sub_resource type="Resource" id="E_owed_time"]
 script = ExtResource("2_card_effect")
@@ -18,12 +18,11 @@ status_data = ExtResource("3_owed_time")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Owed Time+"
-cost = 3
 card_type = 1
 rarity = 3
 target_type = 1
 removal_scope = 1
-description = "Take another turn after this.
+description = "Take another turn after this one.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_owed_time")])
 art = ExtResource("9_art")
