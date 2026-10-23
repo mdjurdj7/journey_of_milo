@@ -3737,7 +3737,7 @@ func _card_slot_of(event: InputEvent) -> int:
 
 # A number key: the card at that hand position (HandContainer.card_view_
 # at_position()), as a click on it - into Devour's or Sheathe's open pick,
-# else armed (request_play(), by key). The
+# toggled in an open choice, else armed (request_play(), by key). The
 # armed card's own key again plays it (confirm_armed()); another card's
 # switches to that one, when it can be played - the armed one straight
 # back to the fan. No card there, or one still in flight: nothing.
@@ -3749,6 +3749,12 @@ func key_slot(index: int) -> void:
 		return
 	if _devour_picking or _sheathe_picking:
 		request_play(view)
+		return
+	# Every hand choice (the end-of-turn keep, Bide, Twice Over, Take In,
+	# Weathered Map): the card marked or unmarked, as a click; its own
+	# confirm keys as before.
+	if _choice_open():
+		toggle_choice(view)
 		return
 	if _pending_card_view != null:
 		if view == _pending_card_view:
