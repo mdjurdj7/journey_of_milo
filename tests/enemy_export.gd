@@ -453,6 +453,7 @@ static func _enemy_entry(data: EnemyData, appears_on: Array) -> Dictionary:
 		"elite": data.is_elite,
 		"mechanic_summary": data.mechanic_summary,
 		"starts_dormant": data.starts_dormant,
+		"starts_aboard": data.starts_aboard,
 		"field": _field_entry(data),
 		"moveset": _moveset_entry(data),
 		"statuses": _status_entries(data),
@@ -581,7 +582,7 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 		EnemyIntent.IntentType.HEAL_ALLY:
 			entry["heal_each_packmate"] = intent.value
 		EnemyIntent.IntentType.SIGNAL:
-			entry["signal"] = "wakes every dormant packmate; each living packmate answers at once with one attack out of turn"
+			entry["signal"] = "deploys every packmate still aboard and wakes every dormant one; each living packmate answers at once with one attack out of turn"
 		EnemyIntent.IntentType.DIG:
 			# Its moves under the sand, one a turn, the last surfacing it;
 			# its mounds, each a target of mound_hp.

@@ -1001,6 +1001,7 @@
       "elite": true,
       "mechanic_summary": "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 7 and 3 Venom, Strike 13, in a loop. Coiled from its Coil until its next move (a Denied Coil brings none), it strikes back for 5 at every Attack played against it - which Brace, Garnish, No Further and Unbroken don't reduce; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and leaves a worn piece where it falls: its Shed Skin, or rarely the Coiled Wrap.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Adder/Adder.glb",
         "model_is_default": false,
@@ -1139,6 +1140,7 @@
       "elite": false,
       "mechanic_summary": "Alternates Peck (4 x 2) and Lunge (12), and is Fed while its Nipper lives; once alone it turns Hungry and every hit deals 3 more. Hungry adds the most to the two-hit Peck.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Stork/Stork.glb",
         "model_is_default": false,
@@ -1260,6 +1262,7 @@
       "elite": false,
       "mechanic_summary": "One of a pair of crowned cranes on a shared loop, Bow (4 Block), Step (6), Leap (10), both on the same step. Paired from the start: if its partner falls first it turns Bereft and carries out each step twice. Felled on the same turn, neither acts again.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Chalkcrown/crane.glb",
         "model_is_default": false,
@@ -1374,6 +1377,7 @@
       "elite": false,
       "mechanic_summary": "Bites for 3 twice, then every living dragonfly Swarms together, 4 each, in one beat; each turn it acts, its attacks deal 1 more for the fight (Quickening). Teaches thinning a pack before its shared turn lands all at once, and racing it.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Dragonfly/Dragonfly_body.glb",
         "model_is_default": false,
@@ -1501,6 +1505,7 @@
       "elite": false,
       "mechanic_summary": "The crab's escort: bites for 3 every turn, on its own clock. Teaches that a weak second body still adds up - deal with it or outpace it.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Dragonfly/Dragonfly_body.glb",
         "model_is_default": false,
@@ -1562,6 +1567,7 @@
       "elite": false,
       "mechanic_summary": "Snarls for 8, then Rushes for 12; every Attack card played against it while Rush is coming adds 2 to that Rush, up to +8. Teaches holding Attacks on the Rush turn and hitting while it Snarls.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Dunecur/Dunecur.glb",
         "model_is_default": false,
@@ -1664,6 +1670,7 @@
       "elite": false,
       "mechanic_summary": "A pufferfish resting in the shallows, on a two-turn rhythm in step with the Underfoot: Puff, telegraphed by its false-eye glyph, then Inflated through the next turn - Attacks at one enemy must target it, and it takes 50% less - while it Bites (4) and lets the air out. Brace the Sting, use area Attacks or pop it on the taunt turn; killing it lifts the taunt at once.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Glower/Glower_deflated.glb",
         "model_is_default": false,
@@ -1758,6 +1765,7 @@
       "elite": false,
       "mechanic_summary": "Lashes its tail 5 × 3, then Gapes for 24, in turn — break the Gape by dealing 26 that turn, but every Attack card you play into it adds 2, up to 30; broken, it lands nothing. Off its rock below half HP, the lash strikes four times and the Gape breaks at 20. Teaches committing a whole turn to one break, and knocking it off its rock.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Greyshelf/Greyshelf.glb",
         "model_is_default": false,
@@ -1884,8 +1892,9 @@
       "file": "res://battle/rules/enemies/nettle.tres",
       "hp": 9,
       "elite": false,
-      "mechanic_summary": "One of the three small scorpions riding in the Nettlebasket's cradle. Dormant from the fight's start - no intent, no action, but hit and hurt as ever - until the Nettlebasket Signals, or the enemy turn after she falls; then it Nips for 2 every turn, and answers each Signal with one more Nip out of turn.",
+      "mechanic_summary": "One of the three small scorpions riding in the Nettlebasket's cradle. Not in the fight until she Signals - no plate, no intent, out of reach of every card, Carve included - then it comes off the basket to its place, Nips for 2 every turn, and answers each Signal with one more Nip out of turn. If she falls before her Signal, it never comes out.",
       "starts_dormant": true,
+      "starts_aboard": true,
       "field": {
         "model": "res://assets/models/enemies/Nettlebasket/Nettlebasket.glb",
         "model_is_default": false,
@@ -1975,8 +1984,9 @@
       "file": "res://battle/rules/enemies/nettlebasket.tres",
       "hp": 36,
       "elite": false,
-      "mechanic_summary": "A scorpion carrying three Nettles in the cradle on her back. Pinches for 6, then Signals - every Nettle wakes and strikes at once, out of turn - then Stings for 12, in a loop; with the Nettles gone the Signal drops out and she alternates Pinch and Sting. Teaches clearing a pack before its caller brings it in: an attack on all of them weakens the Nettles before they wake.",
+      "mechanic_summary": "A scorpion carrying three Nettles in the cradle on her back. Pinches for 6, then Signals - every Nettle comes off the basket and strikes at once, out of turn - then Stings for 12, in a loop; with the Nettles gone the Signal drops out and she alternates Pinch and Sting. Until the Signal the fight is her alone: the Nettles can't be hit. Teaches bursting a caller before it brings its pack in: kill her before the Signal and the Nettles never come out.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Nettlebasket/Nettlebasket.glb",
         "model_is_default": false,
@@ -2007,7 +2017,7 @@
           {
             "name": "Signal",
             "type": "SIGNAL",
-            "signal": "wakes every dormant packmate; each living packmate answers at once with one attack out of turn",
+            "signal": "deploys every packmate still aboard and wakes every dormant one; each living packmate answers at once with one attack out of turn",
             "pack_only": "a pack move: dropped from the loop once the enemy is the last of its pack"
           },
           {
@@ -2062,6 +2072,7 @@
       "elite": false,
       "mechanic_summary": "Nips for 3 twice, then Forages: each living packmate heals 8. Teaches kill order - it keeps the Blackback topped up, but killing it first turns the Blackback Hungry.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Sputter/Sputter.glb",
         "model_is_default": true,
@@ -2146,6 +2157,7 @@
       "elite": false,
       "mechanic_summary": "Buried in the sand on the field, and dug in when the fight opens: three mounds of 12 HP rise close together and it is under one of them. Break its mound and it surfaces Exposed (takes 50% more) until your next turn ends, the overkill carried into it; break a wrong one and nothing happens. An attack on every enemy hits every mound. Left alone through your turn, it Erupts for 14 - only Block reduces it, not Brace, Garnish, No Further or Unbroken - and surfaces. Up, it Snaps for 6, Charges for 14, then Digs again. Teaches reading the sand - the one mound that breathes.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Siltjaw/Siltjaw.glb",
         "model_is_default": false,
@@ -2262,6 +2274,7 @@
       "elite": false,
       "mechanic_summary": "Picks its move fresh each turn - a 7 Block, a 5 Strike or a 9 Scissor - never Block or Scissor on turn one, never Block twice running. Teaches reading the intent every turn instead of learning a pattern.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Sputter/Sputter.glb",
         "model_is_default": true,
@@ -2366,6 +2379,7 @@
       "elite": false,
       "mechanic_summary": "One of a pair of crowned cranes on a shared loop, Bow (4 Block), Step (6), Leap (10), both on the same step. Paired from the start: if its partner falls first it turns Bereft and carries out each step twice. Felled on the same turn, neither acts again.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Strawcrown/crane.glb",
         "model_is_default": false,
@@ -2480,6 +2494,7 @@
       "elite": false,
       "mechanic_summary": "A stingray under the sand at the waterline, on a two-turn rhythm: Covered (takes 50% less damage) while its Sting (14) is telegraphed, then Exposed (takes 50% more) while it reburies, dealing nothing. The Sting can't be broken — Block or Brace it, work the enemy beside it, and hit the Underfoot when it's Exposed.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Underfoot/Underfoot.glb",
         "model_is_default": false,
@@ -2598,6 +2613,7 @@
       "elite": true,
       "mechanic_summary": "An elite tied to its post: Shove 9, Stamp 5, Trample 11 in a loop, its attacks growing every two turns (x1.3, x1.6, then x2); the first time it drops below half HP it loses a turn. Teaches racing escalation, and leaves a worn piece where it falls: the Harness, or rarely its Lamp.",
       "starts_dormant": false,
+      "starts_aboard": false,
       "field": {
         "model": "res://assets/models/enemies/Wardling/Wardling.glb",
         "model_is_default": false,
