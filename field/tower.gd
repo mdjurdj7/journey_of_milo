@@ -51,10 +51,12 @@ class_name Tower
 	set(value):
 		sides = value
 		_rebuild()
-# Fraction of the whole tower added per floor index: every dimension x
-# (1 + this x RunState.current_floor_index). The tower grows with depth
-# (see docs/GAME_FRAMEWORK.md) - a touch per floor, read at rebuild,
-# which is once per floor since a floor change is a scene reload.
+# Fraction of the whole tower added per floor crossed: every dimension x
+# (1 + this x RunState.floors_crossed) - the run's own count, across
+# regions, which matches the floor index all through Region 1 and keeps
+# growing past it. The tower grows with depth (see docs/GAME_FRAMEWORK.md)
+# - a touch per floor, read at rebuild, which is once per floor since a
+# floor change is a scene reload.
 @export var growth_per_floor: float = 0.02:
 	set(value):
 		growth_per_floor = value
@@ -116,7 +118,7 @@ func _ready() -> void:
 	_rebuild()
 
 func _floor_scale() -> float:
-	return 1.0 + growth_per_floor * float(RunState.current_floor_index)
+	return 1.0 + growth_per_floor * float(RunState.floors_crossed)
 
 func _fog_color() -> Color:
 	var sky := get_node_or_null(sky_path) as RegionSky
