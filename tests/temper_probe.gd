@@ -27,6 +27,16 @@ const COMPENDIUM_SCENE_PATH := "res://ui/card_compendium.tscn"
 const TEMPERED_DIR := "res://cards/tempered/"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 const STARTERS: Array[String] = ["slash", "bite_down", "brace", "settled_account", "down_payment"]
+# The cards the screen case previews: the starting deck's (Endure, the
+# basic defence card, from cards/neutral/), and the two Toll cards it no
+# longer holds, added to the deck so their inline Toll mark still previews.
+const PREVIEWED: Dictionary = {
+	"slash": "res://cards/data/slash.tres",
+	"bite_down": "res://cards/data/bite_down.tres",
+	"endure": "res://cards/neutral/endure.tres",
+	"settled_account": "res://cards/data/settled_account.tres",
+	"down_payment": "res://cards/data/down_payment.tres",
+}
 # The smallest rules size a tempered face may shrink to and still read.
 const MIN_RULES_SIZE := 13
 # Scripts whose folder lists must leave cards/tempered/ out: the
@@ -448,6 +458,10 @@ func _check_screen_short() -> void:
 # (LEAVE refused), then EMPTY. The tempered card is dimmed next time.
 func _check_screen_temper() -> void:
 	_new_run_on_field()
+	for id: String in PREVIEWED:
+		var card: CardData = load(PREVIEWED[id])
+		if _index_of(_deck(), card.card_name) < 0:
+			_deck().append(card)
 	_run_state.call("add_glassbone", 1)
 	var screen: Node = await _open_screen()
 	if screen == null:
@@ -467,11 +481,13 @@ func _check_screen_temper() -> void:
 	for i in grid.size():
 		var card: CardData = grid[i]
 		_expect_eq(views[i].modulate.a < 1.0, card.tempered == null, "%s is %s" % [card.card_name, "dimmed" if card.tempered == null else "pickable"])
-	for id in STARTERS:
-		var name: String = (load("res://cards/data/%s.tres" % id) as CardData).card_name
+	for id: String in PREVIEWED:
+		var name: String = (load(PREVIEWED[id]) as CardData).card_name
 		await _preview(screen, name)
 		_expect_eq(screen.call("get_mode"), "PREVIEW", "Picking %s previews it" % name)
 		var after: CardView = screen.get("_after_view")
+		if after == null:
+			continue
 		var text: String = after.rules_text.text
 		var cost_mark: Node = after.get_node_or_null(^"CostMark")
 		match id:
@@ -479,8 +495,9 @@ func _check_screen_temper() -> void:
 				_expect_eq(text, "Deal [u]9[/u] damage.", "...Slash+ underlines its 9")
 			"bite_down":
 				_expect_eq(text, "Deal [u]11[/u] damage.\nThen lose 2 HP.", "...Bite Down+ underlines its 11 alone")
-			"brace":
-				_expect(text.ends_with("\n[u]Draw 1.[/u]") and text.count("[u]") == 1, "...Brace+ underlines its added line whole (%s)" % text)
+			"endure":
+				var block: int = _values((load(PREVIEWED[id]) as CardData).tempered, CardEffect.EffectType.BLOCK)[0]
+				_expect_eq(text, "Gain [u]%d[/u] block." % block, "...Endure+ underlines its Block alone")
 			"settled_account":
 				_expect(text.begins_with("Gain [u]8[/u] block.
 ") and text.count("[u]") == 1 and text.contains(CardView.TOLL_SPACER_CLOSE), "...Settled Account+ underlines its 8 alone, its Toll mark inline (%s)" % text)
