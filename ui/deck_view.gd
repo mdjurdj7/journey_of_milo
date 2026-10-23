@@ -34,6 +34,9 @@ signal card_picked(card: CardData)
 # and any battle overlay. Every size is in the 1080p canvas's pixels.
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+# Every open DeckView is in this group - what keeps the battle's number
+# keys off the hand under one (BattleController._unhandled_input()).
+const OPEN_GROUP := &"open_deck_views"
 const VOICE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 
 @export_group("Page")
@@ -310,6 +313,7 @@ var _voice_font: Font = null
 var _card_height: float = 0.0
 
 func _ready() -> void:
+	add_to_group(OPEN_GROUP)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_anchors_preset(Control.PRESET_FULL_RECT)

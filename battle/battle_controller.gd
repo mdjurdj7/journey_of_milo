@@ -3669,10 +3669,14 @@ func _on_card_view_clicked(card_view: CardView) -> void:
 # read at any time; an armed card's target also moves by target_next/
 # target_prev (cycle_key_target()) and plays on battle_confirm.
 func _unhandled_input(event: InputEvent) -> void:
+	# A pile view open over the fight (DeckView) covers the hand from the
+	# keys as from the mouse.
+	var covered: bool = get_tree().get_first_node_in_group(DeckView.OPEN_GROUP) != null
 	var slot: int = _card_slot_of(event)
 	if slot >= 0:
-		key_slot(slot)
-		get_viewport().set_input_as_handled()
+		if not covered:
+			key_slot(slot)
+			get_viewport().set_input_as_handled()
 		return
 	if _devour_picking:
 		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT) or event.is_action_pressed("battle_cancel"):
@@ -3712,6 +3716,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("battle_cancel"):
 		cancel_target()
 		get_viewport().set_input_as_handled()
+	elif covered:
+		return
 	# Shift+Tab is Tab with Shift held - target_prev is asked first, as
 	# target_next's Tab matches it too.
 	elif event.is_action_pressed("target_prev"):
