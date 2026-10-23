@@ -72,6 +72,13 @@ const SWORD_FIT_PROPERTIES: Array[StringName] = [&"sword_length", &"grip_fractio
 @export var dash_distance: float = 6.0
 @export var dash_duration: float = 0.2
 @export var dash_cooldown: float = 1.0
+# The walk to a fight's stance round what stands in the way (enter_battle_
+# stance_along()), metres a second - its own pace, not move_speed, so the
+# field walk's speed never retimes a fight's opening. Read as the walk is
+# laid out.
+@export var stance_walk_speed: float = 5.0:
+	set(value):
+		stance_walk_speed = value
 
 @export_group("Point To Move")
 # A click on the field (see RegionField._unhandled_input()) is planned
@@ -2463,7 +2470,7 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 
 # A stance reached round something standing between him and it (Region
 # Field._stance_path_round() - the Greyshelf's rock): walked along `path`
-# (world points, his own spot first, the stance last) at move_speed, the
+# (world points, his own spot first, the stance last) at stance_walk_speed, the
 # walk playing and each leg faced, through the battle freeze as a tween -
 # then settled into the stance as enter_battle_stance() does, over
 # settle_duration, from where the walk ends. Returns the walk's seconds,
@@ -2481,7 +2488,7 @@ func enter_battle_stance_along(path: PackedVector3Array, target: Node3D, spacing
 		var flat := Vector3(leg.x, 0.0, leg.z)
 		if flat.length() < 0.01:
 			continue
-		var leg_seconds: float = flat.length() / maxf(move_speed, 0.1)
+		var leg_seconds: float = flat.length() / maxf(stance_walk_speed, 0.1)
 		var face: float = _angle_from_direction(flat.normalized())
 		angle = angle + wrapf(face - angle, -PI, PI)
 		tween.tween_property(self, "global_position", path[i], leg_seconds)
