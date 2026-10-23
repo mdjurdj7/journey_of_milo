@@ -54,7 +54,7 @@ Every model — characters, enemies, props — is textured and drawn on the pain
 - Meshy, **Smart Topology, texture on**, Standard resolution, Pose off. Reference image on white with nothing but the object (no rail, no ground).
 - Download glb, **Resize to real height**, origin **Bottom** (feet/keel at y 0).
 - In engine: the painted shader with the glb's colour map, darker than dry sand.
-- The existing hulls and the cormorant keep their old flat tint (Hull's shared flat material: hulls (0.50, 0.47, 0.42); the cormorant (0.28, 0.29, 0.31)) until they are regenerated textured.
+- The hulls wear hull.glb's own colour map (`hull_0.jpg`, tint white: on screen about 0.58 of the sand's value). The cormorant keeps its old flat tint (Hull's shared flat material, (0.28, 0.29, 0.31)) until it is regenerated textured.
 - Age is placement: sink 0.3 × height, roll 8–12°, low side toward the water. Never damage.
 - **Glassbone** is the one exception to the painted shader (Bible §20): its own restrained material, set with the first piece built (floor 2's seam, `GlassboneSeam` - since its shard model, the whole mesh wears it, the model's own maps ignored) in `field/glassbone_material.tres` - every Glassbone piece wears it:
   - albedo (0.86, 0.87, 0.84) - pale, a hair cool, never white; alpha 0.82 (alpha-blended: slightly translucent, the stone under it just reads through)

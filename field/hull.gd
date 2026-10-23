@@ -3,13 +3,12 @@ class_name Hull
 
 # An aged rowing-boat hull pulled up on the sand: the opening room's mid-
 # distance dressing (Region 1 doc, section 3). Loads hull.glb at runtime
-# under this node, applies the project's flat matte material (same shape
-# as Wanderer._build_flat_material() - one StandardMaterial3D via
-# material_override on every mesh, roughness 1, no specular; the glb's own
-# PBR textures are ignored - the hull keeps this flat tint until it is
-# regenerated textured for the painted shader, Field Asset Spec §3),
-# faces its bow seaward, and sits on the relief minus sink_depth of its
-# own height.
+# under this node on its own colour map (colour_map_path, the glb's
+# baseColor) under the painted shader, times tint, with the enemy_fog
+# pass laid over it at fog_factor (PaintedProp, Field Asset Spec §3) -
+# the shared flat material, tinted, only if that fails to load. Faces
+# its bow seaward, and sits on the relief minus sink_depth of its own
+# height.
 # Solid to the Wanderer at the gunwale (see collision_inset).
 
 const MODEL_SCENE_PATH := "res://assets/models/hull/hull.glb"
@@ -74,17 +73,26 @@ const MODEL_SCENE_PATH := "res://assets/models/hull/hull.glb"
 	set(value):
 		yaw_offset_degrees = value
 		_ground_to_relief()
-# Weathered wood as a dark figure on the pale ground: a grey with a
-# slight warm bias (R - B +0.08, less warm than the sand's +0.14),
-# applied as the albedo of this hull's own duplicate of the shared flat
-# material (see _shared_flat_material), so it's well below the sand
-# (Ground.ground_color (0.74, 0.70, 0.60), value 0.74 vs 0.50 here)
-# without touching the material anything else shares.
-@export var hull_tint: Color = Color(0.50, 0.47, 0.42):
+# The hull's own colour map - weathered wood, a dark figure on the pale
+# ground.
+@export_file("*.jpg", "*.png") var colour_map_path: String = "res://assets/models/hull/hull_0.jpg":
 	set(value):
-		hull_tint = value
-		if _material != null:
-			_material.albedo_color = value
+		colour_map_path = value
+		if _model != null:
+			_dress_model()
+# Multiplied into the colour map - white is the map as painted.
+@export var tint: Color = Color(1.0, 1.0, 1.0):
+	set(value):
+		tint = value
+		_apply_tint()
+# Its share of the depth fog - 1 fogged as the scene fogs it.
+@export_range(0.0, 1.0, 0.01) var fog_factor: float = 1.0:
+	set(value):
+		fog_factor = value
+		_push_fog()
+# The flat fallback's colour, should the colour map fail to load: the
+# hulls' old flat tint, a step darker than the sand.
+const FALLBACK_TINT := Color(0.50, 0.47, 0.42)
 # Instances live under RegionField/Hulls, so Ground and RegionField are
 # two levels up.
 @export var ground_path: NodePath = ^"../../Ground"
@@ -126,9 +134,9 @@ static func reset_findings() -> void:
 
 # The project's flat matte material (the same recipe as Wanderer._build_
 # flat_material(): roughness 1, no specular), built once for the class
-# and never applied directly - every Hull duplicates it and tints the
-# copy (hull_tint), so the shared instance stays untouched for anything
-# else that adopts it.
+# and never applied directly - whatever adopts it (the painted props'
+# fallbacks, the bird, a hull whose colour map fails) duplicates it and
+# tints the copy, so the shared instance stays untouched.
 static var _shared_flat_material: StandardMaterial3D = null
 
 static func _get_shared_flat_material() -> StandardMaterial3D:
@@ -139,8 +147,11 @@ static func _get_shared_flat_material() -> StandardMaterial3D:
 	return _shared_flat_material
 
 var _model: Node3D = null
-# This hull's own tinted duplicate of _shared_flat_material.
-var _material: StandardMaterial3D = null
+# This hull's painted material (or its flat fallback), its fog pass, and
+# the sky that fills it.
+var _material: Material = null
+var _fog: ShaderMaterial = null
+var _sky: RegionSky = null
 var _approach_area: Area3D = null
 var _approach_shape: SphereShape3D = null
 var _collision_body: StaticBody3D = null
@@ -162,6 +173,11 @@ var _ready_done: bool = false
 
 func _ready() -> void:
 	_spawn_model()
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	_sky = region_field.get_region_sky() if region_field != null else null
+	if _sky != null:
+		_sky.fog_changed.connect(_push_fog)
+	_push_fog()
 	_spawn_approach_area()
 	_ready_done = true
 	_apply_facing()
@@ -186,15 +202,36 @@ func _spawn_model() -> void:
 	_model = scene.instantiate() as Node3D
 	_model.name = "Model"
 	add_child(_model)
+	_dress_model()
+	_apply_model_transform()
 
-	_material = _get_shared_flat_material().duplicate() as StandardMaterial3D
-	_material.albedo_color = hull_tint
+# The painted material on every mesh, its fog pass over it - or the flat
+# fallback, tinted, if the colour map or the shader fails to load.
+func _dress_model() -> void:
+	_material = PaintedProp.material(colour_map_path, tint)
+	_fog = null
+	if _material != null:
+		_fog = PaintedProp.fog_pass()
+		_material.next_pass = _fog
+	else:
+		_material = _get_shared_flat_material().duplicate() as StandardMaterial3D
+		_apply_tint()
 	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
 		var mi := mesh_instance as MeshInstance3D
 		mi.material_override = _material
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	_push_fog()
 
-	_apply_model_transform()
+# The painted material's albedo_tint; the flat fallback's colour is
+# FALLBACK_TINT times tint.
+func _apply_tint() -> void:
+	if _material is ShaderMaterial:
+		(_material as ShaderMaterial).set_shader_parameter("albedo_tint", tint)
+	elif _material is BaseMaterial3D:
+		(_material as BaseMaterial3D).albedo_color = FALLBACK_TINT * tint
+
+func _push_fog() -> void:
+	PaintedProp.push_fog(_fog, _sky, fog_factor)
 
 # The approach trigger: a sphere of approach_radius around the hull's
 # origin, watching for the Wanderer (group "wanderer", a CharacterBody3D

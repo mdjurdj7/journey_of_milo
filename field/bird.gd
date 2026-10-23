@@ -40,7 +40,7 @@ enum FlyDirection { SEAWARD, INLAND, LEFT, RIGHT }
 		model_yaw_offset_degrees = value
 		if _model != null and _body == null:
 			_model.rotation = Vector3(0.0, deg_to_rad(model_yaw_offset_degrees), 0.0)
-# Cormorant-dark: clearly darker than a Hull's hull_tint.
+# Cormorant-dark: clearly darker than a hull (Hull.FALLBACK_TINT, the hulls' old flat tint).
 @export var bird_tint: Color = Color(0.28, 0.29, 0.31)
 # Local position on the parent (the perch): the point the bird's feet
 # rest on.
