@@ -40,8 +40,10 @@ const SHRUNK_RULES: Dictionary = {
 	"Blood Arc": 14,
 	"Collateral": 14,
 	"Cornered": 14,
+	"Go Under": 14,
 	"Last Resort": 14,
 	"No Further": 14,
+	"Owed Time": 14,
 	"Refuse the End": 13,
 	"The Return": 13,
 }
