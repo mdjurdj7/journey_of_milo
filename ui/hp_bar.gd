@@ -400,6 +400,29 @@ class_name HPBar
 		_restyle_critical_slip()
 @export_group("")
 
+@export_group("Toll Hover")
+# The battle's Toll readout hovered: what Toll does between fights, on a
+# slip styled as the Critical line's (its Critical Hover exports) -
+# toll_hover_name in Bold, then toll_hover_format, whose {carry} is the
+# character's toll_carry_cap (KeywordTable.live_values()). Centred
+# critical_hover_gap_px above the readout, under it where there's no room
+# above. The hover area is the readout - numeral, label and rule - grown
+# toll_hover_reach_px each way. Read off the mouse every frame; a card or
+# button under the cursor wins.
+@export var toll_hover_name: String = "Toll":
+	set(value):
+		toll_hover_name = value
+		_sync_toll_hover(true)
+@export var toll_hover_format: String = "kept between fights. Up to {carry} carries to the next floor.":
+	set(value):
+		toll_hover_format = value
+		_sync_toll_hover(true)
+@export var toll_hover_reach_px: float = 3.0:
+	set(value):
+		toll_hover_reach_px = value
+		_sync_toll_hover(true)
+@export_group("")
+
 @export_group("HP Change")
 # A loss: the fill drops in the frame it lands, and a ghost - the fill's
 # own ink at ghost_alpha - holds the lost stretch for ghost_hold_sec, then
@@ -646,6 +669,9 @@ var _blend_tween: Tween = null
 # The Critical line's hover slip, and the line it shows ("" for none).
 var _critical_slip: KeywordSlip = null
 var _critical_slip_text: String = ""
+# The Toll readout's hover slip, and the line it shows ("" for none).
+var _toll_slip: KeywordSlip = null
+var _toll_slip_text: String = ""
 
 func _ready() -> void:
 	# FieldHUD (this panel's parent) already sets PROCESS_MODE_ALWAYS, so
@@ -680,6 +706,11 @@ func _ready() -> void:
 	_critical_slip.set_fade_time(0.0)
 	_critical_slip.visible = false
 	add_child(_critical_slip)
+	_toll_slip = KeywordSlip.new()
+	_toll_slip.name = "TollSlip"
+	_toll_slip.set_fade_time(0.0)
+	_toll_slip.visible = false
+	add_child(_toll_slip)
 	_restyle_critical_slip()
 
 	_reveal = StatusReveal.new()
@@ -1176,6 +1207,7 @@ func set_energy_clearance_x(right_x: float) -> void:
 
 func _process(_delta: float) -> void:
 	_sync_critical_hover()
+	_sync_toll_hover()
 
 # The most HP that is Critical at the line the fight holds now - the
 # fight's own rule (Combatant.critical_at()), so it can't drift from it.
@@ -1218,7 +1250,7 @@ func _sync_critical_hover(force: bool = false) -> void:
 	var text: String = (critical_hover_format % critical_threshold_hp()) if hovered else ""
 	if text == _critical_slip_text and not force:
 		if hovered:
-			_place_critical_slip(area)
+			_place_hover_slip(_critical_slip, area)
 		return
 	_critical_slip_text = text
 	if text.is_empty():
@@ -1228,31 +1260,73 @@ func _sync_critical_hover(force: bool = false) -> void:
 	_critical_slip.visible = hovered
 	_critical_slip.set_revealed(hovered)
 	if hovered:
-		_place_critical_slip(area)
+		_place_hover_slip(_critical_slip, area)
 
-# Centred on the line, critical_hover_gap_px above the area - below it
-# where the window's top would cut it - and kept inside the window.
-func _place_critical_slip(area: Rect2) -> void:
-	var slip_size: Vector2 = _critical_slip.size
+# `slip` centred on its hover area (the Critical line's, the Toll
+# readout's), critical_hover_gap_px above it - below it where the
+# window's top would cut it - and kept inside the window.
+func _place_hover_slip(slip: KeywordSlip, area: Rect2) -> void:
+	var slip_size: Vector2 = slip.size
 	var at := Vector2(area.get_center().x - slip_size.x * 0.5, area.position.y - critical_hover_gap_px - slip_size.y)
 	var view: Vector2 = get_viewport_rect().size
 	var origin: Vector2 = get_global_transform() * Vector2.ZERO
 	if origin.y + at.y < 0.0:
 		at.y = area.end.y + critical_hover_gap_px
 	at.x = clampf(origin.x + at.x, 0.0, maxf(view.x - slip_size.x, 0.0)) - origin.x
-	_critical_slip.position = at.round()
+	slip.position = at.round()
 
+# Both hover slips - the Critical line's and the Toll readout's - in the
+# Critical Hover group's style.
 func _restyle_critical_slip() -> void:
-	if _critical_slip == null:
-		return
-	_critical_slip.set_font_size_px(critical_hover_font_size_px)
-	_critical_slip.set_max_width(critical_hover_max_width_px)
-	_critical_slip.set_padding(critical_hover_padding_px)
-	_critical_slip.set_line_height(critical_hover_line_height)
-	_critical_slip.set_bone(critical_hover_bone)
-	_critical_slip.set_ink(critical_hover_ink)
-	_critical_slip.set_edge(0.0, critical_hover_ink)
+	for slip: KeywordSlip in [_critical_slip, _toll_slip]:
+		if slip == null:
+			continue
+		slip.set_font_size_px(critical_hover_font_size_px)
+		slip.set_max_width(critical_hover_max_width_px)
+		slip.set_padding(critical_hover_padding_px)
+		slip.set_line_height(critical_hover_line_height)
+		slip.set_bone(critical_hover_bone)
+		slip.set_ink(critical_hover_ink)
+		slip.set_edge(0.0, critical_hover_ink)
 	_sync_critical_hover(true)
+	_sync_toll_hover(true)
+
+# The Toll readout's hover area, in this control's space: the readout as
+# _draw_toll() draws it - numeral, label and rule - grown toll_hover_
+# reach_px. Empty out of battle or while no Toll is shown.
+func toll_hover_rect() -> Rect2:
+	if _battle_blend < 1.0 or not _toll_visible or numeral_font == null:
+		return Rect2()
+	var bar_top: float = _battle_bar_top()
+	var left: float = _block_readout_width() + battle_width + toll_gap_px
+	var top: float = bar_top - toll_rule_gap_px - _toll_ascent()
+	return Rect2(left, top, _toll_block_width(), bar_top + toll_rule_px - top).grow(maxf(toll_hover_reach_px, 0.0))
+
+func get_toll_hover_text() -> String:
+	return _toll_slip_text
+
+# Every frame: the slip shows while the cursor is on the readout's hover
+# area and nothing of the UI is under it; `force` re-places it after a
+# layout edit.
+func _sync_toll_hover(force: bool = false) -> void:
+	if _toll_slip == null:
+		return
+	var area: Rect2 = toll_hover_rect()
+	var hovered: bool = area.has_area() and is_visible_in_tree() and get_viewport().gui_get_hovered_control() == null and area.has_point(get_local_mouse_position())
+	var text: String = Status.fill_template(toll_hover_format, KeywordTable.live_values()) if hovered else ""
+	if text == _toll_slip_text and not force:
+		if hovered:
+			_place_hover_slip(_toll_slip, area)
+		return
+	_toll_slip_text = text
+	if text.is_empty():
+		_toll_slip.set_lines(PackedStringArray(), PackedStringArray())
+	else:
+		_toll_slip.set_lines(PackedStringArray([toll_hover_name]), PackedStringArray([text]))
+	_toll_slip.visible = hovered
+	_toll_slip.set_revealed(hovered)
+	if hovered:
+		_place_hover_slip(_toll_slip, area)
 
 func _physics_process(delta: float) -> void:
 	if _wanderer == null or not is_instance_valid(_wanderer):
