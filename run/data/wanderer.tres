@@ -18,6 +18,7 @@ ExtResource("4_endure"): 4,
 ExtResource("3_bite_down"): 1
 }
 starting_weapon = ExtResource("7_rusted_blade")
+basic_defence_card = ExtResource("4_endure")
 has_toll = true
 has_grace = true
 has_devour = true

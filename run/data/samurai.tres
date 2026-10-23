@@ -18,6 +18,7 @@ ExtResource("3_stillness"): 4,
 ExtResource("4_patient_cut"): 1
 }
 reward_pool = ExtResource("6_pool")
+basic_defence_card = ExtResource("3_stillness")
 has_sheathe = true
 field_model_path = "res://assets/models/samurai/samurai_v2.glb"
 field_albedo = ExtResource("7_albedo")

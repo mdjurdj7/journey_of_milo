@@ -27,6 +27,13 @@ class_name CharacterData
 # one that modifies this class's basic attack (WeaponData).
 @export var starting_weapon: WeaponData = null
 
+# The class's basic defence card - Endure for the Wanderer, Stillness for
+# the Samurai - what a piece that upgrades it reads (TrinketData's
+# basic_defence_block_*). A card is it by name: this card's, or its
+# tempered version's (is_basic_defence()). Null = the class has none, and
+# nothing is upgraded.
+@export var basic_defence_card: CardData = null
+
 # What a won fight, and any prop without a pool of its own, rolls from in
 # this character's runs (RegionField.reward_pool()). Null = the floor's own
 # FloorData.reward_pool - the Wanderer's case, whose pool every floor of
@@ -130,3 +137,13 @@ enum GraceCapMode { LARGEST_HIT, SUM }
 # The height the model is scaled to, by its own AABB (Wanderer.
 # target_height's per-character value).
 @export var field_model_height: float = 1.8
+
+# Whether `card` is this class's basic defence card: named as basic_
+# defence_card is, or as its tempered version (Endure, Endure+) - a deck
+# holds copies, so the name is what they share.
+func is_basic_defence(card: CardData) -> bool:
+	if card == null or basic_defence_card == null:
+		return false
+	if card.card_name == basic_defence_card.card_name:
+		return true
+	return basic_defence_card.tempered != null and card.card_name == basic_defence_card.tempered.card_name
