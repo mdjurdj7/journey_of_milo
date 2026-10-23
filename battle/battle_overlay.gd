@@ -375,6 +375,9 @@ var _card_armed: bool = false
 var _choice_prompt: Label = null
 var _choice_card_name: String = ""
 var _choice_verb: String = ""
+# What asks for the open choice (BattleController.hand_choice_started's
+# `source`): the armed card's name, or the keepsake's.
+var _choice_source: String = ""
 # The open choice's DONE (choice_done_text), made with the first choice
 # that has one; hidden while none is open or the open one has none.
 var _choice_done: EndTurnButton = null
@@ -1114,10 +1117,11 @@ func _update_end_turn() -> void:
 
 # `confirm_label`: what confirms the choice when that's something else
 # (END TURN), empty when DONE or the last pick does; `done`: whether it
-# has a DONE.
-func _on_hand_choice_started(confirm_label: String, _cap: int, verb: String, done: bool) -> void:
+# has a DONE; `source`: what asks for it.
+func _on_hand_choice_started(confirm_label: String, _cap: int, verb: String, done: bool, source: String) -> void:
 	_choice_card_name = confirm_label
 	_choice_verb = verb
+	_choice_source = source
 	if _choice_prompt == null:
 		_choice_prompt = Label.new()
 		_choice_prompt.name = "ChoicePrompt"

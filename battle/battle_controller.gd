@@ -36,10 +36,12 @@ signal target_cancelled()
 # the end of the turn (_begin_keep_choice()): opened with up to `cap`
 # cards to mark, the verb that names what happens to them, what to click
 # to confirm when that's something other than DONE (END TURN, the keep's;
-# empty otherwise) and whether it has a DONE (Bide's - a variable count,
-# confirm_choice()), the count marked as it moves, and closed (confirmed,
-# or cancelled with nothing spent).
-signal hand_choice_started(confirm_label: String, cap: int, verb: String, done: bool)
+# empty otherwise), whether it has a DONE (Bide's - a variable count,
+# confirm_choice()) and what asks for it (`source` - the armed card's
+# name, or the keepsake's for the end-of-turn keep; empty for Weathered
+# Map's pick), the count marked as it moves, and closed (confirmed, or
+# cancelled with nothing spent).
+signal hand_choice_started(confirm_label: String, cap: int, verb: String, done: bool, source: String)
 signal hand_choice_changed(marked: int, cap: int)
 signal hand_choice_ended()
 
@@ -266,6 +268,8 @@ var _choice_cap: int = 0
 # lets the hand keep (TrinketData.end_turn_keep), read as the fight opens.
 var _keep_choice_open: bool = false
 var _end_turn_keep: int = 0
+# The keepsakes that keep, by name - what the keep's prompt says asks.
+var _end_turn_keep_source: String = ""
 # Collateral's look (_begin_look()): open while its picker is up - the
 # cards it shows, top first, and the picker; then the card picked, in the
 # hand as the player's free card (Combatant.free_card) until its play
@@ -460,6 +464,8 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 			player.card_count_discount = piece.card_count_discount
 			player.discount_on_card_count = maxi(piece.discount_on_card_count, 0)
 		_end_turn_keep += maxi(piece.end_turn_keep, 0)
+		if piece.end_turn_keep > 0:
+			_end_turn_keep_source = piece.display_name if _end_turn_keep_source.is_empty() else "%s + %s" % [_end_turn_keep_source, piece.display_name]
 		_energy_carry += maxi(piece.energy_carry, 0)
 		player.first_hit_scale = minf(player.first_hit_scale, clampf(piece.first_hit_scale, 0.0, 1.0))
 		# The largest big-hit cut held, with its own threshold.
@@ -955,7 +961,7 @@ func _begin_top_choice() -> void:
 	_choice_cap = 1
 	_choice_eligible = eligible
 	_hand_container.begin_choice(null, eligible)
-	hand_choice_started.emit("", 1, top_choice_verb, false)
+	hand_choice_started.emit("", 1, top_choice_verb, false, "")
 	hand_choice_changed.emit(0, 1)
 	_emit_devour_changed()
 
@@ -1186,9 +1192,9 @@ func _begin_choice(card_view: CardView, cap: int, eligible: Array[CardView] = []
 	card_view.lift_and_hold(true)
 	_hand_container.begin_choice(card_view, eligible)
 	if eligible.is_empty():
-		hand_choice_started.emit("", cap, "KEEP", true)
+		hand_choice_started.emit("", cap, "KEEP", true, card_view.card_data.card_name)
 	else:
-		hand_choice_started.emit("", cap, verb, false)
+		hand_choice_started.emit("", cap, verb, false, card_view.card_data.card_name)
 	hand_choice_changed.emit(0, cap)
 	_emit_devour_changed()
 
@@ -1210,7 +1216,7 @@ func _begin_keep_choice() -> bool:
 	_choice_marked.clear()
 	_choice_cap = cap
 	_hand_container.begin_choice(null)
-	hand_choice_started.emit("END TURN", cap, "KEEP", false)
+	hand_choice_started.emit("END TURN", cap, "KEEP", false, _end_turn_keep_source)
 	hand_choice_changed.emit(0, cap)
 	_emit_devour_changed()
 	return true
