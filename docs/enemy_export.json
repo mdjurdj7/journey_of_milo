@@ -36,7 +36,7 @@
               10,
               15
             ],
-            "card_pool": "res://cards/pools/wanderer_pool.tres",
+            "card_pool": "res://cards/pools/floor1_pool.tres",
             "cards_offered": 3,
             "rarity_rates": {
               "common": 63.0,
@@ -934,7 +934,7 @@
               "weight": 1.0,
               "anchor": [
                 -2.011,
-                -45.886
+                -40.386
               ],
               "slot_yaw_degrees": 0.0,
               "cluster": null,
@@ -948,7 +948,7 @@
                   -0.1022,
                   -0.9948
                 ],
-                "gate_distance_beyond_enemy": 9.0,
+                "gate_distance_beyond_enemy": 14.47,
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0,
                 "engage_line_offset_m": 0.0
@@ -969,7 +969,7 @@
                   "card_reward": "TOP_TIER_FIRST",
                   "position": [
                     -2.011,
-                    -45.886
+                    -40.386
                   ],
                   "yaw_degrees": -174.13,
                   "face_prop": null
@@ -979,8 +979,8 @@
                 {
                   "scene": "res://field/basking_slab.tscn",
                   "position": [
-                    -1.94,
-                    -45.2
+                    -1.845,
+                    -40.57
                   ]
                 }
               ],
@@ -1737,13 +1737,13 @@
       "field": {
         "model": "res://assets/models/enemies/Greyshelf/Greyshelf.glb",
         "model_is_default": false,
-        "model_scale": 1.36,
+        "model_scale": 1.197,
         "model_yaw_offset_degrees": 180.0,
         "attachment": {
           "scene": "res://field/greyshelf_pose.tscn",
           "class": "GreyshelfPose"
         },
-        "contact_radius_m": 4.4,
+        "contact_radius_m": 2.85,
         "cluster_gap_m": null,
         "rest_height_m": 0.0,
         "sink_m": 0.05,
