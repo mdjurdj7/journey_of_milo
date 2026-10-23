@@ -31,9 +31,10 @@ class_name Collector
 # reset_hint(); a hint cut off by a screen opening waits for the next
 # visit.
 #
-# What it hands over (CollectorScreen), rolled once on the first open
+# What it hands over (CollectorScreen), rolled once as the floor loads
 # from the run's generator (RunState.rng) and never restocked - the same
-# stock, minus what was bought, for as long as the floor lasts:
+# stock, minus what was bought, for as long as the floor lasts - so the
+# field can show it before the screen opens:
 #   class_card_count cards of the run's class from its reward pool
 #     (RegionField.run_reward_pool(), neutrals left out) and neutral_card_
 #     count from the neutral pool, each tier first at the floor's own
@@ -46,6 +47,9 @@ class_name Collector
 #   with weapon_chance, one weapon of weapon_paths for the run's class
 #     (WeaponData.card_class), never the one carried;
 #   and one removal, once.
+# A stocked weapon with a model (weapon_display_paths) lies on the sand
+# beside it (CollectorDisplay) - display_offset from it, turned display_
+# rotation_degrees, display_length_m long - until it is bought.
 # Every price is an export, overridable per floor through the FloorProp's
 # overrides; a change re-prices an open screen (prices_changed). State
 # lives on this node: a new floor is a new node.
@@ -118,6 +122,36 @@ const GROUP := &"collectors"
 @export_range(0.0, 1.0, 0.01) var weapon_chance: float = 0.35
 @export_group("")
 
+@export_group("Display")
+# A stocked weapon's model on the sand, weapon_paths' order (empty: none
+# shown), on its colour map (weapon_display_colour_maps).
+@export var weapon_display_paths: PackedStringArray = PackedStringArray(["res://assets/models/weapons/gaff_hook/gaff_hook.glb"]):
+	set(value):
+		weapon_display_paths = value
+		_apply_display()
+@export var weapon_display_colour_maps: PackedStringArray = PackedStringArray(["res://assets/models/weapons/gaff_hook/gaff_hook_0.jpg"]):
+	set(value):
+		weapon_display_colour_maps = value
+		_apply_display()
+# Where it lies: this far from the collector in world axes (XZ - Y from
+# the relief), turned (degrees, YXZ - X -90 lays an upright model down),
+# this long end to end (CollectorDisplay measures the model's own length,
+# however it lies in its box). Floors set their own through the FloorProp's
+# overrides.
+@export var display_offset: Vector3 = Vector3(3.0, 0.0, 2.9):
+	set(value):
+		display_offset = value
+		_apply_display()
+@export var display_rotation_degrees: Vector3 = Vector3(-90.0, 150.0, 0.0):
+	set(value):
+		display_rotation_degrees = value
+		_apply_display()
+@export var display_length_m: float = 1.2:
+	set(value):
+		display_length_m = value
+		_apply_display()
+@export_group("")
+
 @export_group("Prices")
 @export var price_common: int = 40:
 	set(value):
@@ -175,6 +209,8 @@ var _sky: RegionSky = null
 var _aabb: AABB = AABB()
 var _collision_body: StaticBody3D = null
 var _contact_shadow: ContactShadow = null
+# The stocked weapon on the sand, while one is (_apply_display()).
+var _display: CollectorDisplay = null
 var _approach: PropApproach = null
 var _ground: Ground = null
 # hint_line has been said this run.
@@ -226,6 +262,12 @@ func _ready() -> void:
 	_contact_shadow.set_ground(_ground)
 	_ground.relief_rebuilt.connect(_ground_to_relief)
 	_ground_to_relief()
+	# The stock, once the floor is up, so the sand can show it.
+	_roll_on_load.call_deferred()
+
+func _roll_on_load() -> void:
+	ensure_stock()
+	_apply_display()
 
 # The model, dressed, its feet on the origin by its box, and the capsule
 # round it.
@@ -292,6 +334,8 @@ func _apply_tint() -> void:
 
 func _push_fog() -> void:
 	PaintedProp.push_fog(_fog, _sky, fog_factor)
+	if _display != null:
+		_display.push_fog(_sky, fog_factor)
 
 # The pool's radii: the box's half-extents across and along the body.
 func _apply_shadow_footprint() -> void:
@@ -346,6 +390,7 @@ func _ground_to_relief() -> void:
 		return
 	var local_xz: Vector3 = _ground.to_local(Vector3(global_position.x, 0.0, global_position.z))
 	global_position.y = _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
+	_apply_display()
 
 # Whether the Wanderer at `from` is in reach (approach_radius, on the
 # ground).
@@ -355,7 +400,14 @@ func can_open_from(from: Vector3) -> bool:
 
 # --- Stock ---
 
-# The roll, on the first call only (the first open): the class cards,
+# For probes that change what the roll reads (weapon_chance, the pieces
+# held) after the floor has loaded: the stock rolled again.
+func reroll_stock() -> void:
+	_rolled = false
+	ensure_stock()
+	_apply_display()
+
+# The roll, on the first call only (the floor's load): the class cards,
 # the neutral cards, the worn piece, the keepsake, then the weapon's
 # chance - in that order, from the run's generator.
 func ensure_stock() -> void:
@@ -458,6 +510,44 @@ func get_goods() -> Array[CollectorGood]:
 func take_good(index: int) -> void:
 	if index >= 0 and index < _goods.size():
 		_goods_taken[index] = true
+	_apply_display()
+
+# The first stocked, untaken weapon with a model (weapon_display_paths),
+# on the sand at display_offset - or none.
+func _apply_display() -> void:
+	if not is_inside_tree():
+		return
+	var model_path: String = ""
+	var colour_map: String = ""
+	for good in get_goods():
+		var weapon: WeaponData = good.get_weapon() if good != null else null
+		if weapon == null:
+			continue
+		var index: int = weapon_paths.find(weapon.resource_path)
+		if index >= 0 and index < weapon_display_paths.size() and not weapon_display_paths[index].is_empty():
+			model_path = weapon_display_paths[index]
+			colour_map = weapon_display_colour_maps[index] if index < weapon_display_colour_maps.size() else ""
+			break
+	if model_path.is_empty():
+		if _display != null:
+			_display.queue_free()
+			_display = null
+		return
+	if _display == null:
+		_display = CollectorDisplay.new()
+		_display.name = "Display"
+		add_child(_display)
+		_display.set_ground(_ground)
+	if not _display.dress(model_path, colour_map):
+		_display.queue_free()
+		_display = null
+		return
+	_display.push_fog(_sky, fog_factor)
+	_display.place(global_position + Vector3(display_offset.x, 0.0, display_offset.z), display_rotation_degrees, display_length_m)
+
+# For probes: the weapon on the sand, or null.
+func get_display() -> CollectorDisplay:
+	return _display
 
 # The Bedroll stocked, until it is bought; null with none or once taken.
 func get_bedroll() -> BedrollData:

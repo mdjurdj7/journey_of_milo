@@ -285,6 +285,8 @@ func _check_buy() -> void:
 func _check_goods() -> void:
 	await _load_floor_4(0)
 	_collector.set("weapon_chance", 1.0)
+	# The stock rolled as the floor loaded: again, at this chance.
+	_collector.call("reroll_stock")
 	var worn_table := load(str(_collector.get("worn_table_path"))) as KeepsakeTable
 	var keepsake_table := load(str(_collector.get("keepsake_table_path"))) as KeepsakeTable
 	var screen: Node = _open()
@@ -381,6 +383,7 @@ func _check_goods() -> void:
 
 	await _load_floor_4(0)
 	_collector.set("weapon_chance", 0.0)
+	_collector.call("reroll_stock")
 	var without: Node = _open()
 	if without != null:
 		_expect_eq(_line_of_kind(without, KIND_WEAPON), -1, "At chance 0, no weapon")

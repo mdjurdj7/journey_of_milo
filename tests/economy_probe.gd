@@ -141,6 +141,9 @@ func _check_collector() -> void:
 	var old_weapon: WeaponData = _run_state.get("weapon")
 	var base_max_hp: int = int(_run_state.get("player_max_hp")) - (old_worn.max_hp_bonus if old_worn != null else 0)
 	_run_state.call("add_gold", PURSE)
+	# The stock rolled as the floor loaded: again, at this chance and with
+	# these pieces held.
+	collector.call("reroll_stock")
 	var screen: Node = _open(collector)
 	if screen == null:
 		return
