@@ -52,6 +52,9 @@ const WAGON_FLOOR := 2
 # How far into the sand a wheel or a shaft tip may sit: the cart's sink
 # plus its roll's dip at the wheels, and a margin.
 const CART_SUNK_MAX := 0.09
+# How far every footprint sample keeps from every ledge line, so no
+# footprint lies across one.
+const LEDGE_CLEAR_M := 0.3
 # The handcart glb's own points (model frame): a wheel's lowest point
 # either side of the axle, and the shaft tips - Handcart's defaults.
 const CART_WHEEL_LOW: Array[Vector3] = [Vector3(-0.636, 0.001, -0.69), Vector3(-0.636, 0.001, 0.69)]
@@ -415,24 +418,53 @@ func _check_wagon_placement() -> void:
 	_completed += 1
 
 # A prop's footprint (`rect`, in its own XZ) on walkable ground: every
-# sampled point inside the floor's ledge lines - never across one - and
+# sampled point inside the floor's outer rim, LEDGE_CLEAR_M or more from
+# every ledge line (so across none - the rim's or floor 3's ridges'), and
 # on land, not in the water.
 func _expect_on_walkable_ground(label: String, node: Node3D, rect: Rect2, spawn: Vector3, ground: Node) -> void:
 	var ledges: Array = (_field.call("get_floor_data") as Resource).get("ledges")
+	var rim: PackedVector2Array = _outer_rim(ledges)
 	var outside: int = 0
+	var across: int = 0
 	var wet: int = 0
 	for u in 9:
 		for v in 5:
 			var local := Vector3(lerpf(rect.position.x, rect.end.x, float(u) / 8.0), 0, lerpf(rect.position.y, rect.end.y, float(v) / 4.0))
 			var point: Vector3 = node.global_transform * local
 			var at := Vector2(point.x, point.z)
+			var relative: Vector2 = at - Vector2(spawn.x, spawn.z)
+			if not rim.is_empty() and not Geometry2D.is_point_in_polygon(relative, rim):
+				outside += 1
 			for ledge: PackedVector2Array in ledges:
-				if not Geometry2D.is_point_in_polygon(at - Vector2(spawn.x, spawn.z), ledge):
-					outside += 1
+				if _distance_to_line(relative, ledge) < LEDGE_CLEAR_M:
+					across += 1
 			if float(ground.call("get_landmass_distance", at)) > 0.0:
 				wet += 1
-	_expect_eq(outside, 0, "%s's footprint inside the floor's ledge lines, across none" % label)
+	_expect_eq(outside, 0, "%s's footprint inside the floor's outer rim" % label)
+	_expect_eq(across, 0, "...across no ledge line (every sample %.2f m clear)" % LEDGE_CLEAR_M)
 	_expect_eq(wet, 0, "...and on land")
+
+# The floor's outer rim: the ledge loop enclosing the most ground (the
+# others - floor 3's ridges - stand inside it). Empty with no ledges.
+func _outer_rim(ledges: Array) -> PackedVector2Array:
+	var rim := PackedVector2Array()
+	var largest: float = -1.0
+	for ledge: PackedVector2Array in ledges:
+		var area: float = 0.0
+		for i in ledge.size():
+			var next: Vector2 = ledge[(i + 1) % ledge.size()]
+			area += ledge[i].cross(next)
+		if absf(area) > largest:
+			largest = absf(area)
+			rim = ledge
+	return rim
+
+# `point`'s distance to the nearest segment of `line`.
+func _distance_to_line(point: Vector2, line: PackedVector2Array) -> float:
+	var nearest: float = INF
+	for i in line.size() - 1:
+		nearest = minf(nearest, point.distance_to(Geometry2D.get_closest_point_to_segment(point, line[i], line[i + 1])))
+	return nearest
 
 # Glassbone short: EMPTY - the count, the empty line, no grid built. The
 # field locks while it's open; ui_cancel closes it and unlocks.
