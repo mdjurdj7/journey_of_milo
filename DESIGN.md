@@ -378,6 +378,20 @@ and up the west shore north of z -27. (2026-10-17.)
   until the region transition from the Greyshelf is built. RegionField
   lists both regions (`regions`) and plays `RunState.current_region_
   index`; nothing advances that index yet. (2026-10-23.)
+- **Region 2 floor 1 is a stand-in test floor.** `floors/region2_
+  floor1.tres` and its masks (`assets/field/masks/region2_floor1_*.png`)
+  are a minimal layout made to exercise the debug start, the Pier's deck
+  and steps, reed-wall ledges, a floor with no sea and the clearing fight
+  - not the designed lakebed. One lane north to a clearing, a west bench
+  with one low point to the pier root, the pier over a hollow (deck ~3 m
+  above it at the end), boat steps onto a short lane back to the
+  clearing; reeds are REED placeholders (1.5 m, 0.8 m in the hollow), one
+  polygon per mass feeding both its ledge and its scatter area. To be
+  replaced by a dimensioned plan and a mask-generator script under
+  `assets/field/masks/source/`; the throwaway generator that made it
+  isn't in the repo. Not built: the south bench and its step-down at
+  spawn, the open patch with the pier in view, the creature's trail, the
+  exit step. (2026-10-23.)
 - **The Samurai is a shell; these are left as they are.** She is a
   second CharacterData (`run/data/samurai.tres`), selected by
   RegionField's `starting_character` export, with no cards, mechanics or

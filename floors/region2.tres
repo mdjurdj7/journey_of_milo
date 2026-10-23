@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="RegionData" format=3]
+
+[ext_resource type="Script" uid="uid://64my4s1ldhv2" path="res://floors/region_data.gd" id="1_region_data"]
+[ext_resource type="Script" uid="uid://8yxy7cpevuvt" path="res://floors/floor_data.gd" id="2_floor_data"]
+[ext_resource type="Resource" path="res://floors/region2_floor1.tres" id="3_floor1"]
+
+[resource]
+script = ExtResource("1_region_data")
+floors = Array[ExtResource("2_floor_data")]([ExtResource("3_floor1")])
+display_name = "The Drained Lake"
