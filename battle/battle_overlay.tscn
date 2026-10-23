@@ -18,6 +18,7 @@ energy_group_offset = Vector2(-246.75, 12)
 sand_puff_tint = 0.75
 keep_prompt_font_size_px = 15
 keep_prompt_gap_px = 10.0
+keep_note_card_gap_px = 12.0
 
 [node name="HandContainer" type="Control" parent="." unique_id=524001564]
 anchors_preset = 0
@@ -36,6 +37,9 @@ fan_max_rotation_degrees = 4.0
 layout_mode = 0
 text = "END TURN"
 script = ExtResource("4_end_turn")
+quiet_alpha = 0.55
+note_font_size_px = 15
+note_gap_px = 4.0
 
 [node name="DebugRow" type="HBoxContainer" parent="." unique_id=770130127]
 visible = false

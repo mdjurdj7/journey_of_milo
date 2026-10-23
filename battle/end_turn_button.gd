@@ -23,9 +23,32 @@ class_name EndTurnButton
 @export var rule_gap_px: float = 3.0
 @export_range(0.0, 1.0) var disabled_alpha: float = 0.4
 @export var label_text: String = "END TURN"
+# Quiet (set_quiet()): enabled, but its text and rule in grey ink - the
+# ink at quiet_alpha - for a confirm that will do the least (KEEP NONE).
+@export_range(0.0, 1.0) var quiet_alpha: float = 0.55:
+	set(value):
+		quiet_alpha = value
+		if is_inside_tree():
+			refresh_style()
+# A note over the label (set_note() - the keep's "KEEP SLASH" over END
+# TURN): right-aligned to it, its bottom note_gap_px over the label's
+# top, in the same tracked caps at note_font_size_px - in ink, or grey
+# ink when quiet. Drawn over the control, not in it: the button keeps its
+# own size and place.
+@export var note_font_size_px: int = 15:
+	set(value):
+		note_font_size_px = value
+		queue_redraw()
+@export var note_gap_px: float = 4.0:
+	set(value):
+		note_gap_px = value
+		queue_redraw()
 
 var _ink: Color = Color.BLACK
 var _hovered: bool = false
+var _quiet: bool = false
+var _note: String = ""
+var _note_quiet: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -51,13 +74,54 @@ func refresh_style() -> void:
 	add_theme_font_size_override("font_size", font_size_px)
 	var dim: Color = _ink
 	dim.a = disabled_alpha
-	add_theme_color_override("font_color", _ink)
-	add_theme_color_override("font_hover_color", _ink)
-	add_theme_color_override("font_pressed_color", _ink)
-	add_theme_color_override("font_focus_color", _ink)
-	add_theme_color_override("font_hover_pressed_color", _ink)
+	var shown: Color = _text_ink()
+	add_theme_color_override("font_color", shown)
+	add_theme_color_override("font_hover_color", shown)
+	add_theme_color_override("font_pressed_color", shown)
+	add_theme_color_override("font_focus_color", shown)
+	add_theme_color_override("font_hover_pressed_color", shown)
 	add_theme_color_override("font_disabled_color", dim)
 	_relayout()
+
+# The label's ink: full, or grey while quiet.
+func _text_ink() -> Color:
+	var shown: Color = _ink
+	if _quiet:
+		shown.a = _ink.a * quiet_alpha
+	return shown
+
+# A new label: the text, and the size it takes - the right edge held.
+func set_label(value: String) -> void:
+	label_text = value
+	text = value
+	_relayout()
+
+func set_quiet(quiet: bool) -> void:
+	if quiet == _quiet:
+		return
+	_quiet = quiet
+	refresh_style()
+
+# The note over the label (note_*), empty for none.
+func set_note(note: String, quiet: bool = false) -> void:
+	if note == _note and quiet == _note_quiet:
+		return
+	_note = note
+	_note_quiet = quiet
+	queue_redraw()
+
+func get_note() -> String:
+	return _note
+
+func _note_font() -> Font:
+	return InkType.tracked(label_font, note_font_size_px, tracking_em)
+
+# The box a note would take over the label, in this control's space.
+func note_rect(note: String) -> Rect2:
+	var font: Font = _note_font()
+	var width: float = InkType.width(font, note, note_font_size_px)
+	var height: float = font.get_height(note_font_size_px) if font != null else float(note_font_size_px)
+	return Rect2(size.x - width, -note_gap_px - height, width, height)
 
 func _text_width() -> float:
 	var font: Font = get_theme_font("font")
@@ -88,11 +152,21 @@ func rule_bottom() -> float:
 
 func _draw() -> void:
 	var thickness: float = rule_hover_px if (_hovered and not disabled) else rule_px
-	var color: Color = _ink
+	var color: Color = _text_ink()
 	if disabled:
 		color.a = disabled_alpha
 	var rule_top: float = _text_height() + rule_gap_px
 	draw_rect(Rect2(0.0, rule_top, _text_width(), thickness), color)
+	if not _note.is_empty():
+		var font: Font = _note_font()
+		var box: Rect2 = note_rect(_note)
+		var note_color: Color = _ink
+		if _note_quiet:
+			note_color.a = _ink.a * quiet_alpha
+		if disabled:
+			note_color.a = minf(note_color.a, disabled_alpha)
+		var ascent: float = font.get_ascent(note_font_size_px) if font != null else float(note_font_size_px)
+		InkType.draw_run(self, font, _note, Vector2(box.position.x, box.position.y + ascent), note_font_size_px, note_color)
 
 func set_enabled(enabled: bool) -> void:
 	disabled = not enabled

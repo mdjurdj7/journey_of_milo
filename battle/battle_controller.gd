@@ -1198,6 +1198,14 @@ func _begin_choice(card_view: CardView, cap: int, eligible: Array[CardView] = []
 	hand_choice_changed.emit(0, cap)
 	_emit_devour_changed()
 
+# The cards marked in the open choice, by name, in the order marked.
+func get_choice_marked_names() -> Array[String]:
+	var names: Array[String] = []
+	for view in _choice_marked:
+		if is_instance_valid(view) and view.card_data != null:
+			names.append(view.card_data.card_name)
+	return names
+
 # Whether the open choice is a keep - the end-of-turn keep, or Bide's
 # (an armed card's that names no cards) - its marks KEEP marks.
 func _choice_is_keep() -> bool:

@@ -226,6 +226,44 @@ signal battle_finished(outcome: Outcome)
 	set(value):
 		keep_prompt_gap_px = value
 		_place_choice_prompt()
+# A keep's confirm says what it will do. The end-of-turn keep's is End
+# Turn itself: over its label a note (EndTurnButton.set_note()) - keep_
+# note_none_text in grey ink with nothing marked, keep_note_one_format
+# with the card's name (caps) for one, keep_note_many_format with the
+# count for more - and, where the name's note would come within keep_
+# note_card_gap_px of a hand card (as far as it reaches on hover),
+# keep_note_many_format's count instead; with no room even for that, no
+# note. Bide's is its DONE: bide_confirm_none_format (grey ink, with the
+# card's name), bide_confirm_one_format (the kept card's, then its own)
+# or bide_confirm_many_format (the count, then its own).
+@export var keep_note_none_text: String = "KEEP NONE":
+	set(value):
+		keep_note_none_text = value
+		_refresh_keep_confirm()
+@export var keep_note_one_format: String = "KEEP %s":
+	set(value):
+		keep_note_one_format = value
+		_refresh_keep_confirm()
+@export var keep_note_many_format: String = "KEEP %d":
+	set(value):
+		keep_note_many_format = value
+		_refresh_keep_confirm()
+@export var keep_note_card_gap_px: float = 12.0:
+	set(value):
+		keep_note_card_gap_px = value
+		_refresh_keep_confirm()
+@export var bide_confirm_none_format: String = "PLAY %s · KEEP NONE":
+	set(value):
+		bide_confirm_none_format = value
+		_refresh_keep_confirm()
+@export var bide_confirm_one_format: String = "KEEP %s · PLAY %s":
+	set(value):
+		bide_confirm_one_format = value
+		_refresh_keep_confirm()
+@export var bide_confirm_many_format: String = "KEEP %d · PLAY %s":
+	set(value):
+		bide_confirm_many_format = value
+		_refresh_keep_confirm()
 
 @export_group("Corners")
 # The fixed readouts' inset from the viewport's edges: bottom-left the
@@ -1176,6 +1214,67 @@ func _on_hand_choice_changed(marked: int, cap: int) -> void:
 	_choice_marked_count = marked
 	_choice_cap = cap
 	_refresh_choice_prompt()
+	_refresh_keep_confirm()
+
+# A keep's confirm, for what's marked now: End Turn's note for the
+# end-of-turn keep, DONE's text and ink for Bide's.
+func _refresh_keep_confirm() -> void:
+	if battle_controller == null or _choice_prompt == null or not _choice_prompt.visible or not _is_keep_choice():
+		return
+	var names: Array[String] = battle_controller.get_choice_marked_names()
+	if _choice_done != null and _choice_done.visible:
+		var own: String = _choice_source.to_upper()
+		var label: String = bide_confirm_none_format % own
+		if names.size() == 1:
+			label = bide_confirm_one_format % [names[0].to_upper(), own]
+		elif names.size() > 1:
+			label = bide_confirm_many_format % [names.size(), own]
+		_choice_done.set_label(label)
+		_choice_done.set_quiet(names.is_empty())
+		_place_choice_prompt()
+	elif _choice_card_name != "":
+		_place_keep_note()
+
+# End Turn's note for the end-of-turn keep: the longest that keeps clear
+# of every hand card (keep_note_*), or none. Re-read every frame - the
+# hand reflows and hovers under it.
+func _place_keep_note() -> void:
+	if battle_controller == null or not _is_keep_choice() or _choice_card_name == "" or _choice_prompt == null or not _choice_prompt.visible:
+		return
+	var names: Array[String] = battle_controller.get_choice_marked_names()
+	var notes: Array[String] = []
+	if names.is_empty():
+		notes.append(keep_note_none_text)
+	elif names.size() == 1:
+		notes.append(keep_note_one_format % names[0].to_upper())
+		notes.append(keep_note_many_format % 1)
+	else:
+		notes.append(keep_note_many_format % names.size())
+	var chosen: String = ""
+	for note in notes:
+		if _note_clears_hand(note):
+			chosen = note
+			break
+	end_turn_button.set_note(chosen, names.is_empty())
+
+# Whether End Turn's `note` keeps keep_note_card_gap_px clear of every
+# hand card, each as far as it reaches on hover.
+func _note_clears_hand(note: String) -> bool:
+	var local: Rect2 = end_turn_button.note_rect(note)
+	var box := Rect2(end_turn_button.get_global_transform() * local.position, local.size).grow(keep_note_card_gap_px)
+	for view: CardView in hand_container.call("_card_views"):
+		if box.intersects(_hover_reach_rect(view)):
+			return false
+	return true
+
+# A hand card's rect as far as hover takes it: grown hover_scale about
+# its bottom centre from the hand's scale, lifted hover_lift.
+func _hover_reach_rect(view: CardView) -> Rect2:
+	var rect: Rect2 = view.get_global_rect()
+	var grow: float = maxf(view.hover_scale * hand_container.hand_card_scale / maxf(view.scale.x, 0.01), 1.0)
+	var lift: float = view.hover_lift * hand_container.hand_card_scale if grow > 1.001 else 0.0
+	var reach: Vector2 = rect.size * grow
+	return Rect2(Vector2(rect.get_center().x - reach.x / 2.0, rect.end.y - reach.y - lift), Vector2(reach.x, reach.y + lift))
 
 # The open choice's line: a keep's why and how many (keep_prompt_format),
 # any other's verb and what's left (choice_prompt_format), then what
@@ -1204,6 +1303,9 @@ func _on_hand_choice_ended() -> void:
 		_choice_prompt.visible = false
 	if _choice_done != null:
 		_choice_done.visible = false
+		_choice_done.set_label(choice_done_text)
+		_choice_done.set_quiet(false)
+	end_turn_button.set_note("")
 
 func _style_choice_prompt() -> void:
 	if _choice_prompt == null:
@@ -1245,6 +1347,7 @@ func _place_choice_prompt() -> void:
 func _process(_delta: float) -> void:
 	_place_heal_preview()
 	_place_choice_prompt()
+	_place_keep_note()
 	_sync_mound_plates()
 	_lay_out_readouts()
 	_sync_armed_intents()
