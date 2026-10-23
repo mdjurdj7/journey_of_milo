@@ -86,10 +86,10 @@ static func _stringify(export: Dictionary) -> String:
 # clean.
 static func load_problems() -> Array[String]:
 	var problems: Array[String] = _import_problems()
-	var region := _scene_root_property(REGION_SCENE_PATH, "region") as RegionData
-	if region == null:
+	var listed: Array[RegionData] = regions()
+	if listed.is_empty():
 		problems.append("%s didn't load, or names no region" % REGION_SCENE_PATH)
-	else:
+	for region in listed:
 		if region.floors.is_empty():
 			problems.append("%s has no floors" % region.resource_path)
 		for index in region.floors.size():
@@ -210,13 +210,16 @@ static func entry_counts(export: Dictionary) -> Dictionary:
 		"enemies": (enemies as Array).size() if enemies is Array else 0,
 	}
 
-# The regions RegionField plays: its scene's own `region` export (one
-# region today).
+# The regions RegionField plays: its scene's own `regions` export, in
+# order.
 static func regions() -> Array[RegionData]:
 	var found: Array[RegionData] = []
-	var region := _scene_root_property(REGION_SCENE_PATH, "region") as RegionData
-	if region != null:
-		found.append(region)
+	var listed: Variant = _scene_root_property(REGION_SCENE_PATH, "regions")
+	if listed is Array:
+		for entry: Variant in listed:
+			var region := entry as RegionData
+			if region != null:
+				found.append(region)
 	return found
 
 static func build() -> Dictionary:

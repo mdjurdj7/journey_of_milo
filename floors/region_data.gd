@@ -1,12 +1,13 @@
 extends Resource
 class_name RegionData
 
-# A region's floors, in walking order. RegionField holds one of these
-# (its `region` export) and plays floors[RunState.current_floor_index];
-# stepping off the last one wraps back to the first for now (see
-# RegionField._on_floor_exited() - "end of region"). Region-level facts
-# (sea, sky, light, the tower's place) stay authored in the region's
-# scene, not here.
+# A region's floors, in walking order. RegionField lists these (its
+# `regions` export, picked by RunState.current_region_index) and plays
+# floors[RunState.current_floor_index]; stepping off the last one ends
+# the run, won (RegionField._on_floor_exited()), unless its
+# loop_region_after_last_floor test switch sends it round to the first.
+# Region-level facts (sea, sky, light, the tower's place) stay authored
+# in the region's scene, not here.
 
 @export var floors: Array[FloorData] = []
 

@@ -784,7 +784,8 @@ func _free_menu() -> void:
 # _layout_title(); alpha is driven from _process().
 func _spawn_title() -> void:
 	var region_field := _region_field()
-	if region_field == null or region_field.region == null or region_field.region.display_name.is_empty():
+	var region: RegionData = region_field.get_region() if region_field != null else null
+	if region == null or region.display_name.is_empty():
 		return
 	_title_layer = CanvasLayer.new()
 	_title_layer.name = "IntroTitle"
@@ -793,7 +794,7 @@ func _spawn_title() -> void:
 
 	_title = Label.new()
 	_title.name = "Title"
-	_title.text = region_field.region.display_name
+	_title.text = region.display_name
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE

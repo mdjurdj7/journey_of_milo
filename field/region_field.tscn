@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://ui/hp_bar.tscn" id="15"]
 [ext_resource type="PackedScene" path="res://field/exit_gate.tscn" id="16"]
 [ext_resource type="Resource" uid="uid://b0a7mp27d3sfv" path="res://floors/region1.tres" id="21_region1"]
+[ext_resource type="Script" uid="uid://64my4s1ldhv2" path="res://floors/region_data.gd" id="21_region_data"]
 [ext_resource type="Script" uid="uid://b1kiu1ojh1n34" path="res://field/zone_intro.gd" id="22_zone_intro"]
 [ext_resource type="Resource" path="res://run/data/wanderer.tres" id="23_wanderer"]
 
@@ -155,7 +156,7 @@ size = Vector3(4.4, 2.2, 3.2)
 
 [node name="RegionField" type="Node3D" unique_id=2096648515]
 script = ExtResource("1")
-region = ExtResource("21_region1")
+regions = Array[ExtResource("21_region_data")]([ExtResource("21_region1")])
 starting_character = ExtResource("23_wanderer")
 field_extents = Vector2(26, 30)
 shoreline_wall_margin = 3.0

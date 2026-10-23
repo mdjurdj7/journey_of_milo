@@ -17,15 +17,23 @@ const ENCOUNTER_SLOT_META := &"encounter_slot"
 # doesn't emit it again.
 signal floor_cleared
 
-# This scene is the REGION: sea, sky, light, tower, HUD. Which floor of it
-# is standing is data - region.floors[RunState.current_floor_index], a
+# This scene is the REGION: sea, sky, light, tower, HUD. Which region it
+# plays is data - regions[RunState.current_region_index] (get_region()) -
+# and which floor of that, region.floors[RunState.current_floor_index], a
 # FloorData (see floors/floor_data.gd) read once per scene load. Its
 # landmass and spawn go onto Ground/Wanderer in _enter_tree() (before any
 # child's _ready() can read them - see that method's own doc), its
 # enemies and props are spawned in _ready(), and everything else (gate,
 # wear, rewards) reads get_floor_data() where it needs it. A floor change
 # is a scene reload with the index advanced - see _on_floor_exited().
-@export var region: RegionData = null
+# Every region the run can play, in walking order; RunState.current_
+# region_index picks one. Nothing walks on from one region to the next
+# yet - a region's last floor ends the run (_on_floor_exited()).
+@export var regions: Array[RegionData] = []
+# The region this scene load plays - see get_region(). Not an export: a
+# probe's fixture region is set here before the scene enters the tree,
+# and wins over the list.
+var region: RegionData = null
 # Dev only: slot id -> option id, standing that option in that slot of
 # whichever floor loads, instead of its roll (_resolve_encounters()). An
 # id this floor doesn't have is ignored with a warning. Read at floor
@@ -1473,6 +1481,21 @@ func get_forward() -> Vector3:
 		print("RegionField: forward = %s" % str(_forward))
 	return _forward
 
+# The region this scene load plays: regions[RunState.current_region_
+# index], resolved once, unless something set `region` first. Null, with
+# a warning, if the list is empty.
+func get_region() -> RegionData:
+	if region != null:
+		return region
+	if regions.is_empty():
+		push_warning("RegionField: no regions - no region to play.")
+		return null
+	var index: int = clampi(RunState.current_region_index, 0, regions.size() - 1)
+	if index != RunState.current_region_index:
+		push_warning("RegionField: region index %d out of range - playing %d." % [RunState.current_region_index, index])
+	region = regions[index]
+	return region
+
 # The floor this scene load plays: region.floors[RunState.current_floor_
 # index], resolved once (lazily, so _enter_tree() and any child can ask in
 # whatever order) and held for the scene's life - the index only moves
@@ -1483,15 +1506,16 @@ func get_floor_data() -> FloorData:
 	if _floor_resolved:
 		return _floor
 	_floor_resolved = true
-	if region == null or region.floors.is_empty():
+	var played: RegionData = get_region()
+	if played == null or played.floors.is_empty():
 		push_warning("RegionField: no region (or an empty one) - no floor to play.")
 		return null
-	var index: int = clampi(RunState.current_floor_index, 0, region.floors.size() - 1)
-	_floor = region.floors[index]
+	var index: int = clampi(RunState.current_floor_index, 0, played.floors.size() - 1)
+	_floor = played.floors[index]
 	if _floor == null:
 		push_warning("RegionField: region floor %d is null." % index)
 		return null
-	print("RegionField: floor %d of %d - %s" % [index + 1, region.floors.size(), _floor.resource_path])
+	print("RegionField: floor %d of %d - %s" % [index + 1, played.floors.size(), _floor.resource_path])
 	return _floor
 
 # The way OUT of this floor, unit XZ: the gate channel, the camera's
@@ -2615,7 +2639,8 @@ func _on_floor_exited() -> void:
 	await fade.fade_out(_fog_colour(), fade_seconds)
 
 	RunState.floors_crossed += 1
-	var floor_count: int = region.floors.size() if region != null else 0
+	var played: RegionData = get_region()
+	var floor_count: int = played.floors.size() if played != null else 0
 	if RunState.current_floor_index + 1 >= floor_count:
 		if not loop_region_after_last_floor:
 			print("RegionField: the region's last floor left - the run is won")
