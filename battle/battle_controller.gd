@@ -3630,16 +3630,17 @@ func _on_card_view_clicked(card_view: CardView) -> void:
 # Gated on awaiting-target or Bide's open choice: this controller only
 # reacts to input while a card is armed - waiting for an enemy click, or
 # for its choice to be confirmed (Enter/Space) or cancelled (right-click/
-# Esc) - everything else (movement, camera, ...) is untouched - and
+# Esc; the keys are the InputMap's battle_confirm and battle_cancel) -
+# everything else (movement, camera, ...) is untouched - and
 # already frozen by RegionField anyway.
 func _unhandled_input(event: InputEvent) -> void:
 	if _devour_picking:
-		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT) or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE):
+		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT) or event.is_action_pressed("battle_cancel"):
 			cancel_devour_pick()
 			get_viewport().set_input_as_handled()
 		return
 	if _sheathe_picking:
-		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT) or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE):
+		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT) or event.is_action_pressed("battle_cancel"):
 			cancel_sheathe_pick()
 			get_viewport().set_input_as_handled()
 		return
@@ -3647,13 +3648,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 			cancel_choice()
 			get_viewport().set_input_as_handled()
-		elif event is InputEventKey and event.pressed and not event.echo:
-			if event.keycode == KEY_ESCAPE:
-				cancel_choice()
-				get_viewport().set_input_as_handled()
-			elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER or event.keycode == KEY_SPACE:
-				confirm_choice()
-				get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("battle_cancel"):
+			cancel_choice()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("battle_confirm"):
+			confirm_choice()
+			get_viewport().set_input_as_handled()
 		return
 	if _pending_card_view == null:
 		return
@@ -3669,7 +3669,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 		return
 
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+	if event.is_action_pressed("battle_cancel"):
 		cancel_target()
 		get_viewport().set_input_as_handled()
 		return
