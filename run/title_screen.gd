@@ -12,7 +12,8 @@ class_name TitleScreen
 # field; RegionField._ready() consumes the flag and holds the title
 # instead of playing the intro outright. F6 on the field never passes
 # through here, so it keeps starting a run with the intro, no title;
-# the end screen's NEW RUN likewise.
+# the end screen's NEW RUN likewise. Nor does a debug start (RunState.
+# debug_start): it goes straight to its floor.
 
 const FIELD_SCENE_PATH := "res://field/region_field.tscn"
 
@@ -29,7 +30,7 @@ const FIELD_SCENE_PATH := "res://field/region_field.tscn"
 
 func _ready() -> void:
 	background.color = background_color
-	RunState.title_pending = true
+	RunState.title_pending = not RunState.has_debug_start()
 	_boot()
 
 # One drawn frame of this colour before the load: the scene change is

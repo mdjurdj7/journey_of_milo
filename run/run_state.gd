@@ -117,6 +117,15 @@ var character: CharacterData = null
 
 var current_region_index: int = 0
 var current_floor_index: int = 0
+# Dev only: the --start=<region>:<floor> user argument (after `--`, both
+# 1-based, so --start=2:1 is Region 2's first floor), held 0-based; (-1,
+# -1) with none, or in a release build. Read once at boot (_ready());
+# every new run (new_run()) then starts there instead of at Region 1
+# floor 1, with no title (TitleScreen) and no zone intro (RegionField).
+# The only way into a region past the first until the region transition
+# is built.
+const DEBUG_START_PREFIX := "--start="
+var debug_start: Vector2i = Vector2i(-1, -1)
 # How many times this run has gone round the region - its last floor
 # wraps to the first only with RegionField.loop_region_after_last_floor
 # (otherwise leaving it ends the run, won). For the run log's
@@ -173,6 +182,37 @@ var run_seed: int = 0
 # new_run() clears it.
 var encounter_rolls: Dictionary = {}
 
+func _ready() -> void:
+	debug_start = _read_debug_start()
+	# The first field load reads the indices before any new_run() runs
+	# (RegionField's _enter_tree(); its _ready() starts the run), so they
+	# are set here too.
+	_apply_debug_start()
+
+func has_debug_start() -> bool:
+	return debug_start.x >= 0
+
+# The --start=<region>:<floor> user argument, 0-based, or (-1, -1) with
+# none, a malformed one (warned) or a release build.
+static func _read_debug_start() -> Vector2i:
+	if not OS.is_debug_build():
+		return Vector2i(-1, -1)
+	for arg in OS.get_cmdline_user_args():
+		if not arg.begins_with(DEBUG_START_PREFIX):
+			continue
+		var parts: PackedStringArray = arg.substr(DEBUG_START_PREFIX.length()).strip_edges().split(":")
+		if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int() and parts[0].to_int() >= 1 and parts[1].to_int() >= 1:
+			return Vector2i(parts[0].to_int() - 1, parts[1].to_int() - 1)
+		push_warning("RunState: '%s' isn't --start=<region>:<floor> (both from 1) - ignored." % arg)
+	return Vector2i(-1, -1)
+
+func _apply_debug_start() -> void:
+	if not has_debug_start():
+		return
+	current_region_index = debug_start.x
+	current_floor_index = debug_start.y
+	print("RunState: debug start at region %d floor %d." % [debug_start.x + 1, debug_start.y + 1])
+
 # Starts a brand new run: seeds HP and the starting Belongings from
 # `starting_character`'s own values, resets run-graph position. The only
 # intended caller today is region_field.gd's _ready() (called once at
@@ -204,6 +244,7 @@ func new_run(starting_character: CharacterData) -> void:
 	deck = _build_starting_deck(starting_character)
 	current_region_index = 0
 	current_floor_index = 0
+	_apply_debug_start()
 	region_lap = 0
 	floors_crossed = 0
 	fights_won = 0

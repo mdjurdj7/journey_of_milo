@@ -28,7 +28,8 @@ signal floor_cleared
 # is a scene reload with the index advanced - see _on_floor_exited().
 # Every region the run can play, in walking order; RunState.current_
 # region_index picks one. Nothing walks on from one region to the next
-# yet - a region's last floor ends the run (_on_floor_exited()).
+# yet - a region's last floor ends the run (_on_floor_exited()) - so only
+# the debug start (RunState.debug_start) reaches past the first.
 @export var regions: Array[RegionData] = []
 # The region this scene load plays - see get_region(). Not an export: a
 # probe's fixture region is set here before the scene enters the tree,
@@ -984,7 +985,8 @@ func _ready() -> void:
 	# HUD seeded: the new run's zone intro, once, on the region's first
 	# floor - or, booted from the title scene (RunState.title_pending),
 	# the title held over the intro's own first frame, which Start then
-	# plays from. Both flags are consumed here whether or not anything
+	# plays from. A debug start (RunState.debug_start) plays neither.
+	# Both flags are consumed here whether or not anything
 	# plays, so a run that starts elsewhere (or with the intro off)
 	# doesn't carry them to a later floor. ZoneIntro freezes this node
 	# (the battle freeze, process_mode DISABLED) and releases it itself
@@ -1002,7 +1004,7 @@ func _ready() -> void:
 			intro_running = zone_intro.hold_title()
 		elif title_start_pending:
 			intro_running = zone_intro.start_held_title()
-		elif opening_pending and RunState.current_floor_index == 0:
+		elif opening_pending and RunState.current_floor_index == 0 and not RunState.has_debug_start():
 			intro_running = zone_intro.play()
 	# The character select's freeze frame comes down with its held title
 	# play (ZoneIntro.start_held_title()) - or here, when that can't run.
