@@ -4,3 +4,6 @@
 
 [node name="BattleFeedback" type="Node"]
 script = ExtResource("1_feedback")
+heavy_hit_damage = 20
+heavy_hitstop_ms = 180.0
+heavy_kill_hitstop_ms = 220.0

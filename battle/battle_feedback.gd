@@ -34,7 +34,9 @@ class_name BattleFeedback
 # big_hitstop_ms for a hit of big_hit_min_damage or more or a kill,
 # multi_hit_hitstop_ms for each hit of an enemy's multi-hit attack or of
 # a card hit that lands several times (Lash) - a kill still the big one, blocked_hitstop_ms for a hit taken whole by a
-# block. The number, the contact sound and the HP bar land in the frame
+# block. A heavy hit - one hit of heavy_hit_damage or more, either way,
+# by that hit's own damage (a multi-hit's included) - takes
+# heavy_hitstop_ms, or heavy_kill_hitstop_ms if it kills. The number, the contact sound and the HP bar land in the frame
 # it starts. Damage with no contact - a countdown going off, a tick, a
 # Drain, a self-inflicted cost - stops nothing. hitstop_enabled off: no
 # stops at all. Each stop runs on a SceneTreeTimer, so under the probes'
@@ -95,6 +97,11 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 @export var big_hit_min_damage: int = 15
 @export var multi_hit_hitstop_ms: float = 40.0
 @export var blocked_hitstop_ms: float = 40.0
+# A heavy hit (is_heavy_hit()): one hit's damage to HP of this or more,
+# either way - his on an enemy, an enemy's on him. 0 = none.
+@export var heavy_hit_damage: int = 20
+@export var heavy_hitstop_ms: float = 180.0
+@export var heavy_kill_hitstop_ms: float = 220.0
 
 @export_group("Heavy Hit")
 @export var heavy_hit_enabled: bool = true
@@ -283,11 +290,15 @@ func heavy_level(damage: int) -> float:
 	return clampf(float(damage - heavy_min_damage) / float(heavy_max_damage - heavy_min_damage), 0.0, 1.0)
 
 # A contact's stop, in milliseconds of game time, for a hit of `amount`:
-# big for a kill or big_hit_min_damage and up, the multi-hit stop for one
-# hit of several (a kill excepted), normal otherwise; 0 with the stop off.
+# a heavy hit's (is_heavy_hit()) - its kill's if it kills - whatever else
+# it is; big for a kill or big_hit_min_damage and up, the multi-hit stop
+# for one hit of several (a kill excepted), normal otherwise; 0 with the
+# stop off.
 func stop_ms(amount: int, killing: bool = false, multi: bool = false) -> float:
 	if not hitstop_enabled:
 		return 0.0
+	if is_heavy_hit(amount):
+		return maxf(heavy_kill_hitstop_ms if killing else heavy_hitstop_ms, 0.0)
 	if killing:
 		return maxf(big_hitstop_ms, 0.0)
 	if multi:
@@ -295,6 +306,10 @@ func stop_ms(amount: int, killing: bool = false, multi: bool = false) -> float:
 	if amount >= big_hit_min_damage:
 		return maxf(big_hitstop_ms, 0.0)
 	return maxf(normal_hitstop_ms, 0.0)
+
+# Whether one hit of `amount` (its damage to HP) is a heavy hit.
+func is_heavy_hit(amount: int) -> bool:
+	return heavy_hit_damage > 0 and amount >= heavy_hit_damage
 
 # A hit a block took whole: its stop, in milliseconds; 0 with the stop off.
 func blocked_stop_ms() -> float:

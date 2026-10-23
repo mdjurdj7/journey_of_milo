@@ -21,7 +21,7 @@ extends SceneTree
 # blackback_probe.gd's header explains.
 
 const CASES := 3
-const FEEDBACK_PATH := "res://battle/battle_feedback.gd"
+const FEEDBACK_PATH := "res://battle/battle_feedback.tscn"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
@@ -71,8 +71,13 @@ func _check_tier() -> void:
 	_expect_eq(roundi(float(feedback.call("stop_ms", 14))), 70, "...a 14 too")
 	_expect_eq(roundi(float(feedback.call("stop_ms", 15))), 110, "A 15 stops 110 ms")
 	_expect_eq(roundi(float(feedback.call("stop_ms", 3, true))), 110, "A kill for 3 stops 110 ms")
-	_expect_eq(roundi(float(feedback.call("stop_ms", 20, false, true))), 40, "One hit of a multi-hit, 40 ms - for 20 as well")
+	var heavy: int = int(feedback.get("heavy_hit_damage"))
+	_expect_eq(roundi(float(feedback.call("stop_ms", heavy - 1, false, true))), roundi(float(feedback.get("multi_hit_hitstop_ms"))), "One hit of a multi-hit under the heavy hit, the multi-hit stop")
 	_expect_eq(roundi(float(feedback.call("stop_ms", 4, true, true))), 110, "...the one that kills, 110")
+	_expect_eq(roundi(float(feedback.call("stop_ms", heavy - 1))), roundi(float(feedback.get("big_hitstop_ms"))), "Just under the heavy hit, the big stop")
+	_expect_eq(roundi(float(feedback.call("stop_ms", heavy))), roundi(float(feedback.get("heavy_hitstop_ms"))), "A heavy hit, the heavy stop")
+	_expect_eq(roundi(float(feedback.call("stop_ms", heavy, false, true))), roundi(float(feedback.get("heavy_hitstop_ms"))), "...one inside a multi-hit too")
+	_expect_eq(roundi(float(feedback.call("stop_ms", heavy, true))), roundi(float(feedback.get("heavy_kill_hitstop_ms"))), "...and its kill, the heavy kill's")
 	_expect_eq(roundi(float(feedback.call("blocked_stop_ms"))), 40, "A hit a block takes whole, 40 ms")
 	_expect(float(feedback.call("heavy_impact_volume_db", feedback.call("heavy_level", 10))) <= -80.0, "The layer is silent at 10")
 	_expect(is_equal_approx(float(feedback.call("heavy_impact_volume_db", feedback.call("heavy_level", 35))), -14.0), "...and -14 dB at 35")
@@ -183,7 +188,7 @@ func _reckoning_fight(enabled: bool) -> Dictionary:
 	return out
 
 func _feedback() -> Node:
-	return (load(FEEDBACK_PATH) as GDScript).new()
+	return (load(FEEDBACK_PATH) as PackedScene).instantiate()
 
 # A fresh run and a fresh fight on floor 1 against its first enemy, made
 # unkillable here, at PLAYER_HP, with an empty hand and 3 Energy - as
