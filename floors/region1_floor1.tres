@@ -9,7 +9,7 @@
 [ext_resource type="PackedScene" path="res://field/bird.tscn" id="7_bird"]
 [ext_resource type="PackedScene" path="res://field/keeper.tscn" id="8_keeper"]
 [ext_resource type="PackedScene" uid="uid://bti18febtfxyt" path="res://assets/models/cormorant/bird.glb" id="9_cormorant"]
-[ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="10_wanderer_pool"]
+[ext_resource type="Resource" path="res://cards/pools/floor1_pool.tres" id="10_floor1_pool"]
 [ext_resource type="Script" uid="uid://bp8hnb8ai830l" path="res://floors/scatter/scatter_set.gd" id="11_scatter_set"]
 [ext_resource type="Resource" uid="uid://d01nm80nur52n" path="res://floors/scatter/floor1_pristine.tres" id="12_wet_scatter"]
 [ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
@@ -82,6 +82,6 @@ gate_bar_axis_offset = 0.85
 wear_path_override = null
 scatter_sets = Array[ExtResource("11_scatter_set")]([ExtResource("12_wet_scatter")])
 scatter_budget = 22
-reward_pool = ExtResource("10_wanderer_pool")
+reward_pool = ExtResource("10_floor1_pool")
 gold_max = 15
 wear_darken = 0.08

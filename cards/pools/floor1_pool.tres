@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RewardPool" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://cards/reward_pool.gd" id="1_reward_pool"]
+[ext_resource type="Resource" path="res://cards/data/carve.tres" id="2_carve"]
+[ext_resource type="Resource" path="res://cards/data/hold_fast.tres" id="3_hold_fast"]
+[ext_resource type="Resource" path="res://cards/data/small_price.tres" id="4_small_price"]
+[ext_resource type="Resource" path="res://cards/data/blood_arc.tres" id="5_blood_arc"]
+[ext_resource type="Resource" path="res://cards/data/brace.tres" id="6_brace"]
+[ext_resource type="Resource" path="res://cards/data/wrest.tres" id="7_wrest"]
+[ext_resource type="Resource" path="res://cards/data/ransom.tres" id="8_ransom"]
+[ext_resource type="Resource" path="res://cards/data/take_in.tres" id="9_take_in"]
+[ext_resource type="Resource" path="res://cards/data/cornered.tres" id="10_cornered"]
+[ext_resource type="Resource" path="res://cards/data/settled_account.tres" id="11_settled_account"]
+
+[resource]
+script = ExtResource("1_reward_pool")
+entries = Array[ExtResource("2_carve")]([ExtResource("2_carve"), ExtResource("3_hold_fast"), ExtResource("4_small_price"), ExtResource("5_blood_arc"), ExtResource("6_brace"), ExtResource("7_wrest"), ExtResource("8_ransom"), ExtResource("9_take_in"), ExtResource("10_cornered"), ExtResource("11_settled_account")])
+weights = Array[float]([])
+enemy_bias = {}
+enemy_bias_multiplier = 2.0
+roll_flat = true
