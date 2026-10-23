@@ -378,20 +378,20 @@ and up the west shore north of z -27. (2026-10-17.)
   until the region transition from the Greyshelf is built. RegionField
   lists both regions (`regions`) and plays `RunState.current_region_
   index`; nothing advances that index yet. (2026-10-23.)
-- **Region 2 floor 1 is a stand-in test floor.** `floors/region2_
-  floor1.tres` and its masks (`assets/field/masks/region2_floor1_*.png`)
-  are a minimal layout made to exercise the debug start, the Pier's deck
-  and steps, reed-wall ledges, a floor with no sea and the clearing fight
-  - not the designed lakebed. One lane north to a clearing, a west bench
-  with one low point to the pier root, the pier over a hollow (deck ~3 m
-  above it at the end), boat steps onto a short lane back to the
-  clearing; reeds are REED placeholders (1.5 m, 0.8 m in the hollow), one
-  polygon per mass feeding both its ledge and its scatter area. To be
-  replaced by a dimensioned plan and a mask-generator script under
-  `assets/field/masks/source/`; the throwaway generator that made it
-  isn't in the repo. Not built: the south bench and its step-down at
-  spawn, the open patch with the pier in view, the creature's trail, the
-  exit step. (2026-10-23.)
+- **Region 2 floor 1's reeds and pier are placeholders.** The floor is
+  wired from its generator (`assets/field/masks/source/region2_floor1/`:
+  `floor1_layout.json` and the masks beside region 1's). Left for later:
+  - **Reed height.** One REED scatter entry per outline in the layout,
+    1.5 m tall and 0.8 m short, where the layout asks 2-4 m and 0.8-1.5 m;
+    full height waits for field occlusion, so the reeds don't hide him at
+    the bends. The reed masks are imported but nothing reads them yet -
+    scatter places by the outlines.
+  - **Outer ground.** The outer mask marks both the wet silt under the
+    reeds and the dry land past the bank; both take Ground's one scene-wide
+    outer_color and pebble grain. To be judged in game.
+  - **The pier's art.** `assets/models/props/pier/pier.glb` (make_pier.py)
+    draws it under the painted shader; the Pier prop's collision follows
+    the layout's fields and the model's rail lines. (2026-10-23.)
 - **The Samurai is a shell; these are left as they are.** She is a
   second CharacterData (`run/data/samurai.tres`), selected by
   RegionField's `starting_character` export, with no cards, mechanics or

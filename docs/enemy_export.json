@@ -1028,7 +1028,7 @@
               "weight": 1.0,
               "anchor": [
                 4.0,
-                -38.0
+                -41.5
               ],
               "slot_yaw_degrees": 0.0,
               "cluster": null,
@@ -1042,7 +1042,7 @@
                   0.0,
                   -1.0
                 ],
-                "gate_distance_beyond_enemy": 12.0,
+                "gate_distance_beyond_enemy": 11.5,
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0,
                 "engage_line_offset_m": -2.0
@@ -1063,9 +1063,9 @@
                   "card_reward": "ROLLED",
                   "position": [
                     4.0,
-                    -38.0
+                    -41.5
                   ],
-                  "yaw_degrees": 180.0,
+                  "yaw_degrees": 55.3,
                   "face_prop": null
                 }
               ],
