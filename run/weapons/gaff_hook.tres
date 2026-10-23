@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="WeaponData" format=3]
+[gd_resource type="Resource" script_class="WeaponData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://run/weapon_data.gd" id="1_weapon_data"]
 [ext_resource type="Texture2D" uid="uid://d3xbk85aas55x" path="res://assets/textures/weapons/gaff_hook.png" id="2_art"]
+[ext_resource type="Texture2D" uid="uid://cqha2e26ifiq1" path="res://assets/models/weapons/gaff_hook/gaff_hook_0.jpg" id="3_field_albedo"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -13,3 +14,12 @@ lore = "Made to land things heavier than the hand."
 art = ExtResource("2_art")
 self_loss_attack_bonus = 3
 card_class = &"wanderer"
+field_model_path = "res://assets/models/weapons/gaff_hook/gaff_hook.glb"
+field_albedo = ExtResource("3_field_albedo")
+field_length = 1.2
+field_grip_fraction = 0.77
+field_grip_axis_flip = 1
+field_hand_mount_position = Vector3(-0.019, 0.087, 0.0067)
+field_hand_mount_rotation_degrees = Vector3(-37.98, 91.2, 58.46)
+field_back_mount_position = Vector3(-0.1403, 0.2701, -0.0764)
+field_back_mount_rotation_degrees = Vector3(16, -6.747, -170.54)
