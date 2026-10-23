@@ -66,8 +66,22 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.p
 const SWORD_FIT_PROPERTIES: Array[StringName] = [&"sword_length", &"grip_fraction", &"grip_axis_flip", &"hand_mount_position", &"hand_mount_rotation_degrees", &"back_mount_position", &"back_mount_rotation_degrees"]
 
 @export var move_speed: float = 4.5
-@export var acceleration: float = 14.0
-@export var rotation_speed: float = 10.0
+# His speed toward what the keys (or a click) ask, metres a second per
+# second, and back down when they let go or ask for less (a run let go).
+# His direction is the keys' at once - only his speed ramps - so turning
+# about never coasts through a stop.
+@export var acceleration: float = 14.0:
+	set(value):
+		acceleration = value
+@export var deceleration: float = 14.0:
+	set(value):
+		deceleration = value
+# How fast his body turns to face the way he moves: the gap closes by
+# 1 - exp(-rotation_speed * delta) a frame, the same at any frame rate -
+# at 25, nine tenths of a turn in about 0.09 s.
+@export var rotation_speed: float = 10.0:
+	set(value):
+		rotation_speed = value
 @export var gravity: float = 12.0
 # Held with a direction (the run action, Shift): he runs at run_speed,
 # steered every frame as he walks is; let go, he eases back to move_speed.
@@ -3106,9 +3120,23 @@ func _physics_process(delta: float) -> void:
 	# The run held, with somewhere to go: run_speed. Not while input is
 	# locked - the same gate the keys have.
 	_running = not input_locked and not keys_locked and Input.is_action_pressed("run") and move_direction.length() > 0.01
-	var target_velocity := move_direction * (run_speed if _running else move_speed)
-	velocity.x = move_toward(velocity.x, target_velocity.x, acceleration * delta)
-	velocity.z = move_toward(velocity.z, target_velocity.z, acceleration * delta)
+	# The keys' direction at once; only the speed ramps - up at
+	# acceleration, down at deceleration - so a turn never slows through
+	# zero. With nothing asked he slows along the way he was going.
+	var planar := Vector2(velocity.x, velocity.z)
+	var speed: float = planar.length()
+	if move_direction.length() > 0.01:
+		var target_speed: float = (run_speed if _running else move_speed) * minf(move_direction.length(), 1.0)
+		var rate: float = acceleration if target_speed > speed else deceleration
+		speed = move_toward(speed, target_speed, rate * delta)
+		var heading := Vector2(move_direction.x, move_direction.z).normalized()
+		velocity.x = heading.x * speed
+		velocity.z = heading.y * speed
+	else:
+		speed = move_toward(speed, 0.0, deceleration * delta)
+		planar = planar.normalized() * speed if planar.length() > 0.0001 else Vector2.ZERO
+		velocity.x = planar.x
+		velocity.z = planar.y
 
 	if not _is_grounded():
 		velocity.y -= gravity * delta
@@ -3138,7 +3166,7 @@ func _physics_process(delta: float) -> void:
 	if _look_back_active and planar_speed < walk_speed_threshold:
 		rotation.y = lerp_angle(rotation.y, _angle_from_direction(_look_back_direction), hold_line_turn_speed * delta)
 	elif move_direction.length() > 0.01:
-		rotation.y = lerp_angle(rotation.y, _angle_from_direction(move_direction), rotation_speed * delta)
+		rotation.y = lerp_angle(rotation.y, _angle_from_direction(move_direction), 1.0 - exp(-rotation_speed * delta))
 
 	_tick_stuck(delta, planar_speed)
 	if use_animation_tree:
