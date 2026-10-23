@@ -94,12 +94,15 @@
   never in the tracked tools/probe_times.txt; `--refresh-times` copies
   the local averages over it when I choose to commit them. `--batch`
   splits by the committed copy.
-- Never run probes in the background. Never start probes while another
-  session's probes are running: check for running Godot probe
-  processes first (PowerShell: `Get-CimInstance Win32_Process -Filter
-  "Name='Godot_v4.7.1.exe'"`, any whose CommandLine has
-  `-s res://tests/`, or `--headless --path . --import` - a run's import);
-  if there are any, stop and tell me.
+- Never run probes in the background.
+- Before any probe run, check as its own step: no running game, no other
+  headless Godot (probes or --import), no run_probes.sh, and at least
+  3 GB free. Require two clear checks 30 s apart, then start the run as a
+  separate command. An open editor is fine. Otherwise wait and re-check
+  about every 3 minutes. (PowerShell: `Get-CimInstance Win32_Process
+  -Filter "Name='Godot_v4.7.1.exe'"` - ignore a CommandLine ending in
+  `--editor`; bash.exe processes whose CommandLine has `run_probes.sh`;
+  FreePhysicalMemory from Win32_OperatingSystem.)
 - If a run is stopped for memory, don't retry: end any leftover
   processes from it.
 
