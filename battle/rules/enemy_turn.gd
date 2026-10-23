@@ -229,6 +229,11 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 		# Coiled). A move lost or broken, above, brings nothing.
 		if intent.status_on_resolve != null:
 			Status.apply_to(combatant.statuses, intent.status_on_resolve)
+		# ...and, kept for the fight, what every turn it acts grows (Enemy
+		# Data.turn_end_status - the Dragonfly's Quickening): up before its
+		# next intent is read, so that intent already shows it. A turn lost
+		# or broken, above, grows nothing - its clock pauses.
+		_grow_turn_end_status(combatant, data)
 	# What lived on its intent (StatusData.intent_mark - Braced, Garnished,
 	# Wrested): it cut the first action, and is spent once that intent has
 	# landed; lost, with
@@ -967,6 +972,14 @@ static func _queued_statuses(data: EnemyData) -> Array[StatusData]:
 			if each != null and each.status_while_queued != null and not found.has(each.status_while_queued):
 				found.append(each.status_while_queued)
 	return found
+
+# A turn this enemy acted: turn_end_status_stacks more of its turn_end_
+# status (EnemyData), while it lives. Nothing with no such status.
+static func _grow_turn_end_status(combatant: Combatant, data: EnemyData) -> void:
+	if data == null or data.turn_end_status == null or combatant.hp <= 0:
+		return
+	for i in maxi(data.turn_end_status_stacks, 0):
+		Status.apply_to(combatant.statuses, data.turn_end_status)
 
 # Every status_on_resolve this enemy's intents bring - its loop's and
 # their on_interrupt interjections': each lasts until the enemy's next

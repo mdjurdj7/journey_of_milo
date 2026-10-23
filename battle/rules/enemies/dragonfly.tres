@@ -5,6 +5,7 @@
 [ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_armor.mp3" id="3_hit_armor"]
 [ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="4_l7uxx"]
 [ext_resource type="Resource" path="res://field/contact_shadow_dragonfly.tres" id="8_contact_shadow"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/quickening.tres" id="9_quickening"]
 
 [sub_resource type="Resource" id="EnemyIntent_bite_1"]
 script = ExtResource("2_intent")
@@ -26,9 +27,11 @@ pack_only = true
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Dragonfly"
-mechanic_summary = "Bites for 3 twice, then every living dragonfly Swarms together, 4 each, in one beat. Teaches thinning a pack before its shared turn lands all at once."
+mechanic_summary = "Bites for 3 twice, then every living dragonfly Swarms together, 4 each, in one beat; each turn it acts, its attacks deal 1 more for the fight (Quickening). Teaches thinning a pack before its shared turn lands all at once, and racing it."
 max_hp = 14
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bite_1"), SubResource("EnemyIntent_bite_2"), SubResource("EnemyIntent_swarm")])
+turn_end_status = ExtResource("9_quickening")
+turn_end_status_stacks = 1
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_armor")])
 model_scene_path = "res://assets/models/enemies/Dragonfly/Dragonfly_body.glb"
 model_scale = 0.44

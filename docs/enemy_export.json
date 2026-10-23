@@ -1372,7 +1372,7 @@
       "file": "res://battle/rules/enemies/dragonfly.tres",
       "hp": 14,
       "elite": false,
-      "mechanic_summary": "Bites for 3 twice, then every living dragonfly Swarms together, 4 each, in one beat. Teaches thinning a pack before its shared turn lands all at once.",
+      "mechanic_summary": "Bites for 3 twice, then every living dragonfly Swarms together, 4 each, in one beat; each turn it acts, its attacks deal 1 more for the fight (Quickening). Teaches thinning a pack before its shared turn lands all at once, and racing it.",
       "starts_dormant": false,
       "field": {
         "model": "res://assets/models/enemies/Dragonfly/Dragonfly_body.glb",
@@ -1416,12 +1416,36 @@
             "pack_only": "a pack move: dropped from the loop once the enemy is the last of its pack"
           }
         ],
-        "modified_by": [],
+        "modified_by": [
+          {
+            "status": "quickening",
+            "per_hit_bonus": 1,
+            "only_while_critical": false,
+            "attacks_while_held": {
+              "Bite": "4",
+              "Swarm": "5"
+            }
+          }
+        ],
         "escalation": null,
         "pain_turn": null,
         "phase": null
       },
-      "statuses": [],
+      "statuses": [
+        {
+          "id": "quickening",
+          "name": "Quickening",
+          "file": "res://battle/rules/statuses/quickening.tres",
+          "gained": "1 stack(s) at the end of each turn it acts, kept for the fight",
+          "description": "Its Attacks deal {bonus} more. Grows each turn.",
+          "text": "Its Attacks deal 1 more. Grows each turn.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "attack_damage_bonus": 1
+          }
+        }
+      ],
       "rewards": {
         "keepsake_table": null,
         "armor_table": null,

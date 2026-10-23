@@ -678,6 +678,8 @@ static func _reachable_statuses(data: EnemyData) -> Array:
 		queue.append([data.attack_card_status, "a stack per Attack card played against it while %s is queued" % " / ".join(while_queued)])
 	if data.phase_status != null and data.phase_hp_threshold > 0.0:
 		queue.append([data.phase_status, "once, the first time its HP is below %s of %d" % [str(_num(data.phase_hp_threshold)), data.max_hp]])
+	if data.turn_end_status != null and data.turn_end_status_stacks > 0:
+		queue.append([data.turn_end_status, "%d stack(s) at the end of each turn it acts, kept for the fight" % data.turn_end_status_stacks])
 	var reached: Array = []
 	var seen: Array[String] = []
 	while not queue.is_empty():

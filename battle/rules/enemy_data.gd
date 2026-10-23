@@ -55,6 +55,14 @@ func named(count: int) -> String:
 # spend it; any other attack leaves it waiting (EnemyTurn.held_back()).
 # Null (every enemy by default) = none.
 @export var attack_card_status: StatusData = null
+# The status it gains, turn_end_status_stacks at a time, at the end of
+# each turn it acts - its move resolved, not lost to Stunned, a Deny, a
+# pain turn or an interrupt, which pause it (EnemyTurn.take_turn()) - and
+# keeps for the fight: the Dragonfly's Quickening, its attacks one more
+# each turn. Up before its next intent is read, so that intent and the
+# lethal warning already count it. Null (every enemy by default) = none.
+@export var turn_end_status: StatusData = null
+@export var turn_end_status_stacks: int = 1
 # The sound of a card's hit landing on this creature (its shell, its
 # hide), played by its FieldEnemy on the hit frame - takes dealt
 # at random, never the same take twice running (SoundPool.next_random());
