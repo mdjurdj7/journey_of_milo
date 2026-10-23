@@ -59,16 +59,15 @@ signal draw_started(card_data: CardData)
 			card_view.set_rest_offset(card_size.y - hand_rest_visible_height)
 
 # The row's bounds, viewport x: its rightmost card's drawn edge never
-# right of hand_right_limit_x (clear of END TURN and the DISCARD line,
-# whose left edges sit at 1799 and 1804+ at 1080p), its leftmost's never
-# left of hand_left_limit_x - the mirror of it (1920 - 1775), so the row,
-# centred between them, is centred on the screen. See _row_fit() for what
-# gives when it doesn't fit.
+# right of hand_right_limit_x (clear of END TURN's column, which starts
+# just past it - BattleOverlay places END TURN from this limit), its
+# leftmost's never left of hand_left_limit_x. The row is centred between
+# them. See _row_fit() for what gives when it doesn't fit.
 @export var hand_left_limit_x: float = 145.0:
 	set(value):
 		hand_left_limit_x = value
 		_reflow_hand(false)
-@export var hand_right_limit_x: float = 1775.0:
+@export var hand_right_limit_x: float = 1720.0:
 	set(value):
 		hand_right_limit_x = value
 		_reflow_hand(false)
