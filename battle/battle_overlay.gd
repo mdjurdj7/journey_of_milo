@@ -381,6 +381,7 @@ var _battle_feedback: BattleFeedback = null
 # A number's whole life and its legible part (pop and hold), read once
 # (_read_number_times()); -1 until then.
 var _number_life: float = -1.0
+var _number_heavy_life: float = -1.0
 var _number_legible: float = -1.0
 # Target (a FieldEnemy, or "player") -> how many of its numbers show now,
 # for the stack's step (number_stack_step).
@@ -1973,11 +1974,13 @@ func _on_damage_dealt(_source: Variant, target: Variant, amount: int, kind: Stri
 	var number_kind: String = FloatingNumber.KIND_DAMAGE
 	if not (target is FieldEnemy):
 		number_kind = FloatingNumber.KIND_SELF if kind == "self" else FloatingNumber.KIND_HP_LOST
-	_show_number(target, amount, number_kind)
+	# A heavy hit's number lingers (FloatingNumber's heavy_*).
+	var heavy: bool = _battle_feedback != null and _battle_feedback.is_heavy_report(amount, kind)
+	_show_number(target, amount, number_kind, heavy)
 
 # A number of `kind` (FloatingNumber's KIND_*) for `amount` on `target` -
-# a FieldEnemy or "player" - shown over its body.
-func _show_number(target: Variant, amount: int, kind: String) -> void:
+# a FieldEnemy or "player" - shown over its body; `heavy`, a heavy hit's.
+func _show_number(target: Variant, amount: int, kind: String, heavy: bool = false) -> void:
 	var delay: float = _battle_feedback.reaction_delay(target) if _battle_feedback != null else 0.0
 	# Read in the hit's own frame, while its card is still the impact's.
 	var sized: bool = kind == FloatingNumber.KIND_DAMAGE or kind == FloatingNumber.KIND_HP_LOST
@@ -1995,19 +1998,19 @@ func _show_number(target: Variant, amount: int, kind: String) -> void:
 		var control := display as Control
 		if control != null and is_instance_valid(control) and control.is_visible_in_tree():
 			avoid.append(control.get_global_rect())
-	_place_number(key, kind, amount, _screen_pos_for_damage_target(target), size, avoid, target as FieldEnemy if target is FieldEnemy else null)
+	_place_number(key, kind, amount, _screen_pos_for_damage_target(target), size, avoid, target as FieldEnemy if target is FieldEnemy else null, heavy)
 
 # A number of `kind` for `amount` at `screen_pos` (its bottom centre),
 # stepping on from `key`'s numbers still showing (a multi-hit's stack,
 # sharing its first's jitter), clear of `avoid`.
-func _place_number(key: Variant, kind: String, amount: int, screen_pos: Vector2, size: float, avoid: Array[Rect2], owner: FieldEnemy = null) -> void:
+func _place_number(key: Variant, kind: String, amount: int, screen_pos: Vector2, size: float, avoid: Array[Rect2], owner: FieldEnemy = null, heavy: bool = false) -> void:
 	var shown: int = int(_number_counts.get(key, 0))
 	var stack: Vector2 = number_stack_step * float(shown)
 	_number_counts[key] = shown + 1
-	get_tree().create_timer(_number_seconds()).timeout.connect(func() -> void:
+	get_tree().create_timer(_number_seconds(heavy)).timeout.connect(func() -> void:
 		_number_counts[key] = maxi(int(_number_counts.get(key, 1)) - 1, 0))
 	var jitter: float = NAN if shown == 0 else float(_stack_jitter.get(key, NAN))
-	var number: FloatingNumber = _spawn_floating_number(kind, amount, screen_pos, size, avoid, stack, jitter)
+	var number: FloatingNumber = _spawn_floating_number(kind, amount, screen_pos, size, avoid, stack, jitter, heavy)
 	if shown == 0:
 		_stack_jitter[key] = number.jitter.x
 	# Over an enemy: its intent dims while this shows.
@@ -2153,10 +2156,10 @@ func _kill_presentation_time(enemy: FieldEnemy, amount: int) -> float:
 	return maxf(_battle_feedback.kill_presentation_time(enemy, amount), number_end)
 
 # A number's whole life (FloatingNumber.life_seconds()) - how long it
-# counts toward its target's stack.
-func _number_seconds() -> float:
+# counts toward its target's stack; a heavy hit's longer.
+func _number_seconds(heavy: bool = false) -> float:
 	_read_number_times()
-	return _number_life
+	return _number_heavy_life if heavy else _number_life
 
 # Read once off the scene.
 func _read_number_times() -> void:
@@ -2164,6 +2167,7 @@ func _read_number_times() -> void:
 		return
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
 	_number_life = number.life_seconds() if number != null else 0.0
+	_number_heavy_life = number.life_seconds(true) if number != null else 0.0
 	_number_legible = number.legible_seconds() if number != null else 0.0
 	if number != null:
 		number.free()
@@ -2173,8 +2177,9 @@ func _read_number_times() -> void:
 # moved beside them, the side with room on screen, when its path would
 # cross one; then `stack` on from there (a multi-hit's step), so the
 # numbers of one target never land on one spot. `jitter`: the sideways
-# offset to land at - NAN draws one (FloatingNumber.jitter_px).
-func _spawn_floating_number(kind: String, value: int, screen_pos: Vector2, size_multiplier: float = 1.0, avoid: Array[Rect2] = [], stack: Vector2 = Vector2.ZERO, jitter: float = NAN) -> FloatingNumber:
+# offset to land at - NAN draws one (FloatingNumber.jitter_px). `heavy`:
+# a heavy hit's number (FloatingNumber's heavy_*).
+func _spawn_floating_number(kind: String, value: int, screen_pos: Vector2, size_multiplier: float = 1.0, avoid: Array[Rect2] = [], stack: Vector2 = Vector2.ZERO, jitter: float = NAN, heavy: bool = false) -> FloatingNumber:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
 	add_child(number)
 	var size: Vector2 = number.measure(kind, value, size_multiplier)
@@ -2193,7 +2198,7 @@ func _spawn_floating_number(kind: String, value: int, screen_pos: Vector2, size_
 	# Its whole rise on screen.
 	var start: Vector2 = at + stack
 	start.y = maxf(start.y, number.rise_px + number_clearance_px)
-	number.show_value(kind, value, start, size_multiplier, jitter)
+	number.show_value(kind, value, start, size_multiplier, jitter, heavy)
 	return number
 
 # Debug: flips the theme between its on-pale and on-dark value sets and

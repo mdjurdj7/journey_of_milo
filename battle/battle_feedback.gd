@@ -311,6 +311,11 @@ func stop_ms(amount: int, killing: bool = false, multi: bool = false) -> float:
 func is_heavy_hit(amount: int) -> bool:
 	return heavy_hit_damage > 0 and amount >= heavy_hit_damage
 
+# The same for a damage_dealt report: a contact (CONTACT_KINDS) only - a
+# tick or his own cost is never a hit. For its number.
+func is_heavy_report(amount: int, kind: String) -> bool:
+	return CONTACT_KINDS.has(kind) and is_heavy_hit(amount)
+
 # A hit a block took whole: its stop, in milliseconds; 0 with the stop off.
 func blocked_stop_ms() -> float:
 	return maxf(blocked_hitstop_ms, 0.0) if hitstop_enabled else 0.0

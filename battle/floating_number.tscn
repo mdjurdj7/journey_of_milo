@@ -4,3 +4,6 @@
 
 [node name="FloatingNumber" type="Label"]
 script = ExtResource("1_floating_number")
+heavy_pop_scale = 1.7
+heavy_hold_sec = 0.9
+heavy_fade_sec = 0.6

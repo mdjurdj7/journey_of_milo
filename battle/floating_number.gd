@@ -11,7 +11,9 @@ class_name FloatingNumber
 # settles to 1 over pop_time_sec - shown in the frame its hit's stop
 # starts, the stop's own beat - holds still and fully legible for
 # hold_sec, then rises rise_px as it fades out over fade_sec, and frees
-# itself. Each one lands up to jitter_px to either side of where it was
+# itself. A heavy hit's (BattleFeedback.is_heavy_hit()) pops at
+# heavy_pop_scale, holds heavy_hold_sec and rises and fades over
+# heavy_fade_sec - it lingers. Each one lands up to jitter_px to either side of where it was
 # put, at random, and keeps the offset it drew (`jitter`) for whoever
 # needs the spot it was put at.
 #
@@ -49,6 +51,10 @@ const KIND_BLOCKED := "blocked"
 @export var hold_sec: float = 0.5
 @export var rise_px: float = 40.0
 @export var fade_sec: float = 0.4
+# A heavy hit's number: its pop, its hold and its rise and fade.
+@export var heavy_pop_scale: float = 1.7
+@export var heavy_hold_sec: float = 0.9
+@export var heavy_fade_sec: float = 0.6
 # The most it lands to either side of where it was put, in pixels.
 @export var jitter_px: float = 14.0
 
@@ -101,13 +107,13 @@ static func text_for(number_kind: String, value: int) -> String:
 			return "Blocked"
 	return str(value)
 
-# Pop, hold and fade - the whole time it shows.
-func life_seconds() -> float:
-	return legible_seconds() + maxf(fade_sec, 0.0)
+# Pop, hold and fade - the whole time it shows; a heavy hit's longer.
+func life_seconds(heavy: bool = false) -> float:
+	return legible_seconds(heavy) + maxf(heavy_fade_sec if heavy else fade_sec, 0.0)
 
 # Until it starts to fade: the pop and the hold.
-func legible_seconds() -> float:
-	return maxf(pop_time_sec, 0.0) + maxf(hold_sec, 0.0)
+func legible_seconds(heavy: bool = false) -> float:
+	return maxf(pop_time_sec, 0.0) + maxf(heavy_hold_sec if heavy else hold_sec, 0.0)
 
 # The size it will show `value` at - for placing it before it shows.
 func measure(number_kind: String, value: int, size_multiplier: float = 1.0) -> Vector2:
@@ -118,19 +124,21 @@ func measure(number_kind: String, value: int, size_multiplier: float = 1.0) -> V
 # `size_multiplier` grows the numeral from font_size_px - a big hit's
 # (BattleFeedback.number_scale()) - on top of its kind's own size.
 # `jitter_x`: the sideways offset to land at; NAN draws one from jitter_px.
-func show_value(number_kind: String, value: int, screen_pos: Vector2, size_multiplier: float = 1.0, jitter_x: float = NAN) -> void:
+# `heavy`: a heavy hit's number, its heavy_* pop, hold and fade.
+func show_value(number_kind: String, value: int, screen_pos: Vector2, size_multiplier: float = 1.0, jitter_x: float = NAN, heavy: bool = false) -> void:
 	_apply_kind(number_kind, value, size_multiplier)
 	reset_size()
 	jitter = Vector2(randf_range(-jitter_px, jitter_px) if is_nan(jitter_x) else jitter_x, 0.0)
 	position = screen_pos + jitter
 	pivot_offset = size / 2.0
-	scale = Vector2.ONE * pop_scale
+	scale = Vector2.ONE * (heavy_pop_scale if heavy else pop_scale)
+	var fade: float = maxf(heavy_fade_sec if heavy else fade_sec, 0.0)
 
 	var tween := create_tween()
 	tween.tween_property(self, "scale", Vector2.ONE, maxf(pop_time_sec, 0.0)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(maxf(hold_sec, 0.0))
-	tween.tween_property(self, "position:y", position.y - rise_px, maxf(fade_sec, 0.0)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.parallel().tween_property(self, "modulate:a", 0.0, maxf(fade_sec, 0.0)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_interval(maxf(heavy_hold_sec if heavy else hold_sec, 0.0))
+	tween.tween_property(self, "position:y", position.y - rise_px, fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(self, "modulate:a", 0.0, fade).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free)
 
 func _apply_kind(number_kind: String, value: int, size_multiplier: float) -> void:
