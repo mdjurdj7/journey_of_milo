@@ -696,6 +696,13 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # Keep - Deck.kept_once). Its own text, as COPY's is, not a KeywordTable
 # entry.
 @export_multiline var sheathed_label_definition: String = "Stays in your hand at the end of this turn."
+# What a marked number's breakdown calls a base the card doesn't print -
+# Reckoning's, the Toll spent this fight: "Toll spent 13 · Whetstone +2 ·
+# = 15".
+@export var toll_spent_base_label: String = "Toll spent":
+	set(value):
+		toll_spent_base_label = value
+		_relayout_rules()
 # A copy's quiet mark: a band this deep along the face's top edge, hatched
 # with 1px ink strokes this far apart at this alpha - no glow, no colour.
 @export var copy_band_px: float = 6.0:
@@ -838,6 +845,8 @@ var _scale_tween: Tween = null
 # whether a host has this card up for inspection (set_keyword_inspect()).
 var _keyword_reveal: KeywordSlip = null
 var _hovered_keyword: String = ""
+# The marked number whose breakdown the slip shows, -1 for none.
+var _hovered_number: int = -1
 var _keyword_inspect: bool = false
 # The scale this card's own scale tween is heading for (_tween_scale()).
 var _scale_target: float = 1.0
@@ -1029,6 +1038,7 @@ func _refresh_dynamic_text() -> void:
 	_bonus_state = CardBonus.state(card_data, _bonus_context.for_card_preview(_upfront_hp_cost())) if _bonus_context != null else CardBonus.State.NONE
 	rules_text.text = _inline_toll_prices(_style_bonus_clauses(_style_live_numbers(_format_rules(_resolve_tokens(card_data.description)))))
 	_redraw_live_marks()
+	_refresh_number_slip()
 	if _bonus_state != was:
 		_animate_bonus_corner()
 
@@ -2106,8 +2116,14 @@ func set_keyword_inspect(on: bool) -> void:
 # definition, or fades it. Called on this card's own motion events, and
 # by a host whose cards don't take the mouse (BelongingsScreen).
 func update_keyword_hover() -> void:
-	var word: String = keyword_at(get_local_mouse_position()) if keyword_hover_allowed() else ""
-	_show_keyword(word)
+	var allowed: bool = keyword_hover_allowed()
+	var at: Vector2 = get_local_mouse_position()
+	# A marked number first: it sits among the keywords, never under one.
+	var number: int = number_at(at) if allowed else -1
+	if number >= 0:
+		_show_number(number)
+		return
+	_show_keyword(keyword_at(at) if allowed else "")
 
 func clear_keyword_hover() -> void:
 	_show_keyword("")
@@ -2175,6 +2191,49 @@ func _undo_preview() -> Dictionary:
 # The keyword whose definition is up, "" for none.
 func get_hovered_keyword() -> String:
 	return _hovered_keyword
+
+# The marked number whose breakdown is up - its index among the face's
+# marked numbers - or -1 for none.
+func get_hovered_number() -> int:
+	return _hovered_number
+
+# The marked number at `local_pos` (this card's own, unscaled pixels), by
+# its index, or -1.
+func number_at(local_pos: Vector2) -> int:
+	if _marked_numbers.is_empty():
+		return -1
+	var numbers: Array[Dictionary] = _rules_geometry()["numbers"]
+	for entry in numbers:
+		var rect: Rect2 = entry["rect"]
+		if rect.grow(KEYWORD_HIT_PAD_PX).has_point(local_pos):
+			return int(entry["index"])
+	return -1
+
+# The breakdown of marked number `index` on the keyword slip: one plain
+# line, the card's own number, each outside source and the total
+# (NumberBreakdown.describe()).
+func _show_number(index: int) -> void:
+	if (index == _hovered_number and _hovered_keyword.is_empty()) or _keyword_reveal == null or index >= _marked_numbers.size():
+		return
+	_hovered_keyword = ""
+	_hovered_number = index
+	set_process(true)
+	_keyword_reveal.set_bone(field_color)
+	_keyword_reveal.set_max_width(keyword_reveal_max_width())
+	_keyword_reveal.set_lines(PackedStringArray([""]), PackedStringArray([_marked_numbers[index].describe()]))
+	_place_keyword_reveal()
+	_keyword_reveal.set_revealed(true)
+
+# The face re-read with a breakdown up: the slip says the new one, or goes
+# with its number.
+func _refresh_number_slip() -> void:
+	if _hovered_number < 0 or _keyword_reveal == null:
+		return
+	if _hovered_number >= _marked_numbers.size():
+		_show_keyword("")
+		return
+	_keyword_reveal.set_lines(PackedStringArray([""]), PackedStringArray([_marked_numbers[_hovered_number].describe()]))
+	_place_keyword_reveal()
 
 # The bold keyword at `local_pos` (this card's own, unscaled pixels) -
 # or STRIKE_LABEL_WORD over a STRIKE card's type label, Keep over a kept
@@ -2399,9 +2458,10 @@ static func _rules_runs(text: String, from: int, to: int, matches: Array[RegExMa
 	return runs
 
 func _show_keyword(word: String) -> void:
-	if word == _hovered_keyword or _keyword_reveal == null:
+	if (word == _hovered_keyword and _hovered_number < 0) or _keyword_reveal == null:
 		return
 	_hovered_keyword = word
+	_hovered_number = -1
 	set_process(not word.is_empty())
 	if word.is_empty():
 		_keyword_reveal.set_revealed(false)
@@ -2710,7 +2770,7 @@ func _toll_spent_damage_preview() -> NumberBreakdown:
 		var spent: int = 0
 		if _bonus_context != null and _bonus_context.player != null:
 			spent = _bonus_context.player.toll_spent_this_fight
-		var blow := NumberBreakdown.new(spent)
+		var blow := NumberBreakdown.new(spent, toll_spent_base_label)
 		if card_data.card_type == CardData.CardType.ATTACK:
 			_add_attack_bonus_preview(blow)
 		return _land_on(blow, false)
