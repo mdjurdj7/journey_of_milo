@@ -14,6 +14,10 @@ class_name ScatterMeshes
 #                tapering - lying along its length on X (a tideline turns
 #                it along the line)
 #   TWIG         a tiny twig: a thin rod, ~10 cm, slightly bent, along X
+#   REED         a graybox reed clump: nine thin upright spikes, ~0.96 m
+#                tall and ~0.29 m across, standing on the origin - sized
+#                by size_m across like the rest, so about 3.3 times as
+#                tall as size_m
 # Every mesh has smooth normals - a glb that arrives without any (Meshy's
 # samphire carries positions only) gets them generated here. One mesh per
 # path or kind, shared by every floor.
@@ -130,6 +134,8 @@ static func placeholder(kind: ScatterEntry.PlaceholderKind) -> Mesh:
 			return _strand()
 		ScatterEntry.PlaceholderKind.TWIG:
 			return _twig()
+		ScatterEntry.PlaceholderKind.REED:
+			return _reed()
 	return _cast()
 
 # A thin tube wound in a loose, low coil - a lugworm's cast: 1.7 turns,
@@ -303,6 +309,32 @@ static func _twig() -> Mesh:
 	for s in range(1, sides - 1):
 		_tri(tool, rings[0][0], rings[0][s], rings[0][s + 1], centres[1])
 		_tri(tool, rings[stations][0], rings[stations][s], rings[stations][s + 1], centres[stations - 1])
+	tool.generate_normals()
+	return tool.commit()
+
+# Nine stems from a hand's breadth of ground, each a thin four-sided spike
+# 0.7-1 m tall leaning out up to 8 degrees - a clump's silhouette for the
+# graybox, not a reed. Laid out by a fixed seed, so every clump is the same
+# (scatter turns and sizes each one).
+static func _reed() -> Mesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for stem in 9:
+		var around: float = float(stem) / 9.0 * TAU + rng.randf_range(-0.3, 0.3)
+		var out: Vector2 = Vector2(cos(around), sin(around))
+		var base := Vector3(out.x, 0.0, out.y) * rng.randf_range(0.01, 0.07)
+		var height: float = rng.randf_range(0.7, 1.0)
+		var lean: float = deg_to_rad(rng.randf_range(2.0, 8.0))
+		var tip: Vector3 = base + Vector3(out.x * sin(lean), cos(lean), out.y * sin(lean)) * height
+		var across := Vector3(-out.y, 0.0, out.x)
+		var corners: Array[Vector3] = [
+			base + across * 0.012, base + Vector3(out.x, 0.0, out.y) * 0.005,
+			base - across * 0.012, base - Vector3(out.x, 0.0, out.y) * 0.005]
+		var inside: Vector3 = (base + tip) * 0.5
+		for k in 4:
+			_tri(tool, corners[k], corners[(k + 1) % 4], tip, inside)
 	tool.generate_normals()
 	return tool.commit()
 

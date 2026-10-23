@@ -27,7 +27,7 @@ class_name ScatterEntry
 enum Mode { CLUSTERS, CONTOUR }
 # Appended: an inserted value would rewrite every .tres that stores one
 # of these as an integer.
-enum PlaceholderKind { CAST, SHELL, STONE_ROUND, STONE_FLAT, STRAND, TWIG }
+enum PlaceholderKind { CAST, SHELL, STONE_ROUND, STONE_FLAT, STRAND, TWIG, REED }
 # How it settles: FLAT lies on the sand as it is (a cast); CONVEX_UP turns
 # its dome up (a shell, the way they come to rest); FLATTEST_SIDE turns
 # its thinnest axis up (a stone).
