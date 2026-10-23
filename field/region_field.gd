@@ -273,6 +273,9 @@ enum RewardMode { SCREEN, WORLD }
 @export_group("Enemy Lines")
 @export var enemy_world_line_seconds: float = 3.0
 @export var enemy_world_line_head_clearance: float = 0.35
+# A defeat line held for after the rewards (EnemyData.defeat_line_after_
+# rewards): this far over the top of the slab the enemy lay on.
+@export var enemy_world_line_slab_clearance: float = 0.2
 @export_group("")
 
 # Enemies read through the field's depth fog as dark figures while the
@@ -557,6 +560,10 @@ var _pending_find_creature: String = ""
 var _pending_shell_find: WarpedShellData = null
 # The find line is waiting on a world-voice line to finish.
 var _find_waiting_on_voice: bool = false
+# A defeat line held for after the rewards (EnemyData.defeat_line_after_
+# rewards) and the world point it is said over (_say_pending_defeat_line()).
+var _pending_defeat_line: String = ""
+var _pending_defeat_line_at: Vector3 = Vector3.ZERO
 var _nav_build_queued: bool = false
 # Debug builds: the F1 row's Path draw, made on its first toggle.
 var _nav_debug: NavDebugDraw = null
@@ -3241,8 +3248,18 @@ func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
 	# roster, no gate waiting on it (see FieldEnemy.mark_defeated()).
 	enemy.mark_defeated()
 	# Its defeat line, where it stood - anchored to the body, which the
-	# line leaves in place if it goes first.
-	if enemy.enemy_data != null:
+	# line leaves in place if it goes first. Or held for after the rewards,
+	# its point read now while the body is here: over the slab where it
+	# lay before the fight (FieldEnemy.get_field_position() - not where a
+	# phase drop left it).
+	if enemy.enemy_data != null and enemy.enemy_data.defeat_line_after_rewards:
+		if not enemy.enemy_data.defeat_line.is_empty():
+			var lay: Vector3 = enemy.get_field_position()
+			var top: float = _slab_top_under(lay)
+			lay.y = (top if top > -INF else lay.y) + enemy_world_line_slab_clearance
+			_pending_defeat_line = enemy.enemy_data.defeat_line
+			_pending_defeat_line_at = lay
+	elif enemy.enemy_data != null:
 		_say_near_enemy(enemy, enemy.enemy_data.defeat_line)
 	# A pack felled together: its line, once, over the first of them to go
 	# down - the rest are already dead (EncounterOption.felled_together_
@@ -3268,6 +3285,40 @@ func _say_near_enemy(enemy: FieldEnemy, text: String) -> void:
 		push_warning("RegionField: no FieldHUD to say an enemy's line on.")
 		return
 	line.show_line_near(text, enemy_world_line_seconds, enemy, Vector3.UP * (enemy.get_head_height() + enemy_world_line_head_clearance))
+
+# The top of the BaskingSlab under `at` (XZ) - its collision box's, in the
+# world - or -INF with none under it.
+func _slab_top_under(at: Vector3) -> float:
+	var props_root: Node = get_node_or_null(NodePath(PROPS_NODE_NAME))
+	if props_root == null:
+		return -INF
+	for node in props_root.find_children("*", "Node3D", true, false):
+		var slab := node as BaskingSlab
+		if slab == null:
+			continue
+		var box: AABB = slab.get_body_aabb()
+		if box.size == Vector3.ZERO:
+			continue
+		var local: Vector3 = slab.to_local(at)
+		if local.x < box.position.x or local.x > box.end.x or local.z < box.position.z or local.z > box.end.z:
+			continue
+		return slab.to_global(Vector3(local.x, box.end.y, local.z)).y
+	return -INF
+
+# A defeat line held for after the rewards (EnemyData.defeat_line_after_
+# rewards), said once over its slab - by the same gate as the find line
+# (_say_pending_find()): no fight open, no screen holding the field. Called
+# where that is, before it, so the find line waits for this one to fade.
+func _say_pending_defeat_line() -> void:
+	if _pending_defeat_line.is_empty() or _battle_open or not can_process():
+		return
+	var line := WorldVoiceLine.on_hud(get_node_or_null(^"FieldHUD"))
+	if line == null:
+		push_warning("RegionField: no FieldHUD to say a defeat line on.")
+		return
+	var text: String = _pending_defeat_line
+	_pending_defeat_line = ""
+	line.show_line_at(text, enemy_world_line_seconds, _pending_defeat_line_at)
 
 # The keepsake's win heal (RunState.settle_keepsake_win()): its "+N" on
 # FieldHUD beside his HP bar, after `delay` (the camera's way back),
@@ -3473,8 +3524,8 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	var floor_data := get_floor_data()
 	var has_pool: bool = floor_data != null and run_reward_pool(floor_data) != null
 	# No card reward to wait for: a keepsake or weapon this win left is still
-	# offered, after the same beat.
-	if not has_pool and _pending_keepsake == null and _pending_weapon == null and _pending_glassbone <= 0:
+	# offered, after the same beat - as is a defeat line held for after it.
+	if not has_pool and _pending_keepsake == null and _pending_weapon == null and _pending_glassbone <= 0 and _pending_defeat_line.is_empty():
 		return
 	var delay: float = reward_spread_delay_sec
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
@@ -3484,15 +3535,21 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	# The floor can be left, or the run ended, during that beat.
 	if not is_inside_tree():
 		return
+	# From here, a held defeat line is said wherever no screen opened to
+	# hold the field (_say_pending_defeat_line()'s own gate); one that did
+	# says it as it closes.
 	if not has_pool and _pending_glassbone <= 0 and _pending_weapon == null and _pending_keepsake == null:
+		_say_pending_defeat_line()
 		return
 	if reward_mode == RewardMode.SCREEN or not has_pool:
 		# The keepsake and weapon are lines on it.
 		_open_reward_screen()
+		_say_pending_defeat_line()
 		return
 	var scene := load(reward_spread_scene_path) as PackedScene
 	if scene == null:
 		push_warning("RegionField: could not load %s; no reward spread." % reward_spread_scene_path)
+		_say_pending_defeat_line()
 		return
 	if _pending_glassbone > 0:
 		# The spread lays cards on the sand and has no piece of its own
@@ -3512,6 +3569,7 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	spread.global_position = fell_at
 	# The cards are on the sand, nothing to close: the keepsake and weapon at once.
 	_open_pending_offers()
+	_say_pending_defeat_line()
 
 # The rarity rates a normal fight's card offer rolls with on this floor:
 # EncounterRewards' FightRarityTable at the region's floor (1 = its
@@ -3578,6 +3636,7 @@ func _open_reward_screen() -> void:
 
 func _on_reward_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
+	_say_pending_defeat_line()
 	_say_pending_find()
 
 # A won fight's keepsake: the first enemy it was won against whose own
@@ -3681,6 +3740,7 @@ func open_weapon_offer(weapon: WeaponData) -> bool:
 func _on_weapon_offer_closed(taken: bool, weapon: WeaponData) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 	_answer_weapon_offer(weapon, taken)
+	_say_pending_defeat_line()
 	_say_pending_find()
 
 # A weapon's plate up - over the field, or a reward screen's line: its reveal.
@@ -3725,6 +3785,7 @@ func _on_keepsake_offer_closed(_taken: bool) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 	# The win's weapon, if it left one, next.
 	_open_pending_offers()
+	_say_pending_defeat_line()
 	_say_pending_find()
 
 # Debug builds only: a row of debug buttons on the field HUD in the

@@ -1856,7 +1856,7 @@
         "weapon": "res://run/weapons/greyshelfs_tail.tres",
         "gold_and_cards": "the floor's - see regions[].floors[].rewards"
       },
-      "defeat_line": "",
+      "defeat_line": "It was only lying in the sun.",
       "sounds": {
         "contact": [
           "res://assets/audio/combat_old/hit.wav"

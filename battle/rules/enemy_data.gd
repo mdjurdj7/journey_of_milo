@@ -132,6 +132,11 @@ func named(count: int) -> String:
 # Said where it stood, in the world voice, as it dies (RegionField._on_
 # enemy_defeated()). Empty = nothing.
 @export var defeat_line: String = ""
+# The defeat line held instead until the win's screens have closed and
+# the field is live again, said once over the basking slab where the
+# enemy lay - not as it dies, over the fight (the Greyshelf's, beside its
+# empty crest rock; RegionField._say_pending_defeat_line()).
+@export var defeat_line_after_rewards: bool = false
 # What this enemy can leave as a keepsake - its own table, offered after
 # a won fight's normal reward (RegionField._roll_keepsake_drop()). Null =
 # none. An elite leaves armor instead (armor_table).
