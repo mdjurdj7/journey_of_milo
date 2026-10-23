@@ -596,6 +596,10 @@ func _lines_for(effect: CardEffect, card: CardData) -> int:
 			return 2 if TWO_LINE_STATUS_CARDS.has(card.card_name) else 1
 		CardEffect.EffectType.DRAW:
 			return 0 if SHARED_DRAW_LINE_CARDS.has(card.card_name) else 1
+		# A required Toll spend is the name row's badge (CardView.required_
+		# toll()), not a rules line.
+		CardEffect.EffectType.SPEND_TOLL:
+			return 0 if effect.toll_cost > 0 else 1
 	return 1
 
 # --- Helpers ---
