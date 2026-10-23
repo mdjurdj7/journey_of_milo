@@ -70,11 +70,12 @@
   probe) unless I ask. Everything else runs in the nightly. A push needs
   only the core set.
 - Never re-run the core set if it passed and no code changed since.
-- If memory is too low to run probes, don't wait; commit and say so.
-  The nightly full set covers it.
+- If the wait-rule checks still don't clear after about 30 minutes, stop
+  and tell me what's blocking (game, headless Godot, run_probes.sh, or
+  memory). Don't merge or push unprobed work unless I say so.
 - A task prompt's own stop or merge conditions ("merge only if the
   probes pass", "stop if memory is under the floor") override this
-  file's general guidance, the low-memory rule above included. Never
+  file's general guidance, the 30-minute wait rule above included. Never
   merge unprobed work unless my message explicitly says to.
 - Nightly full set: `tools/nightly_probes.sh` (Git Bash, main tree),
   or from PowerShell in a window of its own that outlives the terminal:
