@@ -8,10 +8,12 @@ extends SceneTree
 #   - the field: each Nettle's pick rect at least the floor, about the
 #     centre of its padded screen rect, and a click inside the floor but
 #     outside that rect still picks an enemy
-#   - the fight: the controller reads the field's floor; each Nettle's
-#     target at least the floor, about the same centre; the Nettlebasket,
-#     past the floor both ways, its padded rect unchanged; and a click on
-#     a Nettle's grown edge, clear of every other target, hits it
+#   - the fight: the controller reads the field's floor; before her
+#     Signal each Nettle, aboard (Combatant.aboard), is no target at all;
+#     deployed, each Nettle's target at least the floor, about the same
+#     centre; the Nettlebasket, past the floor both ways, its padded rect
+#     unchanged; and a click on a Nettle's grown edge, clear of every
+#     other target, hits it
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/target_floor_probe.gd
 #
@@ -96,9 +98,28 @@ func _check_fight() -> void:
 	_expect_eq(float(controller.get("min_target_size_px")), floor_px, "The fight reads the field's floor")
 	var camera: Camera3D = _field.get_viewport().get_camera_3d()
 	var padding: float = float(controller.get("target_padding_px"))
+	# Aboard before her Signal: no Nettle is a target.
+	controller.call("_refresh_enemy_rects")
+	var members: Array = controller.get("enemies")
+	var aboard: Dictionary = controller.get("_enemy_rects")
+	var nettles: Array[Node] = []
+	for member: Node in members:
+		if _is(member, NETTLE_PATH):
+			nettles.append(member)
+			_expect(not aboard.has(member), "Fight: a Nettle aboard before the Signal is no target")
+	_expect(not nettles.is_empty(), "Fight: the pack has its Nettles aboard")
+	# Deployed (her Signal's deploy), and off the basket to their spots -
+	# the longest climb in game time.
+	controller.call("_deploy_aboard", basket)
+	var climb_msec: int = 0
+	for nettle: Node in nettles:
+		climb_msec = maxi(climb_msec, int(float(nettle.get("deploy_seconds")) * 1000.0))
+	var landed_at: int = ProbePlay.game_msec() + climb_msec
+	await ProbePlay.wait_until(self, func() -> bool: return ProbePlay.game_msec() > landed_at, 5.0)
+	for nettle: Node in nettles:
+		_expect(not bool(nettle.call("is_held_aboard")), "Fight: a Nettle is off the basket once deployed")
 	controller.call("_refresh_enemy_rects")
 	var rects: Dictionary = controller.get("_enemy_rects")
-	var members: Array = controller.get("enemies")
 	for member: Node in members:
 		var raw: Rect2 = member.call("get_screen_rect", camera, padding)
 		var target: Rect2 = rects.get(member, Rect2())

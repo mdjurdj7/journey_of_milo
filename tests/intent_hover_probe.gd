@@ -1,9 +1,10 @@
 extends SceneTree
 
 # Headless probe for what a hovered intent says and where: the
-# Nettlebasket's Signal counts its answerers - "wakes 3 Nettles to Nip 2
-# each (6)." with the pack asleep, "wakes 1 Nettle to Nip 2." with one
-# left, "calls" once any answerer is awake - and the hovered intent's line
+# Nettlebasket's Signal counts its answerers - "brings out 3 Nettles to
+# Nip 2 each (6)." with the pack aboard, "brings out 1 Nettle to Nip 2."
+# with one left, "wakes" with it out but asleep, "calls" once any
+# answerer is awake - and the hovered intent's line
 # is on its bone slip above the readout, clear of every fighter, listed
 # with the readouts (BattleOverlay.get_readout_rects()). Guards the 20 Oct
 # line "wakes the Nettle; each answers with Nip 2 (2 in all)", thin text
@@ -48,8 +49,8 @@ func _initialize() -> void:
 		print("intent_hover_probe: %d FAILED" % _failures)
 		quit(1)
 
-# The Signal's line with the pack asleep, one Nettle left, and that one
-# awake.
+# The Signal's line with the pack aboard, one Nettle left, that one out
+# but asleep, and awake.
 func _check_signal_wording(overlay: Node) -> void:
 	var controller: Node = overlay.get("battle_controller")
 	var basket: Node = _first_of(controller, NETTLEBASKET_PATH)
@@ -66,10 +67,12 @@ func _check_signal_wording(overlay: Node) -> void:
 	var each: int = answer.value
 	var name: String = EnemyTurn.current_intent(basket_combatant, basket.get("enemy_data")).intent_name
 	var count: int = nettles.size()
-	_expect_eq(str(overlay.call("_intent_hover_text", basket)), "%s: wakes %d Nettles to %s %d each (%d)." % [name, count, move, each, each * count], "The pack asleep: it wakes them all, counted")
+	_expect_eq(str(overlay.call("_intent_hover_text", basket)), "%s: brings out %d Nettles to %s %d each (%d)." % [name, count, move, each, each * count], "The pack aboard: it brings them all out, counted")
 	for i in range(1, nettles.size()):
 		(combatants.get(nettles[i]) as Combatant).hp = 0
-	_expect_eq(str(overlay.call("_intent_hover_text", basket)), "%s: wakes 1 Nettle to %s %d." % [name, move, each], "One Nettle left: wakes 1 Nettle, no \"each\"")
+	_expect_eq(str(overlay.call("_intent_hover_text", basket)), "%s: brings out 1 Nettle to %s %d." % [name, move, each], "One Nettle left: brings out 1 Nettle, no \"each\"")
+	(combatants.get(nettles[0]) as Combatant).aboard = false
+	_expect_eq(str(overlay.call("_intent_hover_text", basket)), "%s: wakes 1 Nettle to %s %d." % [name, move, each], "...out but asleep: it wakes it")
 	(combatants.get(nettles[0]) as Combatant).dormant = false
 	_expect_eq(str(overlay.call("_intent_hover_text", basket)), "%s: calls 1 Nettle to %s %d." % [name, move, each], "...awake: it calls it")
 	_completed += 1
