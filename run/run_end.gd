@@ -2,8 +2,9 @@ extends CanvasLayer
 class_name RunEnd
 
 # The run's end, whichever way it went - two scenes on this script: won
-# (run_end.tscn: Region 1's last floor left by its exit, RegionField._on_
-# floor_exited() with loop_region_after_last_floor off) and lost
+# (run_end.tscn: the last region's last floor left by its exit,
+# RegionField._on_floor_exited() with loop_region_after_last_floor off)
+# and lost
 # (run_over.tscn: died in a fight or drowned wading, RegionField._end_run_
 # lost()), each with its own line; a drowning says drowned_line when the
 # scene sets one. Either way the fade has already taken the frame to the

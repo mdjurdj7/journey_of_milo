@@ -126,14 +126,14 @@ var current_floor_index: int = 0
 # is built.
 const DEBUG_START_PREFIX := "--start="
 var debug_start: Vector2i = Vector2i(-1, -1)
-# How many times this run has gone round the region - its last floor
-# wraps to the first only with RegionField.loop_region_after_last_floor
-# (otherwise leaving it ends the run, won). For the run log's
-# floor_entered; new_run() zeroes it.
+# How many times this run has gone round its regions - the last region's
+# last floor wraps to the first region's floor 1 only with RegionField.
+# loop_region_after_last_floor (otherwise leaving it ends the run, won).
+# For the run log's floor_entered; new_run() zeroes it.
 var region_lap: int = 0
 # The run's tally for its end (RunEnd's stats, the log's run_end): floors
-# left by their exit - the last one too, so a straight run of Region 1 is
-# 5 - and fights won (RegionField's WIN outcome, debug wins included).
+# left by their exit, across regions - the last one too, so a straight
+# run of Region 1 and Region 2's one floor is 6 - and fights won (RegionField's WIN outcome, debug wins included).
 # new_run() zeroes both.
 var floors_crossed: int = 0
 var fights_won: int = 0

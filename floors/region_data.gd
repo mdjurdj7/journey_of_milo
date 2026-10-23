@@ -3,9 +3,10 @@ class_name RegionData
 
 # A region's floors, in walking order. RegionField lists these (its
 # `regions` export, picked by RunState.current_region_index) and plays
-# floors[RunState.current_floor_index]; stepping off the last one ends
-# the run, won (RegionField._on_floor_exited()), unless its
-# loop_region_after_last_floor test switch sends it round to the first.
+# floors[RunState.current_floor_index]; stepping off the last one goes
+# on to the next region's first floor, or - the last region's - ends the
+# run, won (RegionField._on_floor_exited()), unless its loop_region_
+# after_last_floor test switch sends it round to the first region.
 # Region-level facts (sea, sky, light, the tower's place) stay authored
 # in the region's scene, not here.
 

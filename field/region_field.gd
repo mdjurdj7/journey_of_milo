@@ -27,9 +27,10 @@ signal floor_cleared
 # wear, rewards) reads get_floor_data() where it needs it. A floor change
 # is a scene reload with the index advanced - see _on_floor_exited().
 # Every region the run can play, in walking order; RunState.current_
-# region_index picks one. Nothing walks on from one region to the next
-# yet - a region's last floor ends the run (_on_floor_exited()) - so only
-# the debug start (RunState.debug_start) reaches past the first.
+# region_index picks one. A region's last floor leads on to the next
+# region's first by the ordinary floor transition, and the last region's
+# last floor ends the run (_on_floor_exited()); the debug start
+# (RunState.debug_start) can begin at any of them.
 @export var regions: Array[RegionData] = []
 # The region this scene load plays - see get_region(). Not an export: a
 # probe's fixture region is set here before the scene enters the tree,
@@ -128,9 +129,10 @@ enum RewardMode { SCREEN, WORLD }
 	set(value):
 		run_logging_enabled = value
 		RunLogger.enabled = value
-# Leaving the region's last floor ends the run, won (RunEnd); on, it goes
-# round to floor 1 again instead and counts a lap - endless laps, for
-# testing. Read at the exit, so a Remote-tab change holds from the next.
+# Leaving the last region's last floor ends the run, won (RunEnd); on, it
+# goes round to the first region's floor 1 again instead and counts a lap
+# - endless laps, for testing. Read at the exit, so a Remote-tab change
+# holds from the next.
 @export var loop_region_after_last_floor: bool = false
 
 # Debug builds only: the field's F1 row and its Keepsake button, which
@@ -2617,11 +2619,14 @@ func is_battle_exempt_prop(prop: Node) -> bool:
 # in _ready() is what keeps it from being reset. Toll lives there too: in
 # full between a floor's fights, down to the character's cap here
 # (RunState.carry_toll()).
-# Grace is per combat and lives on the fight's Combatant. Past the
-# region's last floor the run is won: logged, and the end screen (RunEnd)
-# over the fade, which stays up under it. With loop_region_after_last_
-# floor it goes round to floor 1 again instead (the once-per-run findings
-# stay spent, as they should).
+# Grace is per combat and lives on the fight's Combatant. Past a listed
+# region's last floor the next region's floor 1 loads the same way - the
+# same look-up and fade, the same carry, no zone intro (only new_run()
+# owes one). Past the last region's last floor the run is won: logged,
+# and the end screen (RunEnd) over the fade, which stays up under it.
+# With loop_region_after_last_floor it goes round to the first region's
+# floor 1 again instead (the once-per-run findings stay spent, as they
+# should).
 func _on_floor_exited() -> void:
 	if _transitioning:
 		return
@@ -2643,17 +2648,22 @@ func _on_floor_exited() -> void:
 	RunState.floors_crossed += 1
 	var played: RegionData = get_region()
 	var floor_count: int = played.floors.size() if played != null else 0
-	if RunState.current_floor_index + 1 >= floor_count:
-		if not loop_region_after_last_floor:
-			print("RegionField: the region's last floor left - the run is won")
-			RunState.log_run_end("won")
-			get_tree().change_scene_to_file(RUN_END_SCENE_PATH)
-			return
-		print("RegionField: end of region - back to floor 1 (loop_region_after_last_floor)")
+	if RunState.current_floor_index + 1 < floor_count:
+		RunState.current_floor_index += 1
+	elif regions.has(played) and RunState.current_region_index + 1 < regions.size():
+		print("RegionField: the region's last floor left - on to region %d" % (RunState.current_region_index + 2))
+		RunState.current_region_index += 1
+		RunState.current_floor_index = 0
+	elif not loop_region_after_last_floor:
+		print("RegionField: the last region's last floor left - the run is won")
+		RunState.log_run_end("won")
+		get_tree().change_scene_to_file(RUN_END_SCENE_PATH)
+		return
+	else:
+		print("RegionField: end of the last region - back to region 1 floor 1 (loop_region_after_last_floor)")
+		RunState.current_region_index = 0
 		RunState.current_floor_index = 0
 		RunState.region_lap += 1
-	else:
-		RunState.current_floor_index += 1
 	RunState.carry_toll()
 	print("RegionField: floor_exited, current_floor_index = %d" % RunState.current_floor_index)
 	get_tree().reload_current_scene()

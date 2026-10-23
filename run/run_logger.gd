@@ -338,8 +338,8 @@ static func floor_entered(snapshot: Dictionary, slots: Dictionary = {}) -> void:
 		"slots": slots,
 	})
 
-# The run is over: `cause` is won (Region 1's last floor left by its
-# exit), died, drowned, quit or abandoned (a new run started over one
+# The run is over: `cause` is won (the last region's last floor left by
+# its exit), died, drowned, quit or abandoned (a new run started over one
 # never ended). A death names the fight it was in. Every end carries the
 # run's tally - fights won, floors crossed - and where it stood: HP of
 # max, the deck and its size, keepsake, purse. A run with no fight and no
