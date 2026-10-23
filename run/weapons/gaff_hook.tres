@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="WeaponData" format=3]
 
 [ext_resource type="Script" path="res://run/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="Texture2D" uid="uid://d3xbk85aas55x" path="res://assets/textures/weapons/gaff_hook.png" id="2_art"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -9,5 +10,6 @@ display_name = "Gaff Hook"
 rarity = 2
 description = "Whenever you damage yourself, your next Slash deals {bonus} more. Stacks."
 lore = "Made to land things heavier than the hand."
+art = ExtResource("2_art")
 self_loss_attack_bonus = 3
 card_class = &"wanderer"

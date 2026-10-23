@@ -65,7 +65,7 @@ const TWEEN_ROOM_SEC := 0.4
 # The collector's shop pieces, on the plate's placeholder until their art
 # is made: each still has to fit its plate and say its kind. Remove each
 # id here when its art lands.
-const PLACEHOLDER_ART_IDS: Array[StringName] = [&"salt_collar", &"reed_cape", &"counting_stone", &"knotted_cord", &"gaff_hook"]
+const PLACEHOLDER_ART_IDS: Array[StringName] = [&"salt_collar", &"reed_cape", &"counting_stone", &"knotted_cord"]
 
 var _run_state: Node = null
 var _field: Node = null
