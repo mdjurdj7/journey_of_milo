@@ -23,7 +23,7 @@ status_while_queued = ExtResource("4_exposed")
 script = ExtResource("1_enemy_data")
 enemy_name = "Underfoot"
 mechanic_summary = "A stingray under the sand at the waterline, on a two-turn rhythm: Covered (takes 50% less damage) while its Sting (14) is telegraphed, then Exposed (takes 50% more) while it reburies, dealing nothing. The Sting can't be broken — Block or Brace it, work the enemy beside it, and hit the Underfoot when it's Exposed."
-max_hp = 52
+max_hp = 42
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_sting"), SubResource("EnemyIntent_rebury")])
 ; Placeholder hit, the Greyshelf's (DESIGN.md).
 contact_sounds = Array[AudioStream]([ExtResource("5_hit")])
