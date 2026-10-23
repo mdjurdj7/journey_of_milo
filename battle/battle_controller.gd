@@ -1336,11 +1336,13 @@ func confirm_target(enemy: FieldEnemy, mound: int = -1) -> void:
 	_mound_rects.clear()
 	_resolve_play(card_view, enemy, [], mound)
 
-func cancel_target() -> void:
+# `immediate`: the card goes straight back to the fan (CardView.release()),
+# another taking its place.
+func cancel_target(immediate: bool = false) -> void:
 	if _pending_card_view == null:
 		return
 	var card: CardData = _pending_card_view.card_data
-	_pending_card_view.release()
+	_pending_card_view.release(immediate)
 	_pending_card_view = null
 	_pending_devour_only = false
 	_clear_hover()

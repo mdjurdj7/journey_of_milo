@@ -1931,11 +1931,13 @@ func lift_and_hold(for_choice: bool = false) -> void:
 
 # Cancelled: back to the fan. HandContainer returns the slot on disarmed;
 # this card only returns its scale and frame. If the mouse is still over
-# it, it settles as a plain hover instead of dropping fully.
-func release() -> void:
+# it, it settles as a plain hover instead of dropping fully. `immediate`
+# skips the selected_hold_sec hold - another card is taking its place
+# (a number key switching cards), so this one goes back at once.
+func release(immediate: bool = false) -> void:
 	_armed = false
 	var held_sec: float = float(Time.get_ticks_msec() - _armed_at_msec) / 1000.0
-	var remaining: float = selected_hold_sec - held_sec
+	var remaining: float = 0.0 if immediate else selected_hold_sec - held_sec
 	if remaining > 0.0:
 		await get_tree().create_timer(remaining).timeout
 		if _armed:

@@ -922,6 +922,31 @@ func _card_views() -> Array[CardView]:
 			views.append(card_view)
 	return views
 
+# The hand's cards by position, left to right as the row lays them out:
+# the armed card keeps its own place, a drawn card still waiting to
+# launch has none yet. What the number keys count.
+func positioned_card_views() -> Array[CardView]:
+	var views: Array[CardView] = []
+	for slot in _slots:
+		if _waiting_slots.has(slot):
+			continue
+		var card_view: CardView = slot.get_child(0) as CardView
+		if card_view != null:
+			views.append(card_view)
+	return views
+
+# The card at hand position `index` (0 the leftmost - see
+# positioned_card_views()), or null past the end or on a card still in
+# flight, which takes no click yet either.
+func card_view_at_position(index: int) -> CardView:
+	var views: Array[CardView] = positioned_card_views()
+	if index < 0 or index >= views.size():
+		return null
+	var card_view: CardView = views[index]
+	if _arrival_tweens.has(card_view.get_parent()):
+		return null
+	return card_view
+
 # Straightens this slot to 0 rotation and brings it to the front of the
 # fan - fired for both a plain hover and an armed card (CardView.lifted
 # covers both, see its own doc), so a card picked out of the hand either
