@@ -1,7 +1,8 @@
 extends SceneTree
 
-# Core probe: every floor of the region (its FloorData) loads and can be
-# walked. Per floor, the real region scene:
+# Core probe: every floor of every region (RegionField.regions, each
+# region's FloorData) loads and can be walked. Per floor, the real region
+# scene:
 #
 #   loads    - the field, its Wanderer, its exit gate and its walk grid
 #   walkable - a planned path from spawn to the exit gate (short of its
@@ -24,7 +25,6 @@ extends SceneTree
 # Exit code 0 = every floor passed, 1 = a failure (each printed as FAIL).
 # Untyped against anything that names the RunState autoload.
 
-const REGION_PATH := "res://floors/region1.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 # How far an enemy's body may stand off its ground rule, and a prop's
@@ -41,6 +41,7 @@ var _run_state: Node = null
 var _field: Node = null
 var _failures: int = 0
 var _floors_clean: int = 0
+var _floors_total: int = 0
 
 func _initialize() -> void:
 	create_timer(SAFETY_SECONDS).timeout.connect(func() -> void:
@@ -48,10 +49,14 @@ func _initialize() -> void:
 		quit(1)
 	)
 	_run_state = root.get_node("RunState")
-	var floors: Array = (load(REGION_PATH) as Resource).get("floors")
-	for floor_index in floors.size():
-		await _check_floor(floor_index)
-	print("floor_smoke_probe: %d of %d floors clean" % [_floors_clean, floors.size()])
+	var regions: Array = _regions()
+	_expect(not regions.is_empty(), "the region scene lists regions")
+	for region_index in regions.size():
+		var floors: Array = (regions[region_index] as Resource).get("floors")
+		for floor_index in floors.size():
+			_floors_total += 1
+			await _check_floor(region_index, floor_index)
+	print("floor_smoke_probe: %d of %d floors clean" % [_floors_clean, _floors_total])
 	if _failures == 0:
 		print("floor_smoke_probe: PASSED")
 		quit(0)
@@ -59,11 +64,20 @@ func _initialize() -> void:
 		print("floor_smoke_probe: %d FAILED" % _failures)
 		quit(1)
 
-func _check_floor(floor_index: int) -> void:
-	var label: String = "Floor %d" % (floor_index + 1)
+# The region scene's own list (its `regions` export), read off a copy
+# that never enters the tree.
+func _regions() -> Array:
+	var scene: Node = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	var regions: Array = scene.get("regions")
+	scene.free()
+	return regions
+
+func _check_floor(region_index: int, floor_index: int) -> void:
+	var label: String = "Region %d floor %d" % [region_index + 1, floor_index + 1]
 	var failures_before: int = _failures
 	print("\n=== %s" % label)
 	_run_state.call("new_run", load(CHARACTER_PATH))
+	_run_state.set("current_region_index", region_index)
 	_run_state.set("current_floor_index", floor_index)
 	_run_state.set("run_opening_pending", false)
 	_run_state.set("title_pending", false)
