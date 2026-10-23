@@ -36,7 +36,8 @@ overrides = {
 "fog_factor": 0.4,
 "model_scale": Vector3(0.516, 0.75, 0.57),
 "model_scene_path": "res://assets/models/enemies/Greyshelf/Greyshelf_rock.glb",
-"sink_depth": 0.05
+"sink_depth": 0.05,
+"tint": Color(1, 1, 1, 1)
 }
 
 [sub_resource type="Resource" id="EncounterOption_greyshelf"]
