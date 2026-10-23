@@ -3744,6 +3744,7 @@ func _card_slot_of(event: InputEvent) -> int:
 func key_slot(index: int) -> void:
 	if _hand_container == null:
 		return
+	_hand_container.note_key_used()
 	var view: CardView = _hand_container.card_view_at_position(index)
 	if view == null:
 		return

@@ -11,6 +11,8 @@ const HOVER_Z_INDEX := 1000
 const ARMED_Z_INDEX := 1001
 # The replay ghost, above even the armed card it sits beside.
 const REPLAY_GHOST_Z_INDEX := 1002
+# The node name of a card's key numeral (_sync_key_numerals()).
+const KEY_NUMERAL_NAME := "KeyNumeral"
 
 signal card_clicked(card_view: CardView)
 # A card was lifted into the armed position / returned or played from it -
@@ -281,6 +283,38 @@ signal draw_started(card_data: CardData)
 		_apply_wash()
 @export_group("")
 
+@export_group("Key Numerals")
+# A faint numeral above each hand card naming its number key (1 to 9,
+# then 0 - BattleController.key_slot()), left to right. Off by default;
+# on, it still shows only once a number key has been used this fight
+# (note_key_used()).
+@export var show_key_numerals: bool = false:
+	set(value):
+		show_key_numerals = value
+		_sync_key_numerals()
+@export var key_numeral_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf"):
+	set(value):
+		key_numeral_font = value
+		_sync_key_numerals()
+@export var key_numeral_font_size_px: int = 16:
+	set(value):
+		key_numeral_font_size_px = value
+		_sync_key_numerals()
+@export var key_numeral_color: Color = Color(0.93, 0.95, 0.96):
+	set(value):
+		key_numeral_color = value
+		_sync_key_numerals()
+@export_range(0.0, 1.0) var key_numeral_alpha: float = 0.35:
+	set(value):
+		key_numeral_alpha = value
+		_sync_key_numerals()
+# From the card's top edge up to the numeral's bottom, in card space.
+@export var key_numeral_gap_px: float = 6.0:
+	set(value):
+		key_numeral_gap_px = value
+		_sync_key_numerals()
+@export_group("")
+
 # The bitten card's render reaches this far past the card on every side,
 # so nothing the face draws just outside its rect is cut off.
 const DEVOUR_VIEW_MARGIN_PX := 24.0
@@ -337,6 +371,8 @@ var _waiting_slots: Dictionary = {} # Control (slot) -> true
 # Each flying slot's scale/fade tween - its position and rotation glide
 # is a reflow tween like any other, so a reflow mid-flight retargets it.
 var _arrival_tweens: Dictionary = {} # Control (slot) -> Tween
+# A number key has been used this fight (note_key_used()).
+var _keys_used: bool = false
 # When the next drawn card may launch (Time.get_ticks_msec()) - the
 # stagger runs on across draws that come close together.
 var _next_launch_msec: int = 0
@@ -935,6 +971,43 @@ func positioned_card_views() -> Array[CardView]:
 			views.append(card_view)
 	return views
 
+# A number key was used this fight: the numerals may show from now on
+# (show_key_numerals).
+func note_key_used() -> void:
+	if _keys_used:
+		return
+	_keys_used = true
+	_sync_key_numerals()
+
+# Each hand card's numeral (show_key_numerals): its position's key over
+# the first BattleController.CARD_SLOT_COUNT, none past them or before a
+# key is used. Re-read at every reflow, so it follows the hand.
+func _sync_key_numerals() -> void:
+	if not is_inside_tree():
+		return
+	var views: Array[CardView] = positioned_card_views()
+	var shown: bool = show_key_numerals and _keys_used
+	for card_view in _card_views():
+		var index: int = views.find(card_view)
+		var label: Label = card_view.get_node_or_null(KEY_NUMERAL_NAME) as Label
+		if not shown or index < 0 or index >= BattleController.CARD_SLOT_COUNT:
+			if label != null:
+				label.visible = false
+			continue
+		if label == null:
+			label = Label.new()
+			label.name = KEY_NUMERAL_NAME
+			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card_view.add_child(label)
+		if key_numeral_font != null:
+			label.add_theme_font_override("font", key_numeral_font)
+		label.add_theme_font_size_override("font_size", key_numeral_font_size_px)
+		label.add_theme_color_override("font_color", Color(key_numeral_color, key_numeral_alpha))
+		label.text = str((index + 1) % 10)
+		label.visible = true
+		label.reset_size()
+		label.position = Vector2((card_view.size.x - label.size.x) / 2.0, -key_numeral_gap_px - label.size.y)
+
 # The card at hand position `index` (0 the leftmost - see
 # positioned_card_views()), or null past the end or on a card still in
 # flight, which takes no click yet either.
@@ -1377,6 +1450,7 @@ func _drop_devour_flecks(at: Vector2, colour: Color, z: int) -> void:
 # lifted - see _on_card_lifted()/_on_card_lowered() for who owns those
 # until then.
 func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
+	_sync_key_numerals()
 	# The armed slot is laid out as if it weren't there - the fan closes
 	# under it; its own position is _on_card_armed()'s.
 	# So is a drawn slot still waiting to launch - it joins at its launch.
