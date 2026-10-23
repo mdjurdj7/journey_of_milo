@@ -543,6 +543,37 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 	set(value):
 		mark_rule_width_px = value
 		_place_mark_rule()
+# Marked to keep (a keep's choice - Frayed Cord's, Bide's - set_marked(
+# true, true)): not raised. A hairline of the battle ink, keep_mark_rule_
+# width_px thick, across the card's width keep_mark_rule_gap_px over its
+# top edge, and keep_mark_text over that, keep_mark_label_gap_px up, in
+# the system voice's tracked caps (keep_mark_font_size_px, keep_mark_
+# tracking_em) and the same ink - the card's own children, so the mark
+# lifts and grows with it on hover. No box, no glow, no colour change.
+@export var keep_mark_text: String = "KEEP":
+	set(value):
+		keep_mark_text = value
+		_place_keep_mark()
+@export var keep_mark_font_size_px: int = 11:
+	set(value):
+		keep_mark_font_size_px = value
+		_place_keep_mark()
+@export var keep_mark_tracking_em: float = 0.16:
+	set(value):
+		keep_mark_tracking_em = value
+		_place_keep_mark()
+@export var keep_mark_rule_gap_px: float = 6.0:
+	set(value):
+		keep_mark_rule_gap_px = value
+		_place_keep_mark()
+@export var keep_mark_rule_width_px: float = 1.0:
+	set(value):
+		keep_mark_rule_width_px = value
+		_place_keep_mark()
+@export var keep_mark_label_gap_px: float = 3.0:
+	set(value):
+		keep_mark_label_gap_px = value
+		_place_keep_mark()
 # Unplayable (can't afford): the whole card fades to this - ink and bone
 # alike, no grey overlay.
 @export_range(0.0, 1.0) var unplayable_alpha: float = 0.42
@@ -669,6 +700,10 @@ var _armed: bool = false
 var _armed_for_choice: bool = false
 var _marked: bool = false
 var _mark_rule: ColorRect = null
+# Marked to keep (set_marked(true, true)), and its hairline and word.
+var _keep_marked: bool = false
+var _keep_rule: ColorRect = null
+var _keep_label: Label = null
 var _armed_at_msec: int = 0
 var _playable: bool = true
 # A hand choice is open, and whether it can take this card - see
@@ -1773,11 +1808,18 @@ func _on_mouse_exited() -> void:
 	if hover_enabled and not _armed and not _marked and not _hover_suppressed:
 		_lower_from_hover()
 
-# Chosen (or unchosen) for Bide's set-aside while its choice is open
-# (BattleController's choose mode): lifted mark_lift above rest at its
-# base scale, the hairline above it, held through hover. Unmarked, it
-# settles back - as a plain hover if the cursor is still over it.
-func set_marked(marked: bool) -> void:
+# Chosen (or unchosen) while a hand choice is open (BattleController's
+# choose mode). For a pick that goes on by itself (Twice Over, Take In,
+# Weathered Map): lifted mark_lift above rest at its base scale, the
+# hairline above it, held through hover; unmarked, it settles back - as
+# a plain hover if the cursor is still over it. For a keep (`keep`): the
+# KEEP mark (keep_mark_*), the card where it is, hovering as any. Unmarked
+# either way, every mark comes off.
+func set_marked(marked: bool, keep: bool = false) -> void:
+	if keep or (not marked and _keep_marked):
+		_set_keep_marked(marked)
+		if keep:
+			return
 	if marked == _marked:
 		return
 	_marked = marked
@@ -1800,12 +1842,46 @@ func set_marked(marked: bool) -> void:
 		_lower_from_hover()
 
 func is_marked() -> bool:
-	return _marked
+	return _marked or _keep_marked
 
-# How far a KEEP mark reaches over this card's top edge, in 1x px: none
-# yet - the prompt over the hand clears the hover alone.
+# How far a KEEP mark reaches over this card's top edge, in 1x px - its
+# hairline, its word and the gaps between.
 func keep_mark_height() -> float:
-	return 0.0
+	var font: Font = InkType.text_bold_font()
+	var word: float = font.get_height(keep_mark_font_size_px) if font != null else float(keep_mark_font_size_px)
+	return keep_mark_rule_gap_px + keep_mark_rule_width_px + keep_mark_label_gap_px + word
+
+func _set_keep_marked(marked: bool) -> void:
+	_keep_marked = marked
+	if marked and _keep_rule == null:
+		_keep_rule = ColorRect.new()
+		_keep_rule.name = "KeepRule"
+		_keep_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_keep_rule)
+		_keep_label = Label.new()
+		_keep_label.name = "KeepLabel"
+		_keep_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_keep_label)
+	_place_keep_mark()
+
+# The KEEP mark over the card's top edge: the hairline its full width,
+# the word centred over it.
+func _place_keep_mark() -> void:
+	if _keep_rule == null or _keep_label == null:
+		return
+	var ink: Color = get_theme_color("ink", "Battle") if has_theme_color("ink", "Battle") else ink_color
+	_keep_rule.color = ink
+	_keep_rule.position = Vector2(0.0, -keep_mark_rule_gap_px - keep_mark_rule_width_px)
+	_keep_rule.size = Vector2(card_size.x, keep_mark_rule_width_px)
+	_keep_rule.visible = _keep_marked
+	_keep_label.text = keep_mark_text
+	_keep_label.add_theme_font_override("font", InkType.tracked(InkType.text_bold_font(), keep_mark_font_size_px, keep_mark_tracking_em))
+	_keep_label.add_theme_font_size_override("font_size", keep_mark_font_size_px)
+	_keep_label.add_theme_color_override("font_color", ink)
+	_keep_label.size = Vector2.ZERO
+	var word: Vector2 = _keep_label.get_minimum_size()
+	_keep_label.position = Vector2((card_size.x - word.x) / 2.0, _keep_rule.position.y - keep_mark_label_gap_px - word.y)
+	_keep_label.visible = _keep_marked
 
 func _place_mark_rule() -> void:
 	if _mark_rule == null:

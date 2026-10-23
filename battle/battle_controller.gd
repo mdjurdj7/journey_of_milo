@@ -1198,6 +1198,11 @@ func _begin_choice(card_view: CardView, cap: int, eligible: Array[CardView] = []
 	hand_choice_changed.emit(0, cap)
 	_emit_devour_changed()
 
+# Whether the open choice is a keep - the end-of-turn keep, or Bide's
+# (an armed card's that names no cards) - its marks KEEP marks.
+func _choice_is_keep() -> bool:
+	return _keep_choice_open or (_choosing_card_view != null and _choice_eligible.is_empty())
+
 # Whether a hand choice is open - an armed card's, or the end-of-turn keep.
 func _choice_open() -> bool:
 	return _choosing_card_view != null or _keep_choice_open or _top_choice_open
@@ -1231,7 +1236,7 @@ func toggle_choice(card_view: CardView) -> void:
 		card_view.set_marked(false)
 	elif _choice_marked.size() < _choice_cap:
 		_choice_marked.append(card_view)
-		card_view.set_marked(true)
+		card_view.set_marked(true, _choice_is_keep())
 	else:
 		return
 	hand_choice_changed.emit(_choice_marked.size(), _choice_cap)
