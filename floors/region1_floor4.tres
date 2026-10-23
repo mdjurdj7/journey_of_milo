@@ -32,7 +32,7 @@ yaw_degrees = -90.0
 world_line = "It is sorting what it has."
 overrides = {
 "display_offset": Vector3(3, 0, 2.9),
-"display_rotation_degrees": Vector3(-90, 150, 0)
+"display_rotation_degrees": Vector3(-90, 150, -29.3)
 }
 
 [sub_resource type="Resource" id="FloorEnemy_required"]
