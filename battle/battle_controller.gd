@@ -246,12 +246,24 @@ var _sheathe_uses_this_turn: int = 0
 # Sheathe was clicked: the next hand card clicked keeps - see sheathe().
 var _sheathe_picking: bool = false
 
+# How many hand positions have a number key (card_slot_1 .. card_slot_10).
+const CARD_SLOT_COUNT: int = 10
+
 var _hand_container: HandContainer
 var _pending_card_view: CardView = null
 # The armed card can't be played (unaffordable, blocked, nothing to land
 # on) and is armed for Devour alone: no enemy is a target - see
 # _arm_for_devour().
 var _pending_devour_only: bool = false
+# The armed card needs no target and was armed by its number key: the
+# same key again, or battle_confirm, plays it (confirm_armed()). No enemy
+# is lit - see _arm_or_play().
+var _pending_self_play: bool = false
+# The target the keys chose (target_next/target_prev) for the armed card,
+# and its mound for a dug-in enemy: it stands in for the cursor until the
+# mouse moves (_input()). Null: none.
+var _key_target: FieldEnemy = null
+var _key_target_mound: int = -1
 # Devour was clicked with nothing armed: the next hand card clicked is
 # eaten - see _begin_devour_pick().
 var _devour_picking: bool = false
@@ -860,7 +872,9 @@ func _refused_by_entry_hold(action: String) -> bool:
 		push_warning("BattleController: %s refused - the battle-entry hold is on (lock_entry_input(), until the Wanderer's draw strikes)." % action)
 	return true
 
-func request_play(card_view: CardView) -> void:
+# `by_key`: a number key's request (key_slot()) - an unplayable card is
+# not armed for Devour, and a card that needs no target arms first.
+func request_play(card_view: CardView, by_key: bool = false) -> void:
 	if _refused_by_entry_hold("card play"):
 		return
 	if (_input_locked and not _play_in_flight) or _play_queued or _pending_card_view != null or _choice_open() or _look_open or card_view.card_data == null:
@@ -885,7 +899,7 @@ func request_play(card_view: CardView) -> void:
 		# A card that can't be played arms for Devour alone while Devour
 		# is available; with Devour spent or its Energy short, nothing - as
 		# before Devour existed.
-		if is_devour_available():
+		if is_devour_available() and not by_key:
 			_arm_for_devour(card_view)
 		return
 	# A GRANT_KEEP card (Bide) asks which cards first, unless there is
@@ -916,7 +930,7 @@ func request_play(card_view: CardView) -> void:
 				to_eat.append(view)
 		_begin_choice(card_view, 1, to_eat, "DEVOUR")
 		return
-	_arm_or_play(card_view)
+	_arm_or_play(card_view, by_key)
 
 # Collateral's look (LOOK_AND_PLAY), once its play has resolved: the top
 # `count` cards of the draw pile (Deck.peek_top() - the discard shuffled
@@ -1109,13 +1123,21 @@ func _last_attack_enemy_standing() -> bool:
 	return _can_target(player.last_attack, _combatants.get(enemy))
 
 # The card goes on: an enemy-target card arms for its target (from
-# wherever it is held), any other resolves now.
-func _arm_or_play(card_view: CardView) -> void:
+# wherever it is held), any other resolves now - or, `hold_self` (a
+# number key's), arms too, with no target, for the same key again
+# (confirm_armed()).
+func _arm_or_play(card_view: CardView, hold_self: bool = false) -> void:
 	var card: CardData = card_view.card_data
+	_key_target = null
 	if card.target_type == CardData.TargetType.ENEMY or _replay_needs_target(card):
 		_pending_card_view = card_view
 		card_view.lift_and_hold(card_view == _choosing_card_view)
 		target_requested.emit(card)
+		_emit_devour_changed()
+	elif hold_self:
+		_pending_card_view = card_view
+		_pending_self_play = true
+		card_view.lift_and_hold()
 		_emit_devour_changed()
 	else:
 		_resolve_play(card_view, null)
@@ -1330,6 +1352,7 @@ func confirm_target(enemy: FieldEnemy, mound: int = -1) -> void:
 		return
 	var card_view := _pending_card_view
 	_pending_card_view = null
+	_key_target = null
 	_clear_hover()
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
@@ -1345,6 +1368,8 @@ func cancel_target(immediate: bool = false) -> void:
 	_pending_card_view.release(immediate)
 	_pending_card_view = null
 	_pending_devour_only = false
+	_pending_self_play = false
+	_key_target = null
 	_clear_hover()
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
@@ -2052,6 +2077,8 @@ func devour() -> void:
 	var card_view: CardView = _pending_card_view
 	_pending_card_view = null
 	_pending_devour_only = false
+	_pending_self_play = false
+	_key_target = null
 	_clear_hover()
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
@@ -3542,6 +3569,10 @@ func _input(event: InputEvent) -> void:
 	var press := event as InputEventMouseButton
 	if press != null and press.pressed and not _dying.is_empty():
 		skip_deaths()
+	# The mouse moving takes targeting back from the keys (_key_target).
+	var motion := event as InputEventMouseMotion
+	if motion != null and _key_target != null and motion.relative != Vector2.ZERO:
+		_key_target = null
 
 # The last enemy fell and every death has played out: the fight is won.
 func _maybe_win() -> void:
@@ -3634,8 +3665,15 @@ func _on_card_view_clicked(card_view: CardView) -> void:
 # for its choice to be confirmed (Enter/Space) or cancelled (right-click/
 # Esc; the keys are the InputMap's battle_confirm and battle_cancel) -
 # everything else (movement, camera, ...) is untouched - and
-# already frozen by RegionField anyway.
+# already frozen by RegionField anyway. The number keys (key_slot()) are
+# read at any time; an armed card's target also moves by target_next/
+# target_prev (cycle_key_target()) and plays on battle_confirm.
 func _unhandled_input(event: InputEvent) -> void:
+	var slot: int = _card_slot_of(event)
+	if slot >= 0:
+		key_slot(slot)
+		get_viewport().set_input_as_handled()
+		return
 	if _devour_picking:
 		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT) or event.is_action_pressed("battle_cancel"):
 			cancel_devour_pick()
@@ -3674,7 +3712,125 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("battle_cancel"):
 		cancel_target()
 		get_viewport().set_input_as_handled()
+	# Shift+Tab is Tab with Shift held - target_prev is asked first, as
+	# target_next's Tab matches it too.
+	elif event.is_action_pressed("target_prev"):
+		cycle_key_target(-1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("target_next"):
+		cycle_key_target(1)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("battle_confirm"):
+		confirm_armed()
+		get_viewport().set_input_as_handled()
+
+# Which hand position a number key names (the InputMap's card_slot_1 ..
+# card_slot_10 - 1 to 9, then 0 for the 10th): 0 the leftmost, -1 for
+# any other event.
+func _card_slot_of(event: InputEvent) -> int:
+	if not (event is InputEventKey):
+		return -1
+	for index in CARD_SLOT_COUNT:
+		if event.is_action_pressed("card_slot_%d" % (index + 1)):
+			return index
+	return -1
+
+# A number key: the card at that hand position (HandContainer.card_view_
+# at_position()), as a click on it - into Devour's or Sheathe's open pick,
+# else armed (request_play(), by key). The
+# armed card's own key again plays it (confirm_armed()); another card's
+# switches to that one, when it can be played - the armed one straight
+# back to the fan. No card there, or one still in flight: nothing.
+func key_slot(index: int) -> void:
+	if _hand_container == null:
 		return
+	var view: CardView = _hand_container.card_view_at_position(index)
+	if view == null:
+		return
+	if _devour_picking or _sheathe_picking:
+		request_play(view)
+		return
+	if _pending_card_view != null:
+		if view == _pending_card_view:
+			confirm_armed()
+			return
+		if _entry_locked or view.card_data == null or not deck.hand.has(view.card_data) or not _is_playable(view.card_data):
+			return
+		cancel_target(true)
+	request_play(view, true)
+
+# The armed card, played by key (battle_confirm, or its number again): one
+# armed with no target plays now; else at the target lit - the keys',
+# the cursor's or the default (_update_hover()) - or, with nothing lit,
+# the only one it may land on. Several and none lit, or armed for Devour
+# alone: nothing.
+func confirm_armed() -> void:
+	if _entry_locked or _pending_card_view == null or _pending_devour_only:
+		return
+	if _pending_self_play:
+		var card_view: CardView = _pending_card_view
+		_pending_card_view = null
+		_pending_self_play = false
+		_key_target = null
+		_resolve_play(card_view, null)
+		return
+	_refresh_enemy_rects()
+	_update_hover(get_viewport().get_mouse_position())
+	var enemy: FieldEnemy = _hovered_enemy
+	var mound: int = _hovered_mound
+	if enemy == null:
+		var targets: Array[Dictionary] = _key_targets()
+		if targets.size() != 1:
+			return
+		enemy = targets[0]["enemy"]
+		mound = int(targets[0]["mound"])
+	confirm_target(enemy, mound)
+
+# The armed card's target moved by the keys: `step` +1 the next to the
+# right on screen, -1 the next to the left, wrapping - from the one lit
+# now, or from the row's end with none lit. Lit at once, as a hover is,
+# and held over the cursor until the mouse moves.
+func cycle_key_target(step: int) -> void:
+	if _pending_card_view == null or _pending_devour_only or _pending_self_play:
+		return
+	_refresh_enemy_rects()
+	_update_hover(get_viewport().get_mouse_position())
+	var targets: Array[Dictionary] = _key_targets()
+	if targets.is_empty():
+		return
+	var at: int = -1
+	for index in targets.size():
+		if targets[index]["enemy"] == _hovered_enemy and int(targets[index]["mound"]) == _hovered_mound:
+			at = index
+	var next: int = (0 if step > 0 else targets.size() - 1) if at < 0 else posmod(at + step, targets.size())
+	_key_target = targets[next]["enemy"]
+	_key_target_mound = int(targets[next]["mound"])
+	_update_hover(get_viewport().get_mouse_position())
+
+# Every target the armed card may take now, left to right on screen by
+# its rect's centre (_refresh_enemy_rects()): each enemy's body, each
+# standing mound of one dug in (mound -1 for a body), and an enemy whose
+# intent alone is on screen for a card that marks intents.
+func _key_targets() -> Array[Dictionary]:
+	var targets: Array[Dictionary] = []
+	for enemy: FieldEnemy in _enemy_rects:
+		targets.append({"enemy": enemy, "mound": -1, "x": (_enemy_rects[enemy] as Rect2).get_center().x})
+	for entry: Dictionary in _mound_rects:
+		targets.append({"enemy": entry["enemy"], "mound": int(entry["mound"]), "x": (entry["rect"] as Rect2).get_center().x})
+	for enemy: FieldEnemy in _intent_rects:
+		if not _enemy_rects.has(enemy):
+			targets.append({"enemy": enemy, "mound": -1, "x": (_intent_rects[enemy] as Rect2).get_center().x})
+	targets.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["x"]) < float(b["x"]))
+	return targets
+
+# Whether the keys' target is still one the armed card may take.
+func _key_target_valid() -> bool:
+	if _key_target == null or not is_instance_valid(_key_target):
+		return false
+	for target: Dictionary in _key_targets():
+		if target["enemy"] == _key_target and int(target["mound"]) == _key_target_mound:
+			return true
+	return false
 
 # The target-under-cursor test runs every physics frame while a card is
 # armed (not on mouse motion): the rects move with the camera swing and
@@ -3689,6 +3845,14 @@ func _physics_process(_delta: float) -> void:
 func _update_hover(screen_pos: Vector2) -> void:
 	var enemy := _enemy_at(screen_pos)
 	var mound: int = _cursor_mound if enemy != null else -1
+	# The keys' target over the cursor's, while it stands (cycle_key_
+	# target()) - told as the cursor's is, so the armed face reads it.
+	if _key_target != null:
+		if _key_target_valid():
+			enemy = _key_target
+			mound = _key_target_mound
+		else:
+			_key_target = null
 	_set_cursor_enemy(enemy)
 	if enemy == null:
 		enemy = _default_target()
@@ -3760,8 +3924,9 @@ func _refresh_enemy_rects() -> void:
 		# may not land on (Deny on the already Delayed).
 		if combatant == null or combatant.hp <= 0 or combatant.is_out_of_reach():
 			continue
-		# Armed for Devour alone: no enemy is a target.
-		if _pending_devour_only:
+		# Armed for Devour alone, or a card with no target armed by its
+		# key: no enemy is a target.
+		if _pending_devour_only or _pending_self_play:
 			continue
 		if _pending_card_view != null and not _can_target(_pending_card_view.card_data, combatant):
 			continue
