@@ -763,31 +763,36 @@ and up the west shore north of z -27. (2026-10-17.)
   Gape's tell is `GreyshelfPose`'s rear of the forequarters with the
   throat swelling and its blue deepening (`field/greyshelf_throat.gdshader`,
   hue and value only, no glow). A jaw needs a model with a mouth. It lies
-  on a crest rock at the mouth of floor 5's north bulb - a placeholder
-  glb (`assets/models/props/crest rock/`, `BaskingSlab` with the rock's
-  model and colour map as overrides) until a Meshy rock replaces it - up
-  by its `FloorEnemy.height_offset_m`, settled 0.05 m into the stone
-  (`EnemyData.sink_m`, which lowers the model without burying it the way
-  a negative `rest_height_m` does; 0.3 m on open sand put its feet under
-  the relief). The rock's top tilts about 0.15 m along its length, so
-  the tail end sits a little into it. The rock is stretched to hold all
-  four feet 0.3 m inside its top's edge in the battle pose
-  (`BaskingSlab.model_scale` 1.2 along, 1.6 across - 7.3 x 5.5 m), and
-  the stance is 2.3 m from the snout: the rock's base flares ~0.9 m past
-  its top, and the fight's framing rule (`FloorEnemy.battle_frame_screen`:
-  the Wanderer at 0.3 of the width, the snout no further left than 0.55)
-  needs the room. Its contact area is 4.4 m, so the rock's front edge
-  (4.2 m ahead of it) never stops the Wanderer short of contact. Off the
-  rock at half HP, it steps
-  off the rock's camera side onto the sand at its foot, toward the
-  Wanderer (`FloorEnemy.phase_drop_offset`), the frame fitted as if it
-  stood further out (`phase_drop_frame_offset`) so it reads as just off
-  the rock
-  and turns to the Wanderer; an escape climbs it back. Its
+  on a low stone plate at the mouth of floor 5's north bulb
+  (`assets/models/enemies/Greyshelf/Greyshelf_rock.glb` on its own
+  colour map, `Greyshelf_rock_colour.png`; `BaskingSlab` with the rock's
+  model, colour map, scale and fog 0.4 - the Greyshelf's own share - as
+  the FloorProp's overrides), sized to it: its top 5.28 x 3.20 m, 1.2x
+  the Greyshelf's length and 1.4x its width, 0.55 m over the sand at
+  most and 0.49 m under the body; its base 5.51 x 3.62 m. The plate's
+  flat top sits off its model's centre, so the rock is centred under the
+  body by its top, not its base. It stands up by its
+  `FloorEnemy.height_offset_m` (0.43, 0.06 m under the top), settled
+  0.05 m into the stone (`EnemyData.sink_m`, which lowers the model
+  without burying it the way a negative `rest_height_m` does; 0.3 m on
+  open sand put its feet under the relief). Its contact area is 2.85 m,
+  0.21 m past the rock's base toward the Wanderer, so the rock never
+  stops him short of contact from the front or the sides, and his stance
+  is 1.33 m past the base (`stance_gap_m` 1.51), outside the contact area
+  plus his 0.4 m. From straight behind the rock's box ends past the
+  contact area (the Wanderer steps up 0.35 m at most); floor 5's engage
+  line starts the fight before he gets there. Off the rock at half HP, it
+  steps off the rock's camera side onto the sand, toward the Wanderer
+  (`FloorEnemy.phase_drop_offset`), 2.30 m clear of the stone rather than
+  2.19: the rock's collision is one rectangular box round the plate,
+  which stands out past its rounded side, and the feet must land clear
+  of it. The frame is fitted as if it stood further out
+  (`phase_drop_frame_offset`) so it reads as just off the rock, and it
+  turns to the Wanderer; an escape climbs it back. Its
   `contact_sounds` borrow `combat_old/hit.wav`, as the Dunecur and the
   Wardling do. It wears the painted shader on its own colour map
   (`Greyshelf_colour.png`); its glb's embedded maps are discarded on
-  import. (2026-10-05, Greyshelf.)
+  import. (2026-10-05, Greyshelf; its rock replaced 2026-10-22.)
 - **The card export should be generated, like the enemy export.**
   `docs/wanderer_card_export.json` is rebuilt by throwaway scripts and
   committed by hand, so nothing notices when it drifts from the cards.
