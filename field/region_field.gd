@@ -88,6 +88,8 @@ enum RewardMode { SCREEN, WORLD }
 @export var keepsake_offer_scene_path: String = "res://battle/keepsake_offer.tscn"
 # The Bedroll's one data file - the HUD item, its hover, what a rest heals.
 @export_file("*.tres") var bedroll_data_path: String = "res://run/data/bedroll.tres"
+# A rest's confirm and night (see open_bedroll_rest()).
+@export var bedroll_rest_scene_path: String = "res://field/bedroll_rest.tscn"
 # A worn piece taken off the sand (take_worn_piece()): WorldKeepsake's
 # take, at its level.
 @export var armor_take_sfx_path: String = "res://assets/audio/cards/card_take.wav"
@@ -4107,14 +4109,17 @@ func open_keepsake_examine(keepsake: TrinketData, from_rect: Rect2 = Rect2()) ->
 	add_child(examine)
 	return true
 
-# A rest on the carried Bedroll (BedrollRest): its confirm, and on YES its
+# A rest on the carried Bedroll (BedrollRest, bedroll_rest_scene_path): its confirm, and on YES its
 # night - the field frozen under both, the Wanderer standing still. False,
 # and nothing opens, with none carried, at full HP, in a fight, or with
 # the field already held by a screen.
 func open_bedroll_rest() -> bool:
 	if not can_rest():
 		return false
-	var rest := BedrollRest.new()
+	var scene := load(bedroll_rest_scene_path) as PackedScene
+	if scene == null:
+		return false
+	var rest := scene.instantiate() as BedrollRest
 	rest.name = "BedrollRest"
 	rest.setup(load(bedroll_data_path) as BedrollData, get_region_sky(), get_node_or_null(^"FieldHUD"), _bedroll_line)
 	rest.hud_value_set = set_hud_value_set

@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://0ye07xawfhf3" path="res://field/bedroll_rest.gd" id="1_rest"]
+
+[node name="BedrollRest" type="Node"]
+script = ExtResource("1_rest")
+confirm_size_px = 18
+confirm_tracking_em = 0.16
+confirm_question_gap_px = 36.0
+confirm_word_gap_px = 22.0
+confirm_clear_px = 10.0
+focus_rule_px = 2.0
+focus_rule_gap_px = 3.0

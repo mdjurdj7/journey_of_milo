@@ -2,17 +2,20 @@ extends Node
 class_name BedrollRest
 
 # Resting on the Bedroll: a one-line confirm, then a night, then the day
-# again. Made by RegionField.open_bedroll_rest() when the HUD's BEDROLL
-# is clicked - on the field only, never in a fight, never at full HP -
-# with the field frozen under it (PROCESS_MODE_DISABLED, as the screens
-# freeze it) and the Wanderer standing still in his idle (there is no
-# kneel or lie-down clip; Wanderer.stand_still()). This node runs ALWAYS.
+# again. Made by RegionField.open_bedroll_rest() from bedroll_rest.tscn
+# (where the confirm's sizes are set) when the HUD's BEDROLL is clicked -
+# on the field only, never in a fight, never at full HP - with the field
+# frozen under it (PROCESS_MODE_DISABLED, as the screens freeze it) and
+# the Wanderer standing still in his idle (there is no kneel or lie-down
+# clip; Wanderer.stand_still()). This node runs ALWAYS.
 #
-# The confirm: "REST?  YES / NO" in the system voice's tracked caps, ink
-# on the world, its baseline confirm_gap_px over the HUD row, left-aligned
-# with BEDROLL. YES and NO carry the title menu's focus language - the
-# utility grey at rest, full ink with the short hairline to the left when
-# focused. The mouse focuses by hovering and answers by clicking; a click
+# The confirm: "REST?  YES / NO" in the system voice's tracked caps, all
+# in full ink - the theme's, so ui_on_dark_world turns it bone with the
+# rest of the HUD - no box, no glow, no fill. Right-aligned to the
+# Bedroll slot, the underside of its focus rule confirm_clear_px over
+# the slot's top. The focused answer has END TURN's rule under it, as
+# wide as the word (focus_rule_px, focus_rule_gap_px under the letters);
+# the other stays full ink without one. The mouse focuses by hovering and answers by clicking; a click
 # anywhere else, a right click and ui_cancel are NO; ui_left/ui_right move
 # between the two, ui_accept answers. Nothing is focused until the mouse
 # or a key says so. NO closes it and the field goes on, the Bedroll kept.
@@ -40,22 +43,54 @@ enum Phase { CONFIRM, NIGHT, DONE }
 enum Answer { YES, NO }
 
 @export_group("Confirm")
-@export var confirm_text: String = "REST?"
-@export var yes_text: String = "YES"
-@export var no_text: String = "NO"
-@export var separator_text: String = "/"
-@export var confirm_size_px: int = 15
-@export_range(0.0, 1.0) var confirm_tracking_em: float = 0.16
+@export var confirm_text: String = "REST?":
+	set(value):
+		confirm_text = value
+		_redraw_confirm()
+@export var yes_text: String = "YES":
+	set(value):
+		yes_text = value
+		_redraw_confirm()
+@export var no_text: String = "NO":
+	set(value):
+		no_text = value
+		_redraw_confirm()
+@export var separator_text: String = "/":
+	set(value):
+		separator_text = value
+		_redraw_confirm()
+@export var confirm_size_px: int = 18:
+	set(value):
+		confirm_size_px = value
+		_restyle_confirm()
+@export_range(0.0, 1.0) var confirm_tracking_em: float = 0.16:
+	set(value):
+		confirm_tracking_em = value
+		_restyle_confirm()
 # Between "REST?" and YES, and around the separator.
-@export var confirm_question_gap_px: float = 30.0
-@export var confirm_word_gap_px: float = 18.0
-# The confirm's baseline this far over the HUD row's top.
-@export var confirm_gap_px: float = 14.0
-# The title menu's unfocused item: CardView's keyline_utility.
-@export var unfocused_color: Color = Color(0.58, 0.58, 0.60, 1.0)
-@export var hairline_length_px: float = 10.0
-@export var hairline_gap_px: float = 5.0
-@export var hairline_thickness_px: float = 1.0
+@export var confirm_question_gap_px: float = 36.0:
+	set(value):
+		confirm_question_gap_px = value
+		_redraw_confirm()
+@export var confirm_word_gap_px: float = 22.0:
+	set(value):
+		confirm_word_gap_px = value
+		_redraw_confirm()
+# The focus rule's underside this far over the Bedroll slot's top.
+@export var confirm_clear_px: float = 10.0:
+	set(value):
+		confirm_clear_px = value
+		_redraw_confirm()
+# The focused answer's rule, END TURN's: its thickness, and its gap under
+# the letters' descent.
+@export var focus_rule_px: float = 2.0:
+	set(value):
+		focus_rule_px = value
+		_redraw_confirm()
+@export var focus_rule_gap_px: float = 3.0:
+	set(value):
+		focus_rule_gap_px = value
+		_redraw_confirm()
 @export_group("")
 
 @export_group("Night")
@@ -140,14 +175,36 @@ func _ready() -> void:
 
 # --- The confirm ---
 
-# The question's baseline start: confirm_gap_px over the anchor, the
-# whole line ending at its right edge - the Bedroll stands at the
-# screen's right - or starting at its left, if that's further left.
+func _redraw_confirm() -> void:
+	if _confirm != null:
+		_confirm.queue_redraw()
+
+# A size or tracking edit: the tracked font again. One before _ready()
+# waits for it.
+func _restyle_confirm() -> void:
+	if not is_node_ready():
+		return
+	_font = InkType.tracked(InkType.text_bold_font(), confirm_size_px, confirm_tracking_em)
+	_redraw_confirm()
+
+func _descent() -> float:
+	return _font.get_descent(confirm_size_px) if _font != null else 0.0
+
+func _ascent() -> float:
+	return _font.get_ascent(confirm_size_px) if _font != null else float(confirm_size_px)
+
+# The focus rule's top under the baseline.
+func _rule_top() -> float:
+	return _descent() + focus_rule_gap_px
+
+# The question's baseline start: the whole line ending at the anchor's
+# right edge, the focus rule's underside confirm_clear_px over its top.
 func _confirm_origin() -> Vector2:
 	if _anchor == null:
 		return Vector2(48.0, 960.0)
 	var rect: Rect2 = _anchor.get_global_rect()
-	return Vector2(roundf(minf(rect.position.x, rect.end.x - _confirm_width())), roundf(rect.position.y - confirm_gap_px))
+	var baseline: float = rect.position.y - confirm_clear_px - focus_rule_px - _rule_top()
+	return Vector2(roundf(rect.end.x - _confirm_width()), roundf(baseline))
 
 # The whole confirm line: the question, YES, the separator, NO.
 func _confirm_width() -> float:
@@ -166,12 +223,12 @@ func _answer_left(answer: int) -> float:
 		x += InkType.width(_font, yes_text, confirm_size_px) + confirm_word_gap_px + InkType.width(_font, separator_text, confirm_size_px) + confirm_word_gap_px
 	return roundf(x)
 
-# An answer and the hairline's room to its left.
+# An answer's letters and the rule under them.
 func _answer_rect(answer: int) -> Rect2:
 	var left: float = _answer_left(answer)
 	var baseline: float = _confirm_origin().y
-	var hit_left: float = left - hairline_gap_px - hairline_length_px * 0.5
-	return Rect2(hit_left, baseline - float(confirm_size_px) * 1.1, left + InkType.width(_font, _word(answer), confirm_size_px) - hit_left, float(confirm_size_px) * 1.5)
+	var top: float = baseline - _ascent()
+	return Rect2(left, top, InkType.width(_font, _word(answer), confirm_size_px), baseline + _rule_top() + focus_rule_px - top)
 
 func _draw_confirm() -> void:
 	if phase != Phase.CONFIRM:
@@ -179,14 +236,12 @@ func _draw_confirm() -> void:
 	var origin: Vector2 = _confirm_origin()
 	InkType.draw_run(_confirm, _font, confirm_text, origin, confirm_size_px, _ink)
 	var separator_left: float = _answer_left(Answer.YES) + InkType.width(_font, yes_text, confirm_size_px) + confirm_word_gap_px
-	InkType.draw_run(_confirm, _font, separator_text, Vector2(roundf(separator_left), origin.y), confirm_size_px, unfocused_color)
+	InkType.draw_run(_confirm, _font, separator_text, Vector2(roundf(separator_left), origin.y), confirm_size_px, _ink)
 	for answer: int in [Answer.YES, Answer.NO]:
 		var left: float = _answer_left(answer)
-		var focused: bool = _focus == answer
-		InkType.draw_run(_confirm, _font, _word(answer), Vector2(left, origin.y), confirm_size_px, _ink if focused else unfocused_color)
-		if focused:
-			var mid: float = origin.y - float(confirm_size_px) * 0.35
-			_confirm.draw_rect(Rect2(left - hairline_gap_px - hairline_length_px, mid - hairline_thickness_px * 0.5, hairline_length_px, hairline_thickness_px), _ink)
+		InkType.draw_run(_confirm, _font, _word(answer), Vector2(left, origin.y), confirm_size_px, _ink)
+		if _focus == answer:
+			_confirm.draw_rect(Rect2(left, roundf(origin.y + _rule_top()), InkType.width(_font, _word(answer), confirm_size_px), focus_rule_px), _ink)
 
 func _answer_at(position: Vector2) -> int:
 	for answer: int in [Answer.YES, Answer.NO]:
