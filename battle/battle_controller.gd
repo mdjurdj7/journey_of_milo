@@ -450,6 +450,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	if RunState.weapon != null and RunState.weapon.self_loss_attack_bonus > 0:
 		player.self_loss_attack_bonus = RunState.weapon.self_loss_attack_bonus
 		player.self_loss_attack_tag = RunState.weapon.basic_attack_tag
+		player.self_loss_attack_source = RunState.weapon.display_name
 	var held: Array[TrinketData] = RunState.held_pieces()
 	var opening_block: int = 0
 	var opening_bonus: int = 0

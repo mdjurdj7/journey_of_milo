@@ -180,7 +180,7 @@ const DAMAGE_EFFECT_TYPES: Array = [CardEffect.EffectType.DAMAGE, CardEffect.Eff
 const BLOCK_EFFECT_TYPES: Array = [CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK]
 # The blow a TOLL_SPENT_DAMAGE lands now (Reckoning): the Toll spent this
 # fight (Combatant.toll_spent_this_fight) plus the attack bonus, through
-# _landed() against the target - as toll_spent_damage_effect.gd will land
+# _land_on() against the target - as toll_spent_damage_effect.gd will land
 # it. A battle hand's number only; outside a fight the card says its rule.
 const TOKEN_TOLL_SPENT_DAMAGE := "{toll_spent_damage}"
 # What a TOLL_HEAL would heal for at that Toll: half of whatever it can
@@ -990,28 +990,40 @@ func _resolve_tokens(description: String) -> String:
 			# attack bonus included - the same addition damage_effect.gd
 			# makes, once, to the card's first damage effect. On a Critical
 			# card this is the {else} half: the bonus as if NOT Critical.
+			# The card's own Chain and Energy scaling is its own number.
+			var shown := NumberBreakdown.new(damage + _chain_bonus(DAMAGE_EFFECT_TYPES) + _energy_bonus(DAMAGE_EFFECT_TYPES))
 			if card_data.card_type == CardData.CardType.ATTACK:
-				damage += _attack_bonus_for_half(false)
-			damage += _chain_bonus(DAMAGE_EFFECT_TYPES)
-			damage += _energy_bonus(DAMAGE_EFFECT_TYPES)
-			damage = _landed(damage, _damage_reaches_all(false))
-			text = text.replace(TOKEN_DAMAGE, str(damage))
+				_add_attack_bonus_for_half(shown, false)
+			_land_on(shown, _damage_reaches_all(false))
+			text = text.replace(TOKEN_DAMAGE, _number_text(shown))
 	if text.contains(TOKEN_ALT_DAMAGE) or text.contains(TOKEN_BONUS_DAMAGE):
 		var bonus_damage: int = _bonus_effect_value(card_data, DAMAGE_EFFECT_TYPES)
 		if bonus_damage >= 0:
 			# The {if} half's bonus - on a Critical card, as if Critical.
-			var attack_bonus: int = _attack_bonus_for_half(true) if card_data.card_type == CardData.CardType.ATTACK else 0
+			var attacks: bool = card_data.card_type == CardData.CardType.ATTACK
+			var shown: NumberBreakdown = null
 			if _bonus_effect_adds(card_data, DAMAGE_EFFECT_TYPES):
 				# An ADD's number is what it puts on the hit as it lands: the
 				# whole hit with it, less the hit without - never the attack
 				# bonus a second time.
-				var base: int = _effect_value(card_data, DAMAGE_EFFECT_TYPES) + attack_bonus + _chain_bonus(DAMAGE_EFFECT_TYPES) + _energy_bonus(DAMAGE_EFFECT_TYPES)
-				bonus_damage = _landed(base + bonus_damage, _damage_reaches_all(true)) - _landed(base, _damage_reaches_all(true))
+				var base: int = _effect_value(card_data, DAMAGE_EFFECT_TYPES) + _chain_bonus(DAMAGE_EFFECT_TYPES) + _energy_bonus(DAMAGE_EFFECT_TYPES)
+				var with_it := NumberBreakdown.new(base + bonus_damage)
+				var without_it := NumberBreakdown.new(base)
+				if attacks:
+					_add_attack_bonus_for_half(with_it, true)
+					_add_attack_bonus_for_half(without_it, true)
+				_land_on(with_it, _damage_reaches_all(true))
+				_land_on(without_it, _damage_reaches_all(true))
+				shown = NumberBreakdown.difference(with_it, without_it, bonus_damage)
 			else:
-				bonus_damage = _landed(bonus_damage + attack_bonus, _damage_reaches_all(true))
-			text = text.replace(TOKEN_ALT_DAMAGE, str(bonus_damage)).replace(TOKEN_BONUS_DAMAGE, str(bonus_damage))
+				shown = NumberBreakdown.new(bonus_damage)
+				if attacks:
+					_add_attack_bonus_for_half(shown, true)
+				_land_on(shown, _damage_reaches_all(true))
+			var number: String = _number_text(shown)
+			text = text.replace(TOKEN_ALT_DAMAGE, number).replace(TOKEN_BONUS_DAMAGE, number)
 	# Under a stance that forbids Block (Last Resort, while Critical at the
-	# HP this card leaves - as _attack_bonus_preview() judges it) every
+	# HP this card leaves - as _add_attack_bonus_preview() judges it) every
 	# Block number reads 0 - what EffectContext.gain_block() will actually
 	# give. The card's own data is untouched.
 	var critical: bool = false
@@ -1021,19 +1033,22 @@ func _resolve_tokens(description: String) -> String:
 	if text.contains(TOKEN_BLOCK):
 		var block: int = _effect_value(card_data, BLOCK_EFFECT_TYPES)
 		if block >= 0:
-			block += _chain_bonus(BLOCK_EFFECT_TYPES)
-			block += _energy_bonus(BLOCK_EFFECT_TYPES)
+			var shown := NumberBreakdown.new(block + _chain_bonus(BLOCK_EFFECT_TYPES) + _energy_bonus(BLOCK_EFFECT_TYPES))
 			# The worn piece's Block on the class's basic defence card at
 			# this fight's count (the Harness) - what BlockEffect will add.
 			if _bonus_context != null and _bonus_context.player != null:
-				block += _bonus_context.player.basic_defence_bonus_for(card_data)
-			text = text.replace(TOKEN_BLOCK, str(0 if no_block else block))
+				_bonus_context.player.add_basic_defence_bonus(shown, card_data)
+			if no_block:
+				shown.zero(_stance.data.display_name)
+			text = text.replace(TOKEN_BLOCK, _number_text(shown))
 	if text.contains(TOKEN_ALT_BLOCK) or text.contains(TOKEN_BONUS_BLOCK):
 		var bonus_block: int = _bonus_effect_value(card_data, BLOCK_EFFECT_TYPES)
 		if bonus_block >= 0:
+			var shown := NumberBreakdown.new(bonus_block)
 			if no_block:
-				bonus_block = 0
-			text = text.replace(TOKEN_ALT_BLOCK, str(bonus_block)).replace(TOKEN_BONUS_BLOCK, str(bonus_block))
+				shown.zero(_stance.data.display_name)
+			var number: String = _number_text(shown)
+			text = text.replace(TOKEN_ALT_BLOCK, number).replace(TOKEN_BONUS_BLOCK, number)
 	if text.contains(TOKEN_DRAW):
 		var draw: int = _effect_value(card_data, [CardEffect.EffectType.DRAW])
 		if draw >= 0:
@@ -1102,9 +1117,9 @@ func _resolve_tokens(description: String) -> String:
 		var hits: int = _hit_count()
 		text = text.replace(TOKEN_HITS, " damage" if hits <= 1 else " ×%d" % hits)
 	if text.contains(TOKEN_TOLL_SPENT_DAMAGE):
-		var blow: int = _toll_spent_damage_preview()
-		if blow >= 0:
-			text = text.replace(TOKEN_TOLL_SPENT_DAMAGE, str(blow))
+		var blow: NumberBreakdown = _toll_spent_damage_preview()
+		if blow != null:
+			text = text.replace(TOKEN_TOLL_SPENT_DAMAGE, _number_text(blow))
 	if text.contains(TOKEN_TOLL_HEAL):
 		text = text.replace(TOKEN_TOLL_HEAL, str(_toll_heal_preview()))
 	if text.contains(TOKEN_TOLL_BLOCK):
@@ -1262,11 +1277,15 @@ func _toll_heal_preview() -> int:
 # over (BattleController.preview_context()/preview_context_against());
 # none for an all-enemies effect (`all_enemies`), which reads with the
 # player's own modifiers only. Outside a battle hand, `blow` as it is.
-func _landed(blow: int, all_enemies: bool) -> int:
+func _land_on(blow: NumberBreakdown, all_enemies: bool) -> NumberBreakdown:
 	if _bonus_context == null or _bonus_context.player == null:
 		return blow
 	var enemy: Combatant = null if all_enemies else _bonus_context.target
-	return DamageEffect.landed(blow, _bonus_context.player, enemy)
+	return DamageEffect.land_on(blow, _bonus_context.player, enemy)
+
+# What a number token prints: `shown`'s total.
+func _number_text(shown: NumberBreakdown) -> String:
+	return str(shown.total)
 
 # Whether the damage effect a token reads - the first one, or with
 # `conditional` the first conditional one, as _effect_value() and
@@ -2491,49 +2510,52 @@ func _upfront_hp_cost() -> int:
 # conditional on Critical, each half is read in its own state - the {if}
 # half as if Critical, the {else} half as if not - so neither inherits a
 # bonus (Last Resort) that needs the other. Any other card
-# prints the bonus as it stands (_attack_bonus_preview()).
-func _attack_bonus_for_half(conditional_half: bool) -> int:
+# prints the bonus as it stands (_add_attack_bonus_preview()).
+func _add_attack_bonus_for_half(into: NumberBreakdown, conditional_half: bool) -> NumberBreakdown:
 	if _bonus_context == null or _bonus_context.player == null:
-		return _attack_bonus_preview()
+		return _add_attack_bonus_preview(into)
 	for effect in card_data.effects:
 		if effect == null or not DAMAGE_EFFECT_TYPES.has(effect.effect_type):
 			continue
 		if effect.condition == CardEffect.Condition.CRITICAL:
-			return AttackBonus.when_critical(_bonus_context.player, conditional_half)
+			return AttackBonus.add_when_critical(into, _bonus_context.player, conditional_half)
 		# Into Critical (Last Wager): its {if} half lands Critical; its
 		# {else} half may land either side, so it prints the bonus as it
 		# stands.
 		if effect.condition == CardEffect.Condition.ENTERED_CRITICAL and conditional_half:
-			return AttackBonus.when_critical(_bonus_context.player, true)
+			return AttackBonus.add_when_critical(into, _bonus_context.player, true)
 		break
-	return _attack_bonus_preview()
+	return _add_attack_bonus_preview(into)
 
 # What {toll_spent_damage} prints - see TOKEN_TOLL_SPENT_DAMAGE. 0 spent
-# outside a battle hand. -1 with no such effect, which leaves the token
+# outside a battle hand. Null with no such effect, which leaves the token
 # standing.
-func _toll_spent_damage_preview() -> int:
+func _toll_spent_damage_preview() -> NumberBreakdown:
 	for effect in card_data.effects:
 		if effect == null or effect.effect_type != CardEffect.EffectType.TOLL_SPENT_DAMAGE:
 			continue
 		var spent: int = 0
 		if _bonus_context != null and _bonus_context.player != null:
 			spent = _bonus_context.player.toll_spent_this_fight
-		var bonus: int = _attack_bonus_preview() if card_data.card_type == CardData.CardType.ATTACK else 0
-		return _landed(spent + bonus, false)
-	return -1
+		var blow := NumberBreakdown.new(spent)
+		if card_data.card_type == CardData.CardType.ATTACK:
+			_add_attack_bonus_preview(blow)
+		return _land_on(blow, false)
+	return null
 
-# The attack bonus this Attack would get if played now - AttackBonus, the
-# resolver's own sum, at the HP left after _upfront_hp_cost(). Outside a
-# battle hand there is no player to read, so only the stance counts, and
-# never its Critical half.
-func _attack_bonus_preview() -> int:
+# The attack bonus this Attack would get if played now, as parts of
+# `into` - AttackBonus, the resolver's own sum, at the HP left after
+# _upfront_hp_cost(). Outside a battle hand there is no player to read,
+# so only the stance counts, and never its Critical half.
+func _add_attack_bonus_preview(into: NumberBreakdown) -> NumberBreakdown:
 	if _bonus_context == null or _bonus_context.player == null:
-		return Stance.attack_bonus(_stance, false)
+		return Stance.add_attack_bonus(into, _stance, false)
 	var player: Combatant = _bonus_context.player
 	var upfront: int = _upfront_hp_cost()
+	AttackBonus.add_for_player(into, player, player.hp - upfront)
 	# The weapon's self-loss bonus on the basic attack - armed, or about to
 	# be by this card's own price (Self-Eater's).
-	return AttackBonus.for_player(player, player.hp - upfront) + player.self_loss_attack_bonus_for(card_data, upfront > 0)
+	return player.add_self_loss_attack_bonus(into, card_data, upfront > 0)
 
 static func _type_label_text(keyline_type: KeylineType) -> String:
 	match keyline_type:

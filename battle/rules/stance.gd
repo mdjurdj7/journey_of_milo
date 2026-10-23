@@ -57,11 +57,16 @@ func template_values() -> Dictionary:
 # 0 when the stance wants Critical and `critical` says the player isn't.
 # The whole attack bonus, stance and statuses together, is AttackBonus's.
 static func attack_bonus(stance: Stance, critical: bool) -> int:
+	return add_attack_bonus(NumberBreakdown.new(), stance, critical).total
+
+# The same, as a part of `into` named for the stance (a card face's
+# breakdown of its number - NumberBreakdown); nothing when it pays none.
+static func add_attack_bonus(into: NumberBreakdown, stance: Stance, critical: bool) -> NumberBreakdown:
 	if stance == null or stance.data == null:
-		return 0
+		return into
 	if stance.data.bonus_requires_critical and not critical:
-		return 0
-	return stance.data.attack_damage_bonus * stance.stacks
+		return into
+	return into.add(stance.data.display_name, stance.data.attack_damage_bonus * stance.stacks)
 
 # Whether the stance held forbids gaining Block now (Last Resort) - gated
 # on Critical as attack_bonus() is: false when the stance wants Critical

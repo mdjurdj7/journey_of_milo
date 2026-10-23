@@ -104,7 +104,12 @@ func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> int:
 # never takes what waits for an Attack card's first blows (StatusData.
 # spent_by_attack_card - Bent Nail's doubling): it isn't one.
 static func landed(blow: int, player: Combatant, enemy: Combatant, replay: bool = false) -> int:
-	var amount: int = Status.apply_modifiers(blow, player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE, replay)
+	return land_on(NumberBreakdown.new(blow), player, enemy, replay).total
+
+# The same on `into`'s running total, each modifier a part of it - what a
+# card face explains its number with.
+static func land_on(into: NumberBreakdown, player: Combatant, enemy: Combatant, replay: bool = false) -> NumberBreakdown:
+	Status.apply_modifiers_to(into, player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE, replay)
 	if enemy == null:
-		return amount
-	return Status.apply_modifiers(amount, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
+		return into
+	return Status.apply_modifiers_to(into, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)

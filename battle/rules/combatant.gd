@@ -194,9 +194,11 @@ var big_hit_spent: bool = false
 # attack_tag (the basic attack - Slash, or Second Swing's replay of it)
 # takes every one stored as its attack bonus is taken, and the store is
 # empty again. A fight's Combatant is its own, so the store ends with the
-# fight. 0 bonus = none.
+# fight. 0 bonus = none. The weapon's name goes with it, for a card face
+# explaining the number it adds (self_loss_attack_source).
 var self_loss_attack_bonus: int = 0
 var self_loss_attack_tag: StringName = &""
+var self_loss_attack_source: String = ""
 var self_loss_attack_stacks: int = 0
 # The worn piece that upgrades the class's basic defence card (Trinket
 # Data.basic_defence_block_* - the Harness), read live, the class it reads
@@ -341,12 +343,20 @@ func self_loss_attack_bonus_for(card: CardData, arming: bool = false) -> int:
 		return 0
 	return self_loss_attack_bonus * (self_loss_attack_stacks + (1 if arming else 0))
 
+# self_loss_attack_bonus_for() as a part of `into`, under the weapon's name.
+func add_self_loss_attack_bonus(into: NumberBreakdown, card: CardData, arming: bool = false) -> NumberBreakdown:
+	return into.add(self_loss_attack_source, self_loss_attack_bonus_for(card, arming))
+
 # The Block the worn piece adds to `card`'s next play: its bonus at this
 # fight's count, when `card` is the class's basic defence card; else 0.
 func basic_defence_bonus_for(card: CardData) -> int:
 	if basic_defence_piece == null or basic_defence_character == null or not basic_defence_character.is_basic_defence(card):
 		return 0
 	return basic_defence_piece.basic_defence_block_bonus(basic_defence_plays)
+
+# basic_defence_bonus_for() as a part of `into`, under the piece's name.
+func add_basic_defence_bonus(into: NumberBreakdown, card: CardData) -> NumberBreakdown:
+	return into.add(basic_defence_piece.display_name if basic_defence_piece != null else "", basic_defence_bonus_for(card))
 
 # The same, taken by the card resolving: one more play counted.
 func take_basic_defence_bonus(card: CardData) -> int:

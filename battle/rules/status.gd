@@ -473,7 +473,10 @@ static func consume_triggered(statuses: Array[Status]) -> void:
 # one-shot that the card's first hit has already had - what a repeated
 # hit gets (EffectContext.take_repeat_attack_bonus()).
 static func attack_bonus(statuses: Array[Status], critical: bool, skip: StatusData = null, ongoing_only: bool = false) -> int:
-	var total: int = 0
+	return add_attack_bonus(NumberBreakdown.new(), statuses, critical, skip, ongoing_only).total
+
+# The same, each paying status a part of `into` under its own name.
+static func add_attack_bonus(into: NumberBreakdown, statuses: Array[Status], critical: bool, skip: StatusData = null, ongoing_only: bool = false) -> NumberBreakdown:
 	for active in statuses:
 		if active.data == null or active.data.attack_damage_bonus == 0:
 			continue
@@ -483,8 +486,8 @@ static func attack_bonus(statuses: Array[Status], critical: bool, skip: StatusDa
 			continue
 		if active.data.bonus_requires_critical and not critical:
 			continue
-		total += active.data.attack_damage_bonus * active.stack_count
-	return total
+		into.add(active.data.display_name, active.data.attack_damage_bonus * active.stack_count)
+	return into
 
 # One Attack card has taken its attack bonus (EffectContext.take_attack_
 # bonus()): every status whose bonus that paid and that counts charges -
@@ -787,7 +790,11 @@ static func strike_back_view(statuses: Array[Status]) -> Array[Status]:
 # `amount`, in list order - ADD sums directly; MULTIPLY treats magnitude
 # as a PERCENTAGE. Never returns below 0.
 static func apply_modifiers(amount: int, statuses: Array[Status], target: StatusData.ModifierTarget, skip_attack_card_spent: bool = false) -> int:
-	var result := amount
+	return apply_modifiers_to(NumberBreakdown.new(amount), statuses, target, skip_attack_card_spent).total
+
+# The same on `into`'s running total, each modifier a part under its
+# status's name, the clamp at 0 last.
+static func apply_modifiers_to(into: NumberBreakdown, statuses: Array[Status], target: StatusData.ModifierTarget, skip_attack_card_spent: bool = false) -> NumberBreakdown:
 	for active in statuses:
 		if active.data.category != StatusData.Category.MODIFIER:
 			continue
@@ -800,7 +807,7 @@ static func apply_modifiers(amount: int, statuses: Array[Status], target: Status
 			continue
 		match active.data.modifier_operation:
 			StatusData.ModifierOperation.ADD:
-				result += active.magnitude
+				into.add(active.data.display_name, active.magnitude)
 			StatusData.ModifierOperation.MULTIPLY:
-				result += roundi(result * active.magnitude / 100.0)
-	return max(result, 0)
+				into.multiply(active.data.display_name, active.magnitude)
+	return into.floor_at_zero()
