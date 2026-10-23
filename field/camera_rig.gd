@@ -138,6 +138,13 @@ var _bound_offset: Vector3 = Vector3.ZERO
 var _jolt_offset: Vector3 = Vector3.ZERO
 var _jolt_duration: float = 0.0
 var _jolt_elapsed: float = 0.0
+# The punch running now (see punch()): its full offset (world), its out
+# and back lengths and how far into it it is, in game seconds. _punch_out
+# and _punch_back both 0 = none.
+var _punch_offset: Vector3 = Vector3.ZERO
+var _punch_out: float = 0.0
+var _punch_back: float = 0.0
+var _punch_elapsed: float = 0.0
 
 # The threshold look (see look_up()): 0 = none, 1 = fully on the tower.
 # Only ever rises - the floor change that follows is a scene reload, and
@@ -422,6 +429,7 @@ func _physics_process(delta: float) -> void:
 	_apply_free_pose()
 	_update_dof()
 	_apply_jolt(delta)
+	_apply_punch(delta)
 
 # One small knock to the frame: the camera kicked `amplitude` metres in a
 # random direction across the view, settling back over `duration` game
@@ -450,6 +458,33 @@ func _apply_jolt(delta: float) -> void:
 	_jolt_elapsed += delta
 	if _jolt_elapsed >= _jolt_duration:
 		_jolt_duration = 0.0
+
+# A push toward `world_point`: the camera moves `fraction` of the way
+# there over `out_sec` (easing out) and back over `back_sec` (easing in
+# and out) - a heavy hit's (BattleFeedback), toward the fighter struck. No
+# roll, no shake. On game time in _physics_process, added on the fresh
+# base as the jolt is; a new punch replaces one running.
+func punch(world_point: Vector3, fraction: float, out_sec: float, back_sec: float) -> void:
+	if camera == null or fraction <= 0.0 or out_sec + back_sec <= 0.0:
+		return
+	_punch_offset = (world_point - camera.global_position) * fraction
+	_punch_out = maxf(out_sec, 0.0)
+	_punch_back = maxf(back_sec, 0.0)
+	_punch_elapsed = 0.0
+
+func _apply_punch(delta: float) -> void:
+	if _punch_out + _punch_back <= 0.0:
+		return
+	var amount: float = 0.0
+	if _punch_elapsed < _punch_out:
+		amount = sin(_punch_elapsed / _punch_out * PI * 0.5)
+	elif _punch_back > 0.0:
+		amount = 1.0 - smoothstep(0.0, 1.0, (_punch_elapsed - _punch_out) / _punch_back)
+	camera.position += global_transform.basis.inverse() * (_punch_offset * amount)
+	_punch_elapsed += delta
+	if _punch_elapsed >= _punch_out + _punch_back:
+		_punch_out = 0.0
+		_punch_back = 0.0
 
 # The rig never rotates, so this is a fixed world direction — the follow
 # framing's viewing axis.

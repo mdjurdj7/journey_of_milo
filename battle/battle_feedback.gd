@@ -47,8 +47,12 @@ class_name BattleFeedback
 # sound (heavy_impact_clips dealt in turn, silent at heavy_min_damage
 # rising to heavy_impact_max_volume_db), and the recoil grown up to its
 # max multiplier. A card hit of shake_min_damage or more also jolts the
-# camera once (CameraRig.jolt()) - the only camera movement a hit makes,
-# off with camera_shake_enabled. Presentation only: nothing here touches
+# camera once (CameraRig.jolt()), off with camera_shake_enabled - unless
+# it is a heavy hit, which punches instead: as its stop releases, the
+# camera pushes camera_punch_fraction of the way toward the fighter
+# struck (at camera_punch_height) over camera_punch_out_sec and back over
+# camera_punch_back_sec (CameraRig.punch()), either way, off with
+# camera_punch_enabled. Those are the only camera movements a hit makes. Presentation only: nothing here touches
 # the rules, and heavy_hit_enabled off gives the plain reaction, no jolt
 # either. Every tunable is read as the hit lands, so a Remote-tab edit
 # takes effect on the next.
@@ -137,6 +141,15 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 @export var camera_jolt_amplitude: float = 0.05
 @export var camera_jolt_duration: float = 0.15
 
+@export_group("Camera Punch")
+# A heavy hit's push toward the fighter struck (see the header).
+@export var camera_punch_enabled: bool = true
+@export_range(0.0, 0.2, 0.005) var camera_punch_fraction: float = 0.03
+@export var camera_punch_out_sec: float = 0.06
+@export var camera_punch_back_sec: float = 0.12
+# Where on the fighter it pushes toward, over its feet (metres).
+@export var camera_punch_height: float = 1.3
+
 # The impact layer's volume for "not at all".
 const SILENT_DB: float = -80.0
 # The damage kinds (BattleController.damage_dealt's `kind`) that are a
@@ -203,7 +216,9 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, kind: String
 				return
 		(target as FieldEnemy).hold_for(hold)
 		_react_to_card_hit(target as FieldEnemy, slash, armored, heavy, not sounded)
-		if jolts_camera(amount):
+		if contact and is_heavy_hit(amount):
+			_punch_camera_at(target as FieldEnemy, hold)
+		elif jolts_camera(amount):
 			_jolt_camera()
 	elif source is FieldEnemy:
 		var attacker := source as FieldEnemy
@@ -215,6 +230,8 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, kind: String
 			var hold: float = stop_ms(amount, killing, multi) / 1000.0
 			attacker.hold_for(hold)
 			_hold_wanderer(hold)
+			if is_heavy_hit(amount):
+				_punch_camera_at(_wanderer, hold)
 		_react_to_enemy_attack(attacker)
 
 # BattleController.mound_damaged: a hit on a dug-in enemy's mound - the
@@ -224,7 +241,10 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, kind: String
 func on_mound_damaged(enemy: FieldEnemy, mound: int, amount: int, hp: int, _max_hp: int) -> void:
 	if amount <= 0 or not is_instance_valid(enemy):
 		return
-	_hold_wanderer(stop_ms(amount, hp <= 0) / 1000.0)
+	var hold: float = stop_ms(amount, hp <= 0) / 1000.0
+	_hold_wanderer(hold)
+	if is_heavy_hit(amount):
+		_punch_camera_toward(enemy.get_mound_position(mound), hold)
 	enemy.play_mound_hit(mound)
 	enemy.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees, sand_puff_tint, enemy.get_mound_position(mound))
 
@@ -465,16 +485,34 @@ func _hold_wanderer(seconds: float) -> void:
 	if _wanderer != null and seconds > 0.0:
 		_wanderer.hold_animation(seconds)
 
+# A heavy hit's punch toward `fighter` struck, at camera_punch_height,
+# once its stop of `hold` seconds has run.
+func _punch_camera_at(fighter: Node3D, hold: float) -> void:
+	if fighter == null or not is_instance_valid(fighter):
+		return
+	_punch_camera_toward(fighter.global_position + Vector3(0.0, camera_punch_height, 0.0), hold)
+
+func _punch_camera_toward(point: Vector3, hold: float) -> void:
+	if not camera_punch_enabled:
+		return
+	if hold > 0.0:
+		await get_tree().create_timer(hold).timeout
+	var camera_rig: CameraRig = _camera_rig()
+	if camera_rig != null:
+		camera_rig.punch(point, camera_punch_fraction, camera_punch_out_sec, camera_punch_back_sec)
+
 # CameraRig isn't threaded through as a reference anywhere in this chain -
 # found via the active camera's own parent instead, the same "reach the
 # live camera through the viewport" idiom BattleController._screen_pos_
 # for()/_raycast_enemy() and BattleOverlay._screen_pos_for_damage_target()
 # already use.
 func _jolt_camera() -> void:
+	var camera_rig: CameraRig = _camera_rig()
+	if camera_rig != null:
+		camera_rig.jolt(camera_jolt_amplitude, camera_jolt_duration)
+
+func _camera_rig() -> CameraRig:
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
-		return
-	var camera_rig := camera.get_parent() as CameraRig
-	if camera_rig == null:
-		return
-	camera_rig.jolt(camera_jolt_amplitude, camera_jolt_duration)
+		return null
+	return camera.get_parent() as CameraRig
