@@ -267,12 +267,31 @@ signal battle_finished(outcome: Outcome)
 
 @export_group("Corners")
 # The fixed readouts' inset from the viewport's edges: bottom-left the
-# DECK line, bottom-right End Turn with the DISCARD line beneath it - see
-# _layout_corners(). The energy readout (BattleResources) is pinned at
-# energy_anchor instead.
+# DECK line, bottom-right the DISCARD line - see _layout_corners(). The
+# energy readout (BattleResources) is pinned at energy_anchor instead.
 @export var corner_margin_px: float = 40.0
-# Between End Turn's rule and the DISCARD line under it.
-@export var stack_gap_px: float = 10.0
+@export_group("End Turn")
+# END TURN beside the hand, not in the corner: its column starts end_turn_
+# hand_gap_px right of the hand's right limit (HandContainer.hand_right_
+# limit_x - its cards' tilt and hover growth inside the gap) and is end_
+# turn_column_width_px wide, END TURN right-aligned in it (and never past
+# the corner margin). Its caps' baseline sits end_turn_baseline_px under
+# the hand's rest top (HandContainer.get_rest_top_y() - the arc's peak),
+# on a resting right-hand card's name row. The column above it is left
+# clear for the Keep note. Each re-applies live.
+@export var end_turn_hand_gap_px: float = 25.0:
+	set(value):
+		end_turn_hand_gap_px = value
+		_layout_corners()
+@export var end_turn_column_width_px: float = 135.0:
+	set(value):
+		end_turn_column_width_px = value
+		_layout_corners()
+@export var end_turn_baseline_px: float = 50.0:
+	set(value):
+		end_turn_baseline_px = value
+		_layout_corners()
+@export_group("")
 # The energy readout's place, overlay-local and fixed whatever the hand
 # holds: its right edge (x) and its numeral's top (y) - it grows leftward
 # from that edge. x is where a five-card hand used to put it; y raises it
@@ -663,6 +682,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_refresh_keepsake_row()
 	RunState.keepsake_changed.connect(func(_keepsake: TrinketData) -> void: _refresh_keepsake_row())
 	RunState.worn_changed.connect(func(_worn: TrinketData) -> void: _refresh_keepsake_row())
+	# Its size moves its baseline's offset; its right edge it holds itself.
+	end_turn_button.resized.connect(_place_end_turn)
 	_layout_corners()
 
 	var target_line := TargetLine.new()
@@ -755,8 +776,8 @@ func _refresh_keepsake_row() -> void:
 
 # Bottom-left: DECK line flush in the corner and the keepsake row
 # keepsake_row_gap_px under it, in the corner margin; the energy readout
-# at energy_anchor. Bottom-right: DISCARD line flush in the corner, End
-# Turn's rule stack_gap_px above it. Each readout keeps its
+# at energy_anchor. Bottom-right: DISCARD line flush in the corner. END
+# TURN beside the hand (end_turn_hand_gap_px). Each readout keeps its
 # own corner edge when its text changes size (see their _relayout()s), so
 # this only needs re-running on a viewport resize.
 func _layout_corners() -> void:
@@ -771,8 +792,18 @@ func _layout_corners() -> void:
 	_apply_energy_anchor()
 
 	_discard_readout.position = Vector2(right - _discard_readout.size.x, bottom - _discard_readout.size.y)
-	var end_turn_rule_bottom: float = _discard_readout.position.y - stack_gap_px
-	end_turn_button.position = Vector2(right - end_turn_button.size.x, end_turn_rule_bottom - end_turn_button.rule_bottom())
+	_place_end_turn()
+
+# END TURN in its column beside the hand: right-aligned at the column's
+# right edge (no further right than the corner margin), its baseline end_
+# turn_baseline_px under the hand's rest top. Read from the hand, so it
+# follows the hand's limit rather than the screen's edge.
+func _place_end_turn() -> void:
+	if end_turn_button == null or hand_container == null:
+		return
+	var column_right: float = minf(hand_container.hand_right_limit_x + end_turn_hand_gap_px + end_turn_column_width_px, size.x - corner_margin_px)
+	var baseline: float = hand_container.get_rest_top_y() - global_position.y + end_turn_baseline_px
+	end_turn_button.position = Vector2(column_right - end_turn_button.size.x, baseline - end_turn_button.text_ascent())
 
 # Right edge held at energy_anchor's x, left edge clamped to the corner
 # margin - a very wide readout gives up its edge, not screen; the

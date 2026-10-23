@@ -6,22 +6,46 @@ class_name EndTurnButton
 # the rule (rule_px -> rule_hover_px); disabled dims text and rule to
 # disabled_alpha. A real Button still - pressed/focus/keyboard all work -
 # just with every stylebox emptied and the rule drawn by _draw() over the
-# text. Sized to its own text so BattleOverlay can anchor it flush
-# bottom-right; the rule spans the text's width, not the control's.
+# text. Sized to its own text, its right edge held, so BattleOverlay can
+# anchor it by that edge; the rule spans the text's width, not the
+# control's. Every export re-applies live. The battle's END TURN sets its
+# own size and rule in battle_overlay.tscn; the defaults here are Bide's
+# DONE's.
 #
 # Disabled by BattleOverlay while the enemy turn runs (BattleController.
 # turn_phase_changed), while a card is armed (HandContainer.
 # armed_changed) and through the fight's opening hold (BattleController.
 # entry_lock_changed) - the moments ending the turn makes no sense.
 
-@export var label_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf")
-@export var font_size_px: int = 15
-@export var tracking_em: float = 0.16
-@export var rule_px: float = 2.0
-@export var rule_hover_px: float = 3.0
+@export var label_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf"):
+	set(value):
+		label_font = value
+		_restyle()
+@export var font_size_px: int = 15:
+	set(value):
+		font_size_px = value
+		_restyle()
+@export var tracking_em: float = 0.16:
+	set(value):
+		tracking_em = value
+		_restyle()
+@export var rule_px: float = 2.0:
+	set(value):
+		rule_px = value
+		queue_redraw()
+@export var rule_hover_px: float = 3.0:
+	set(value):
+		rule_hover_px = value
+		queue_redraw()
 # Space between the text's descent and the rule's top.
-@export var rule_gap_px: float = 3.0
-@export_range(0.0, 1.0) var disabled_alpha: float = 0.4
+@export var rule_gap_px: float = 3.0:
+	set(value):
+		rule_gap_px = value
+		queue_redraw()
+@export_range(0.0, 1.0) var disabled_alpha: float = 0.4:
+	set(value):
+		disabled_alpha = value
+		_restyle()
 @export var label_text: String = "END TURN"
 # Quiet (set_quiet()): enabled, but its text and rule in grey ink - the
 # ink at quiet_alpha - for a confirm that will do the least (KEEP NONE).
@@ -123,6 +147,11 @@ func note_rect(note: String) -> Rect2:
 	var height: float = font.get_height(note_font_size_px) if font != null else float(note_font_size_px)
 	return Rect2(size.x - width, -note_gap_px - height, width, height)
 
+# A live edit before the theme can be read waits for _ready().
+func _restyle() -> void:
+	if is_node_ready():
+		refresh_style()
+
 func _text_width() -> float:
 	var font: Font = get_theme_font("font")
 	return InkType.width(font, text, font_size_px)
@@ -144,6 +173,12 @@ func _relayout() -> void:
 	size = new_size
 	position.x = right_edge - new_size.x
 	queue_redraw()
+
+# The caps' baseline below this control's top - what a caller setting it
+# on a line reads.
+func text_ascent() -> float:
+	var font: Font = get_theme_font("font")
+	return font.get_ascent(font_size_px) if font != null else float(font_size_px)
 
 # The rule's underside, below this control's bottom edge - what a caller
 # stacking something beneath should clear.

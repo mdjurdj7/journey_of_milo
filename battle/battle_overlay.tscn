@@ -15,6 +15,9 @@ grow_vertical = 2
 theme = ExtResource("3_theme")
 script = ExtResource("1_overlay")
 energy_group_offset = Vector2(-246.75, 12)
+end_turn_hand_gap_px = 25.0
+end_turn_column_width_px = 135.0
+end_turn_baseline_px = 50.0
 sand_puff_tint = 0.75
 keep_prompt_font_size_px = 15
 keep_prompt_gap_px = 10.0
@@ -40,6 +43,9 @@ script = ExtResource("4_end_turn")
 quiet_alpha = 0.55
 note_font_size_px = 15
 note_gap_px = 4.0
+font_size_px = 22
+rule_px = 3.0
+rule_hover_px = 4.0
 
 [node name="DebugRow" type="HBoxContainer" parent="." unique_id=770130127]
 visible = false
