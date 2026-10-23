@@ -36,11 +36,11 @@ const RIGHT_FOOT_SUFFIX := "RightFoot"
 @export var plant_epsilon: float = 0.05
 @export var max_plant_height: float = 0.05
 @export var footfall_cooldown: float = 0.3
-# Used instead of footfall_cooldown while Wanderer.is_dashing() - Run's
+# Used instead of footfall_cooldown while Wanderer.is_running() - Run's
 # own foot-plant cadence is faster than Walk's, and the plain cooldown
 # above throttled footfalls (and the footstep sounds/prints they drive)
-# to a walking pace even during a dash.
-@export var dash_footfall_cooldown: float = 0.12
+# to a walking pace even while he runs.
+@export var run_footfall_cooldown: float = 0.12
 
 @export var footprint_size: Vector2 = Vector2(0.3, 0.12)
 @export var footprint_height_offset: float = 0.01
@@ -186,7 +186,7 @@ func _process(delta: float) -> void:
 			_foot_swing_exceeded_min_descent[side] = true
 
 		if _foot_swing_exceeded_min_descent[side] and downward_velocity < plant_epsilon and _foot_cooldowns[side] <= 0.0:
-			_foot_cooldowns[side] = dash_footfall_cooldown if _wanderer.is_dashing() else footfall_cooldown
+			_foot_cooldowns[side] = run_footfall_cooldown if _wanderer.is_running() else footfall_cooldown
 			_foot_swing_exceeded_min_descent[side] = false
 			_spawn_footprint(bone_world)
 

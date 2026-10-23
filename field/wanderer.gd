@@ -69,9 +69,12 @@ const SWORD_FIT_PROPERTIES: Array[StringName] = [&"sword_length", &"grip_fractio
 @export var acceleration: float = 14.0
 @export var rotation_speed: float = 10.0
 @export var gravity: float = 12.0
-@export var dash_distance: float = 6.0
-@export var dash_duration: float = 0.2
-@export var dash_cooldown: float = 1.0
+# Held with a direction (the run action, Shift): he runs at run_speed,
+# steered every frame as he walks is; let go, he eases back to move_speed.
+# The Run clip plays while he runs (is_running()).
+@export var run_speed: float = 8.9:
+	set(value):
+		run_speed = value
 # The walk to a fight's stance round what stands in the way (enter_battle_
 # stance_along()), metres a second - its own pace, not move_speed, so the
 # field walk's speed never retimes a fight's opening. Read as the walk is
@@ -142,7 +145,7 @@ const SWORD_FIT_PROPERTIES: Array[StringName] = [&"sword_length", &"grip_fractio
 # remain he won't cross the gate line. Not a wall - nothing on the field
 # stops him - he slows over the last hold_line_ease_distance metres (a
 # constant deceleration, so at walking pace he comes to rest ON the line,
-# and a dash is reined in the same way) and then stands there; only his
+# and a run is reined in the same way) and then stands there; only his
 # motion INTO the line is held, so he still walks along it. At rest
 # within hold_line_arrive_margin of it he emits hold_line_reached once
 # (RegionField turns him to look back - see look_back_toward()), and is
@@ -542,9 +545,8 @@ var _recoil_home: Vector3 = Vector3.ZERO
 # else the AnimationPlayer); foot grounding runs on its mixer_applied.
 var _grounding_mixer: AnimationMixer = null
 var _camera: Camera3D
-var _dash_timer: float = 0.0
-var _dash_cooldown_timer: float = 0.0
-var _dash_direction: Vector3 = Vector3.ZERO
+# Running this frame: the run action held with somewhere to go.
+var _running: bool = false
 
 var _has_move_target: bool = false
 var _move_target: Vector3 = Vector3.ZERO
@@ -583,14 +585,14 @@ var _look_back_active: bool = false
 var _look_back_direction: Vector3 = Vector3.ZERO
 
 # Set by ZoneIntro for the zone intro, which runs this node ALWAYS
-# through the field freeze: input is read as nothing - no WASD, no dash,
+# through the field freeze: input is read as nothing - no WASD, no run,
 # any click target dropped - while everything else in _physics_process()
 # (gravity, move_and_slide(), Idle) keeps running, so he stands seated on
 # the sand rather than hovering where the freeze caught him. Cleared when
 # the intro ends or is skipped; a key still held at that moment moves
 # him then.
 var input_locked: bool = false
-# The arrival hold (RegionField): the movement keys and dash read as
+# The arrival hold (RegionField): the movement keys and run read as
 # nothing - polled, so a key held from the last floor or pressed now moves
 # nothing - while a walk already given (set_move_target()) carries on;
 # the hold swallows the clicks that would give one. Cleared when the
@@ -1606,7 +1608,7 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 #   hold on the last frame, which reads as "idle froze" the moment the
 #   clip's own (short) duration elapses - so it loops, whether playing
 #   standalone or re-triggered by exit_battle_stance()'s play("Idle").
-# - Walk, Run: loops; Run plays during a dash in place of Walk/Idle (see
+# - Walk, Run: loops; Run plays while he runs in place of Walk (see
 #   _physics_process()). Both are cut in place - the Hips never move - so
 #   there is no root motion to take out.
 # - DrawSword: a one-shot combat-start transition, LOOP_NONE explicitly
@@ -1854,8 +1856,8 @@ func _build_animation_tree() -> void:
 		return
 
 	# Run is deliberately not a blend point here: it's a discrete state
-	# tied to is_dashing (see _physics_process()'s AnimationPlayer branch),
-	# not a continuous function of speed the way Idle<->Walk is, and dash
+	# tied to is_running (see _physics_process()'s AnimationPlayer branch),
+	# not a continuous function of speed the way Idle<->Walk is, and run
 	# speed itself runs well past move_speed (this blend space's own
 	# max_space). Wiring it in properly would need an
 	# AnimationNodeStateMachine transition, not another blend point - out
@@ -2147,11 +2149,11 @@ func _tick_stuck(delta: float, planar_speed: float) -> void:
 	else:
 		_stuck_timer = 0.0
 
-# Public read of dash state - used by FootprintSpawner to pick a shorter
-# per-foot cooldown while dashing (Run's own foot-plant cadence is faster
-# than Walk's), without exposing _dash_timer itself.
-func is_dashing() -> bool:
-	return _dash_timer > 0.0
+# Whether he is running - used by FootprintSpawner to pick a shorter
+# per-foot cooldown while he runs (Run's own foot-plant cadence is faster
+# than Walk's).
+func is_running() -> bool:
+	return _running
 
 # Length of a merged clip, in seconds - CardData.impact_time's own clamp
 # (see BattleController._impact_delay_for()) against a clip shorter than
@@ -2389,7 +2391,7 @@ func play_hit_audio() -> void:
 # queue() - not a signal/await, since play() already clears any pending
 # queue on its own, which is exactly what makes exit_battle_stance()'s own
 # play("Idle") safe to call even mid-DrawSword) — independent of
-# _physics_process (and its own dash/move-input handling), which
+# _physics_process (and its own move-input handling), which
 # RegionField's contact freeze has already stopped by the time this runs.
 # The glb's own DrawSword is a swing (_swing_clip) while it plays, so a
 # status change queues the resting clip behind it rather than cutting it
@@ -3067,66 +3069,46 @@ func _hide_debug_lines() -> void:
 		_step_down_line.visible = false
 
 func _physics_process(delta: float) -> void:
-	_dash_cooldown_timer = maxf(_dash_cooldown_timer - delta, 0.0)
-
-	if not input_locked and not keys_locked and _dash_timer <= 0.0 and Input.is_action_just_pressed("dash") and _dash_cooldown_timer <= 0.0:
-		# Dash in the direction the Wanderer is currently facing, via the
-		# same angle<->direction conversion turn-to-face uses below, so it
-		# always matches what's on screen.
-		_dash_direction = _forward_from_angle(rotation.y)
-		_dash_timer = dash_duration
-		_dash_cooldown_timer = dash_cooldown
-
 	# The one and only move_direction for this frame: everything below
 	# (velocity target, turn-to-face) reads from this, nothing re-derives
 	# it separately.
 	var move_direction: Vector3
-	var is_dashing := _dash_timer > 0.0
+	var input_dir := Vector2(
+		Input.get_action_strength("move_right") - Input.get_action_strength("move_left"),
+		Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
+	)
+	if input_locked:
+		input_dir = Vector2.ZERO
+		clear_move_target()
+	elif keys_locked:
+		input_dir = Vector2.ZERO
+	if input_dir.length() > 1.0:
+		input_dir = input_dir.normalized()
 
-	if is_dashing:
-		# Ignore movement input entirely for the dash's duration; direction
-		# is fixed to what was captured when the dash started.
-		_dash_timer -= delta
-		move_direction = _dash_direction
-	else:
-		var input_dir := Vector2(
-			Input.get_action_strength("move_right") - Input.get_action_strength("move_left"),
-			Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
-		)
-		if input_locked:
-			input_dir = Vector2.ZERO
-			clear_move_target()
-		elif keys_locked:
-			input_dir = Vector2.ZERO
-		if input_dir.length() > 1.0:
-			input_dir = input_dir.normalized()
+	# Any key input takes over from a click target.
+	if input_dir.length() > 0.0001:
+		clear_move_target()
 
-		# Any key input takes over from a click target.
-		if input_dir.length() > 0.0001:
-			clear_move_target()
+	move_direction = Vector3(input_dir.x, 0.0, -input_dir.y)
+	if _camera:
+		var camera_basis := _camera.global_transform.basis
+		var camera_forward := _flatten_normalized(-camera_basis.z)
+		var camera_right := _flatten_normalized(camera_basis.x)
+		# input_dir.y is +1 on W (forward - back); camera_forward already
+		# points away from the camera, so W adds it directly.
+		move_direction = camera_right * input_dir.x + camera_forward * input_dir.y
+		if move_direction.length() > 1.0:
+			move_direction = move_direction.normalized()
 
-		move_direction = Vector3(input_dir.x, 0.0, -input_dir.y)
-		if _camera:
-			var camera_basis := _camera.global_transform.basis
-			var camera_forward := _flatten_normalized(-camera_basis.z)
-			var camera_right := _flatten_normalized(camera_basis.x)
-			# input_dir.y is +1 on W (forward - back); camera_forward already
-			# points away from the camera, so W adds it directly.
-			move_direction = camera_right * input_dir.x + camera_forward * input_dir.y
-			if move_direction.length() > 1.0:
-				move_direction = move_direction.normalized()
+	if _has_move_target:
+		move_direction = _move_target_direction()
 
-		if _has_move_target:
-			move_direction = _move_target_direction()
-
-	if is_dashing:
-		var dash_speed := dash_distance / dash_duration
-		velocity.x = move_direction.x * dash_speed
-		velocity.z = move_direction.z * dash_speed
-	else:
-		var target_velocity := move_direction * move_speed
-		velocity.x = move_toward(velocity.x, target_velocity.x, acceleration * delta)
-		velocity.z = move_toward(velocity.z, target_velocity.z, acceleration * delta)
+	# The run held, with somewhere to go: run_speed. Not while input is
+	# locked - the same gate the keys have.
+	_running = not input_locked and not keys_locked and Input.is_action_pressed("run") and move_direction.length() > 0.01
+	var target_velocity := move_direction * (run_speed if _running else move_speed)
+	velocity.x = move_toward(velocity.x, target_velocity.x, acceleration * delta)
+	velocity.z = move_toward(velocity.z, target_velocity.z, acceleration * delta)
 
 	if not _is_grounded():
 		velocity.y -= gravity * delta
@@ -3163,15 +3145,15 @@ func _physics_process(delta: float) -> void:
 		if _animation_tree:
 			_animation_tree.set("parameters/blend_position", clampf(planar_speed, 0.0, move_speed))
 	elif _animation_player:
-		# Run plays for the dash's own duration - a discrete "he sprints"
-		# state, not a continuous speed blend (dash_speed can be well past
+		# Run plays while he runs - a discrete "he sprints" state, not a
+		# continuous speed blend (run_speed is well past
 		# move_speed, and it starts/stops instantly rather than ramping),
 		# which is exactly why this branch (not the AnimationTree/
 		# BlendSpace1D one above) is where it's wired: that blend space
 		# only spans 0..move_speed and models continuous Idle<->Walk
 		# blending, not a hard cut into a separate clip.
 		var next_animation: String
-		if is_dashing:
+		if _running:
 			next_animation = "Run"
 		elif planar_speed > walk_speed_threshold:
 			next_animation = "Walk"

@@ -410,7 +410,7 @@ func _physics_process(delta: float) -> void:
 	var motion := smoothed - global_position
 
 	# Below max_follow_speed this is identical to the plain lerp. Above it
-	# (a dash burst) the step is clamped so the target visibly leads the
+	# (a run past it) the step is clamped so the target visibly leads the
 	# frame instead of the camera snapping to keep up.
 	var max_step := max_follow_speed * delta
 	if motion.length() > max_step:

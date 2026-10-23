@@ -15,7 +15,7 @@ extends SceneTree
 #            put as he then walks back WALK_AWAY_SECONDS (and returns)
 #   keys   - move_forward held into the line, then move_forward and
 #            move_right together: he stays on it, and slides along it
-#   dash   - a dash straight at it from DASH_START_M short: reined in
+#   run    - the run held straight at it from RUN_START_M short: reined in
 #   rearm  - set back REARM_START_M, a click past the line again: a
 #            second arrival, a second look back, and no second line
 #   wade   - floor 2's wade limit (FloorData.wade_limit_m, the Wanderer's
@@ -58,7 +58,7 @@ const LOAD_FRAMES := 30
 const SETTLE_FRAMES := 30
 const GATE_APPROACH_M := 6.0
 const PAST_LINE_TARGET_M := 5.0
-const DASH_START_M := 3.0
+const RUN_START_M := 3.0
 const REARM_START_M := 2.0
 const CASE_SECONDS := 3.0
 const LOOK_SECONDS := 2.0
@@ -144,7 +144,7 @@ func _initialize() -> void:
 
 	await _case_click()
 	await _case_keys()
-	await _case_dash()
+	await _case_run()
 	await _case_rearm()
 	# Before open: it walks him off the floor. Then back where rearm left
 	# him, on the line, for open's click.
@@ -233,18 +233,17 @@ func _case_keys() -> void:
 	_check_at_line("keys slide")
 	_check(_reached == reached_before, "keys: no new arrival without leaving (%d)" % (_reached - reached_before))
 
-func _case_dash() -> void:
-	print("\n=== case: dash")
-	await _place(-DASH_START_M)
+func _case_run() -> void:
+	print("\n=== case: run")
+	await _place(-RUN_START_M)
 	Input.action_press("move_forward")
-	Input.action_press("dash")
-	await physics_frame
-	Input.action_release("dash")
+	Input.action_press("run")
 	await _frames(1.5)
+	Input.action_release("run")
 	Input.action_release("move_forward")
 	await _frames(0.5)
-	print("dash from %.1f m: %+.3f m along" % [DASH_START_M, _along()])
-	_check_at_line("dash")
+	print("run from %.1f m: %+.3f m along" % [RUN_START_M, _along()])
+	_check_at_line("run")
 
 func _case_rearm() -> void:
 	print("\n=== case: rearm")
