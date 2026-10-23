@@ -217,6 +217,11 @@ var option_id: StringName = &""
 # carrier's side, metres, at the middle of the move. The move takes the
 # fight's own transition (the camera's swing), the Wanderer's step.
 @export var climb_hop_m: float = 0.3
+# A rider held aboard in a fight (hold_aboard()), deployed by its
+# packmate's Signal: seconds from its seat to its line spot, its turn to
+# the Wanderer over the same (deploy_from_carrier()). Its Signal answer
+# waits on it.
+@export var deploy_seconds: float = 0.6
 @export var phase_drop_hop_m: float = 0.15
 @export var phase_drop_turn_seconds: float = 0.4
 @export var phase_drop_puff_particles: int = 16
@@ -475,6 +480,10 @@ var _carrier: FieldEnemy = null
 var _ride_offset: Vector3 = Vector3.ZERO
 var _ride_yaw: float = 0.0
 var _seated: bool = false
+# Aboard in a fight (hold_aboard()): kept seated until its deploy, and
+# the line spot it deploys to.
+var _held_aboard: bool = false
+var _deploy_spot: Vector3 = Vector3.ZERO
 # Where it stood as placed, before it was seated - its authored spot,
 # which its cluster's line reads (get_line_point()).
 var _line_spot: Vector3 = Vector3.ZERO
@@ -1710,19 +1719,77 @@ func _set_seated(on: bool) -> void:
 		_contact_shadow.visible = not (on and is_riding())
 
 # Where its body origin goes seated: the carrier's feet on the relief at
-# its own XZ, the offset turned by its yaw, then this body's own grounding
-# terms - as _body_y_on_ground() puts a standing body.
+# its own XZ, the offset turned by its yaw (and its model's battle turn,
+# _carrier_seat_yaw()), then this body's own grounding terms - as
+# _body_y_on_ground() puts a standing body.
 func get_seat_position() -> Vector3:
 	if not is_riding():
 		return global_position
 	var carrier_origin := Vector3(_carrier.global_position.x, _carrier._body_y_on_ground(_carrier.global_position.x, _carrier.global_position.z), _carrier.global_position.z)
 	var feet: Vector3 = carrier_origin + Vector3(0.0, _carrier.model_ground_offset, 0.0)
-	var seat: Vector3 = feet + Basis(Vector3.UP, _carrier.rotation.y) * _ride_offset
+	var seat: Vector3 = feet + Basis(Vector3.UP, _carrier_seat_yaw()) * _ride_offset
 	return seat + Vector3(0.0, -model_ground_offset + height_offset, 0.0)
 
 func _seat_on_carrier() -> void:
 	global_position = get_seat_position()
-	rotation.y = _carrier.rotation.y + _ride_yaw
+	rotation.y = _carrier_seat_yaw() + _ride_yaw
+
+# The yaw its seat turns with: the carrier's body, and in a fight its
+# model's battle turn as far as that has got (enter_battle_turn()) - the
+# cradle is on the model. 0 turn on the field.
+func _carrier_seat_yaw() -> float:
+	var yaw: float = _carrier.rotation.y
+	if _carrier._model != null:
+		yaw += _carrier._model.rotation.y - deg_to_rad(_carrier.model_yaw_offset)
+	return yaw
+
+# --- Aboard (EnemyData.starts_aboard) ---
+
+# In a fight, kept seated rather than brought down to its line spot
+# (RegionField._place_cluster_line()): `spot` is kept for its deploy
+# (deploy_from_carrier()), and it follows its seat every frame - the
+# carrier's turns and steps, through the fight's freeze - until then.
+func hold_aboard(spot: Vector3) -> void:
+	_deploy_spot = spot
+	_held_aboard = true
+	_follow_seat(true)
+
+# Whether it is held aboard in a fight (hold_aboard()), not yet deployed.
+func is_held_aboard() -> bool:
+	return _held_aboard and is_seated()
+
+# Its packmate's Signal (BattleController): off the carrier to its line
+# spot over deploy_seconds - the hop climb_down_to() makes - turning to
+# `face_point` (the Wanderer) and taking its battle turn as it goes.
+# Returns how long the move takes, for its answer to wait on; 0 when it
+# isn't held aboard.
+func deploy_from_carrier(face_point: Vector3) -> float:
+	if not is_held_aboard():
+		return 0.0
+	_held_aboard = false
+	_follow_seat(false)
+	var seconds: float = maxf(deploy_seconds, 0.01)
+	climb_down_to(_deploy_spot, seconds)
+	var to_face := Vector3(face_point.x - _deploy_spot.x, 0.0, face_point.z - _deploy_spot.z)
+	if to_face.length() > 0.0001:
+		_turn_to(atan2(-to_face.x, -to_face.z), seconds)
+	enter_battle_turn(seconds)
+	return seconds
+
+# Following its seat each frame (on) or not. SceneTree.process_frame,
+# which goes on through the field's freeze for a fight.
+func _follow_seat(on: bool) -> void:
+	if not is_inside_tree():
+		return
+	var tree := get_tree()
+	if on and not tree.process_frame.is_connected(_on_follow_seat_frame):
+		tree.process_frame.connect(_on_follow_seat_frame)
+	elif not on and tree.process_frame.is_connected(_on_follow_seat_frame):
+		tree.process_frame.disconnect(_on_follow_seat_frame)
+
+func _on_follow_seat_frame() -> void:
+	if is_seated() and not _settling:
+		_seat_on_carrier()
 
 # Its phase come (RegionField._drop_at_phase()): off what it lies on to
 # phase_drop_spot - sideways, height_offset down to the sand, a hop at
@@ -1778,6 +1845,18 @@ func return_to_field_pose(duration: float) -> void:
 		tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 		tween.tween_method(_drop_step.bind(Vector2(global_position.x, global_position.z), Vector2(_field_position.x, _field_position.z), height_offset, _field_height_offset), 0.0, 1.0, maxf(duration, 0.01))
 		_turn_to(_field_yaw, duration)
+		return
+	# A rider held aboard all fight (hold_aboard()) rides her walk back:
+	# it follows its seat as long as the walk takes, then stops.
+	if _held_aboard:
+		_held_aboard = false
+		var ride := create_tween()
+		ride.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		ride.tween_interval(maxf(duration, 0.0))
+		ride.tween_callback(func() -> void:
+			_follow_seat(false)
+			if is_seated():
+				_seat_on_carrier())
 		return
 	# A rider brought down for the fight climbs back up onto its carrier -
 	# toward its seat as the carrier walks back too, so it lands where
@@ -2434,6 +2513,8 @@ func settle_and_free() -> void:
 		return
 	_end_dig_mounds()
 	_settling = true
+	_held_aboard = false
+	_follow_seat(false)
 	mark_defeated()
 	set_highlight(false)
 	if enemy_status != null and is_instance_valid(enemy_status):

@@ -2459,7 +2459,7 @@ func _can_wake(enemy: FieldEnemy) -> bool:
 func _answer_signal(caller: FieldEnemy) -> void:
 	if caller.group == &"":
 		return
-	_deploy_aboard(caller)
+	await _deploy_aboard(caller)
 	for member in enemies.duplicate():
 		if member == caller or member.group != caller.group or member.enemy_data == null:
 			continue
@@ -2486,8 +2486,12 @@ func _answer_signal(caller: FieldEnemy) -> void:
 		enemy_intent_changed.emit(member, get_intent_preview(member))
 
 # `caller`'s living packmates still aboard (Combatant.aboard) into the
-# fight: in reach from now on - their Signal answer wakes them.
+# fight: in reach from now on - their Signal answer wakes them. Their
+# bodies come off the carrier together (FieldEnemy.deploy_from_carrier()),
+# and this waits for the longest before the answers begin.
 func _deploy_aboard(caller: FieldEnemy) -> void:
+	var longest: float = 0.0
+	var face_point: Vector3 = _wanderer.global_position if _wanderer != null else caller.global_position
 	for member in enemies:
 		if member == caller or member.group != caller.group:
 			continue
@@ -2496,6 +2500,9 @@ func _deploy_aboard(caller: FieldEnemy) -> void:
 			continue
 		combatant.aboard = false
 		RunLogger.mechanic("deployed", {"enemy": _log_id(member), "by": _log_id(caller)})
+		longest = maxf(longest, member.deploy_from_carrier(face_point))
+	if longest > 0.0:
+		await get_tree().create_timer(longest).timeout
 
 # Members still aboard (Combatant.aboard) with no living packmate left
 # that could deploy them (_can_wake() - one with a SIGNAL in its loop):

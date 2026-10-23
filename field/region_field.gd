@@ -2766,7 +2766,12 @@ func _place_cluster_line(members: Array[FieldEnemy], duration: float) -> Vector3
 	_line_stance_spacing = spacing - shift
 	for index in rest.size():
 		var spot: Vector3 = start + along * (shift + offsets[index])
-		rest[index].step_to(spot, duration)
+		# One that opens the fight aboard its carrier (EnemyData.starts_
+		# aboard, the Nettles) stays seated, its spot kept for its deploy.
+		if rest[index].is_seated() and rest[index].enemy_data != null and rest[index].enemy_data.starts_aboard:
+			rest[index].hold_aboard(spot)
+		else:
+			rest[index].step_to(spot, duration)
 		members[index + 1] = rest[index]
 	return -along
 
@@ -2876,6 +2881,10 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		if stance_direction != Vector3.ZERO:
 			face_point = anchor.global_position + stance_direction * spacing
 		for member in _battle_members:
+			# Held aboard: it turns with its seat, and on its own once it is
+			# deployed (FieldEnemy.deploy_from_carrier()).
+			if member.is_held_aboard():
+				continue
 			if not member.holds_facing:
 				member.face_toward_point(face_point, camera_rig.battle_transition_time)
 			member.enter_battle_turn(camera_rig.battle_transition_time)

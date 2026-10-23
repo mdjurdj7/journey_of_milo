@@ -863,8 +863,10 @@ func _physics_process(delta: float) -> void:
 	if mound_index >= 0:
 		target_position = target.get_mound_position(mound_index) + bar_offset
 	# Dug in, only its mounds' plates and its intent show: its own plate -
-	# HP, name, status row - hides until it surfaces.
-	visible = mound_index >= 0 or not target.is_dug_in()
+	# HP, name, status row - hides until it surfaces. Held aboard its
+	# carrier in a fight (FieldEnemy.is_held_aboard()), none until it is
+	# deployed.
+	visible = (mound_index >= 0 or not target.is_dug_in()) and not target.is_held_aboard()
 	var screen_pos: Vector2 = camera.unproject_position(target_position)
 	# Whole pixels only - a fractional Control position on a bare bar (no
 	# panel background to visually absorb it) reads as shimmer/jitter on
