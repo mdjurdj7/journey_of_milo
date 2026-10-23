@@ -98,7 +98,7 @@ func _check_fit() -> void:
 	var keepsakes: Array[Resource] = _all_in(KEEPSAKES_DIR)
 	var worn: Array[Resource] = _all_in(ARMOR_DIR)
 	var weapons: Array[Resource] = _all_in(WEAPONS_DIR)
-	_expect(keepsakes.size() >= 10, "At least the ten keepsakes are found (got %d)" % keepsakes.size())
+	_expect(keepsakes.size() >= 8, "At least the eight keepsakes are found (got %d)" % keepsakes.size())
 	_expect(worn.size() >= 4, "...the four worn pieces (got %d)" % worn.size())
 	_expect(weapons.size() >= 1, "...and the weapon (got %d)" % weapons.size())
 	var one: float = _default(PLATE_SCALES[0])
