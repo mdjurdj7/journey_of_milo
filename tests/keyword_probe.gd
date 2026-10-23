@@ -35,7 +35,7 @@ const REWARD_SCREEN_PATH := "res://battle/reward_screen.tscn"
 const REWARD_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed", "Keep", "Advance", "Hold", "Withdraw", "Burst", "Devour", "Barbed"]
 const DEFINITIONS: Dictionary = {
-	"Toll": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Each card that spends any Toll hurries every Sentence by a turn.",
+	"Toll": "Gained when you lose HP to your own cards. Kept between fights.",
 	"Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to half the largest hit.",
 	"Critical": "At or below 30% of your max HP.",
 	"Drain": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one.",
@@ -110,17 +110,15 @@ func _check_table() -> void:
 	_expect_eq(CardView._format_rules("Your Attacks deal 3 more."), "Your Attacks deal 3 more.", "Attack is plain text, not a keyword")
 	_completed += 1
 
-# Critical's threshold and Toll's carry read the run's character as it
-# stands, and the Wanderer's data with no run.
+# Critical's threshold reads the run's character as it stands, and the
+# Wanderer's data with no run.
 func _check_live_values() -> void:
 	_run_state.call("new_run", load(CHARACTER_PATH))
 	var character: CharacterData = (load(CHARACTER_PATH) as CharacterData).duplicate()
 	character.critical_hp_fraction = 0.25
-	character.toll_carry_cap = 3
 	_run_state.set("character", character)
 	var table: KeywordTable = KeywordTable.shared()
 	_expect_eq(table.definition("Critical"), "At or below 25% of your max HP.", "Critical reads the live fraction: 25%")
-	_expect_eq(table.definition("Toll"), "Gained when you lose HP to your own cards. Carries between fights; up to 3 carries to the next floor. Each card that spends any Toll hurries every Sentence by a turn.", "Toll reads the live carry cap: 3")
 	_run_state.set("character", null)
 	_expect_eq(table.definition("Critical"), DEFINITIONS["Critical"], "With no run, the Wanderer's 30%")
 	_run_state.call("new_run", load(CHARACTER_PATH))
