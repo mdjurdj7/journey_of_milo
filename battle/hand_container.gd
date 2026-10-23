@@ -488,7 +488,9 @@ func _refresh_replay_focus() -> void:
 
 # The ghost beside its focus card as it stands now (lifted, armed, still
 # travelling): its bottom level with the card's, never lower than the
-# resting hand's top less replay_ghost_hand_clear_px, kept on screen.
+# resting hand's top less replay_ghost_hand_clear_px, kept on screen. To
+# the card's right, unless that would reach past hand_right_limit_x into
+# END TURN's column (or off the screen): then to its left.
 func _place_replay_ghost() -> void:
 	if _replay_ghost == null or _replay_focus == null:
 		return
@@ -510,7 +512,7 @@ func _place_replay_ghost() -> void:
 		bottom = minf(bottom, hand_top - replay_ghost_hand_clear_px)
 	var screen: Rect2 = get_viewport_rect()
 	var x: float = focus.end.x + replay_ghost_gap_px
-	if x + face.x > screen.end.x:
+	if x + face.x > minf(screen.end.x, hand_right_limit_x):
 		x = focus.position.x - replay_ghost_gap_px - face.x
 	x = clampf(x, screen.position.x, maxf(screen.end.x - face.x, screen.position.x))
 	var y: float = maxf(bottom - face.y, screen.position.y)
