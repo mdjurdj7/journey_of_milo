@@ -13,6 +13,9 @@ const ARMED_Z_INDEX := 1001
 const REPLAY_GHOST_Z_INDEX := 1002
 # The node name of a card's key numeral (_sync_key_numerals()).
 const KEY_NUMERAL_NAME := "KeyNumeral"
+# How many hand positions have a number key (the InputMap's card_slot_1 ..
+# card_slot_10 - BattleController.key_slot()).
+const KEY_SLOT_COUNT := 10
 
 signal card_clicked(card_view: CardView)
 # A card was lifted into the armed position / returned or played from it -
@@ -980,7 +983,7 @@ func note_key_used() -> void:
 	_sync_key_numerals()
 
 # Each hand card's numeral (show_key_numerals): its position's key over
-# the first BattleController.CARD_SLOT_COUNT, none past them or before a
+# the first KEY_SLOT_COUNT, none past them or before a
 # key is used. Re-read at every reflow, so it follows the hand.
 func _sync_key_numerals() -> void:
 	if not is_inside_tree():
@@ -990,7 +993,7 @@ func _sync_key_numerals() -> void:
 	for card_view in _card_views():
 		var index: int = views.find(card_view)
 		var label: Label = card_view.get_node_or_null(KEY_NUMERAL_NAME) as Label
-		if not shown or index < 0 or index >= BattleController.CARD_SLOT_COUNT:
+		if not shown or index < 0 or index >= KEY_SLOT_COUNT:
 			if label != null:
 				label.visible = false
 			continue

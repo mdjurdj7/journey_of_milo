@@ -246,9 +246,6 @@ var _sheathe_uses_this_turn: int = 0
 # Sheathe was clicked: the next hand card clicked keeps - see sheathe().
 var _sheathe_picking: bool = false
 
-# How many hand positions have a number key (card_slot_1 .. card_slot_10).
-const CARD_SLOT_COUNT: int = 10
-
 var _hand_container: HandContainer
 var _pending_card_view: CardView = null
 # The armed card can't be played (unaffordable, blocked, nothing to land
@@ -3736,7 +3733,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _card_slot_of(event: InputEvent) -> int:
 	if not (event is InputEventKey):
 		return -1
-	for index in CARD_SLOT_COUNT:
+	for index in HandContainer.KEY_SLOT_COUNT:
 		if event.is_action_pressed("card_slot_%d" % (index + 1)):
 			return index
 	return -1
