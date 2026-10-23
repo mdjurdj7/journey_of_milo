@@ -498,7 +498,9 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		combatant.enemy_data = data
 		if data != null:
 			EnemyTurn.pick_initial_intent(combatant, data)
-			combatant.dormant = data.starts_dormant
+			# Aboard its carrier (the Nettles): dormant until deployed too.
+			combatant.aboard = data.starts_aboard
+			combatant.dormant = data.starts_dormant or data.starts_aboard
 			# Its passives (the Blackback's Fed), before the pack check
 			# below can turn one.
 			for status_data: StatusData in data.starting_statuses:
@@ -2453,9 +2455,11 @@ func _can_wake(enemy: FieldEnemy) -> bool:
 # was dormant and answers with one attack out of turn (EnemyTurn.answer_
 # signal()) - its own move and its own report, one after another. One
 # woken here takes no turn of its own this enemy turn (_signal_woken).
+# Any still aboard are deployed first, all together (_deploy_aboard()).
 func _answer_signal(caller: FieldEnemy) -> void:
 	if caller.group == &"":
 		return
+	_deploy_aboard(caller)
 	for member in enemies.duplicate():
 		if member == caller or member.group != caller.group or member.enemy_data == null:
 			continue
@@ -2480,6 +2484,45 @@ func _answer_signal(caller: FieldEnemy) -> void:
 		if player.hp <= 0:
 			return
 		enemy_intent_changed.emit(member, get_intent_preview(member))
+
+# `caller`'s living packmates still aboard (Combatant.aboard) into the
+# fight: in reach from now on - their Signal answer wakes them.
+func _deploy_aboard(caller: FieldEnemy) -> void:
+	for member in enemies:
+		if member == caller or member.group != caller.group:
+			continue
+		var combatant: Combatant = _combatants.get(member)
+		if combatant == null or combatant.hp <= 0 or not combatant.aboard:
+			continue
+		combatant.aboard = false
+		RunLogger.mechanic("deployed", {"enemy": _log_id(member), "by": _log_id(caller)})
+
+# Members still aboard (Combatant.aboard) with no living packmate left
+# that could deploy them (_can_wake() - one with a SIGNAL in its loop):
+# they fall with the last of them, never deployed - dead to the rules
+# now, their deaths held with its blow (_hold_death_for()). Run after
+# every drop (_drop_enemy()), so a carrier killed first ends the fight.
+func _fell_stranded_aboard() -> void:
+	for enemy in enemies.duplicate():
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant == null or combatant.hp <= 0 or not combatant.aboard:
+			continue
+		var carried: bool = false
+		if enemy.group != &"":
+			for other in enemies:
+				if other != enemy and other.group == enemy.group and _can_wake(other):
+					carried = true
+					break
+		if carried:
+			continue
+		combatant.hp = 0
+		RunLogger.mechanic("fell_aboard", {"enemy": _log_id(enemy)})
+		if not _pending_deaths.has(enemy):
+			_pending_deaths.append(enemy)
+		if not _fell_on.has(enemy):
+			_fell_on[enemy] = -1 if _enemy_phase else _player_turn
+		_hold_death_for(enemy, 0)
+		_drop_enemy(enemy)
 
 # Out of its dormancy: it acts from its next turn (this one, woken as the
 # enemy turn begins), and its intent shows.
@@ -3163,7 +3206,8 @@ func get_enemy_statuses(enemy: FieldEnemy) -> Array[Status]:
 # / "holds" ([display name, what it does] of its status_on_resolve /
 # status_while_queued, empty for none), "answers" (each living
 # packmate's answer to a SIGNAL: [move name, damage, its EnemyData]),
-# "waking" (how many of them sleep), "heals" (a HEAL_ALLY's living
+# "waking" (how many of them sleep), "aboard" (how many of those are
+# still aboard, Combatant.aboard), "heals" (a HEAL_ALLY's living
 # packmates' EnemyData), "under" (a DIG's first move under the sand:
 # [name, value]). Empty for no intent.
 func intent_facts(enemy: FieldEnemy) -> Dictionary:
@@ -3174,7 +3218,7 @@ func intent_facts(enemy: FieldEnemy) -> Dictionary:
 	var intent: EnemyIntent = EnemyTurn.current_intent(combatant, data)
 	if intent == null or combatant.dormant:
 		return {}
-	var facts: Dictionary = {"name": intent.intent_name, "preview": get_intent_preview(enemy), "intent": intent, "next": null, "brings": [], "brings_status": null, "holds": [], "answers": [], "waking": 0, "heals": [], "under": []}
+	var facts: Dictionary = {"name": intent.intent_name, "preview": get_intent_preview(enemy), "intent": intent, "next": null, "brings": [], "brings_status": null, "holds": [], "answers": [], "waking": 0, "aboard": 0, "heals": [], "under": []}
 	if not data.erratic_intent_selection and not combatant.dug_in and not data.intents.is_empty():
 		facts["next"] = data.intents[(combatant.current_intent_index + 1) % data.intents.size()]
 	# What lives on the intent (Braced, Garnished), and each hit as it would
@@ -3197,6 +3241,7 @@ func intent_facts(enemy: FieldEnemy) -> Dictionary:
 	if intent.type == EnemyIntent.IntentType.SIGNAL and enemy.group != &"":
 		var answers: Array = []
 		var waking: int = 0
+		var aboard: int = 0
 		# Each answer's hits as they will land (signal_answer_lists(), in
 		# the same member order).
 		# A Signal that won't go (Stunned, Delayed, a pain turn) carries none: what they
@@ -3216,6 +3261,8 @@ func intent_facts(enemy: FieldEnemy) -> Dictionary:
 				continue
 			if mate.dormant:
 				waking += 1
+			if mate.aboard:
+				aboard += 1
 			var landed: int = 0
 			if listed < lists.size():
 				for amount: int in lists[listed]:
@@ -3224,6 +3271,7 @@ func intent_facts(enemy: FieldEnemy) -> Dictionary:
 			answers.append([answer.intent_name, landed, member.enemy_data])
 		facts["answers"] = answers
 		facts["waking"] = waking
+		facts["aboard"] = aboard
 	if intent.type == EnemyIntent.IntentType.HEAL_ALLY and enemy.group != &"":
 		var heals: Array[EnemyData] = []
 		for member in enemies:
@@ -3411,6 +3459,9 @@ func _drop_enemy(enemy: FieldEnemy) -> void:
 		_clear_hover()
 	if _cursor_enemy == enemy:
 		_set_cursor_enemy(null)
+	# The last that could deploy those still aboard: they fall with it.
+	if dying != null and not dying.aboard:
+		_fell_stranded_aboard()
 	if _deferring_pack_check:
 		_pack_check_due = true
 	else:

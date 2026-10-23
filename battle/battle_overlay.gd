@@ -125,13 +125,15 @@ signal battle_finished(outcome: Outcome)
 	&"less_damage": "for %d%% less damage",
 	&"more_damage": "for %d%% more damage",
 	# "Signal: wakes 1 Nettle to Nip 2." / "...wakes 3 Nettles to Nip 2
-	# each (6)." / hits that differ: "...to Nip 0, 2 and 2 (4)." - wakes
-	# while every answerer sleeps, else calls.
+	# each (6)." / hits that differ: "...to Nip 0, 2 and 2 (4)." - brings
+	# out while every answerer is still aboard, wakes while every one
+	# sleeps, else calls.
 	&"signal_one": "%s: %s %s to %s %d.",
 	&"signal": "%s: %s %s to %s %d each (%d).",
 	&"signal_mixed": "%s: %s %s to %s (%d).",
 	&"signal_count": "%d %s",
 	&"and": " and ",
+	&"signal_brings_out": "brings out",
 	&"signal_wakes": "wakes",
 	&"signal_calls": "calls",
 	&"signal_none": "%s: calls a pack that isn't there.",
@@ -1492,8 +1494,14 @@ func _intent_hover_text(enemy: FieldEnemy) -> String:
 			var answers: Array = facts["answers"]
 			if answers.is_empty():
 				return str(lines.get(&"signal_none", "%s")) % name
-			# Wakes while every answerer sleeps; any awake, it calls them.
-			var verb: String = str(lines.get(&"signal_wakes" if int(facts["waking"]) >= answers.size() else &"signal_calls", ""))
+			# Brings out while every answerer is aboard, wakes while every one
+			# sleeps; any awake, it calls them.
+			var verb_key: StringName = &"signal_calls"
+			if int(facts.get("aboard", 0)) >= answers.size():
+				verb_key = &"signal_brings_out"
+			elif int(facts["waking"]) >= answers.size():
+				verb_key = &"signal_wakes"
+			var verb: String = str(lines.get(verb_key, ""))
 			var total: int = 0
 			var kinds: Array[EnemyData] = []
 			var alike: bool = true

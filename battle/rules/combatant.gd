@@ -272,6 +272,10 @@ var pain_turn_pending: bool = false
 # targeted and damaged as ever, and its statuses still tick; its loop
 # waits where it is.
 var dormant: bool = false
+# Not in the fight yet (EnemyData.starts_aboard - riding its carrier):
+# dormant too, and out of reach (is_out_of_reach()). A packmate's SIGNAL
+# deploys it (BattleController) - nothing else clears it.
+var aboard: bool = false
 # An enemy's own rules (BattleController sets it): what its queued intent
 # is read from where only the Combatant is to hand - whether a card that
 # marks an intent (StatusData.intent_mark - Brace, Garnish) may target it
@@ -288,9 +292,9 @@ func _init(starting_hp: int = 1) -> void:
 
 # Whether no card can reach it: no target, no damage (DamagePipeline.
 # resolve()), left out of every all-enemies effect (EffectContext.
-# enemies). The buried.
+# enemies). The buried, and the aboard.
 func is_out_of_reach() -> bool:
-	return buried
+	return buried or aboard
 
 # HP just lost to this fighter's own effect - a card's self-damage, a
 # stance's price, a status tick: the Toll it accrues, 1 per HP.

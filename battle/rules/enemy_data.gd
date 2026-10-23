@@ -37,6 +37,17 @@ func named(count: int) -> String:
 	set(value):
 		starts_dormant = value
 		emit_changed()
+# Opens every fight aboard its carrier (Combatant.aboard): not in the
+# fight yet - dormant, out of reach of every card (no target, no damage,
+# in no all-enemies effect), no plate, until a packmate's SIGNAL deploys
+# it. With nothing living in its pack able to Signal, it falls with the
+# last of them, never deployed (BattleController). The Nettles in the
+# Nettlebasket's cradle. False (every enemy by default) = in the fight
+# from the start.
+@export var starts_aboard: bool = false:
+	set(value):
+		starts_aboard = value
+		emit_changed()
 # What its readout shows while it is dormant: this status's name in the
 # status row, its description in the row's hover (BattleController.get_
 # enemy_status_labels() / get_enemy_statuses()) - display only, never on
