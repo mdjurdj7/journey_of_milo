@@ -372,6 +372,12 @@ and up the west shore north of z -27. (2026-10-17.)
 
 ## Deferred
 
+- **No walk from Region 1 into Region 2 yet.** Leaving Region 1's last
+  floor (the Greyshelf's) still ends the run, won (RunEnd). Region 2 is
+  reached only by the debug start, `--start=2:1` (RunState.debug_start),
+  until the region transition from the Greyshelf is built. RegionField
+  lists both regions (`regions`) and plays `RunState.current_region_
+  index`; nothing advances that index yet. (2026-10-23.)
 - **The Samurai is a shell; these are left as they are.** She is a
   second CharacterData (`run/data/samurai.tres`), selected by
   RegionField's `starting_character` export, with no cards, mechanics or
