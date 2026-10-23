@@ -87,4 +87,4 @@ static func payoff(link: StringName, level: int, player: Combatant) -> CardEffec
 # Whether a Lunge has `target` to land on: one living and unburied. The
 # card's own blow may have killed it - DamageEffect would hit it again.
 static func target_standing(target: Combatant) -> bool:
-	return target != null and target.hp > 0 and not target.buried
+	return target != null and target.hp > 0 and not target.is_out_of_reach()

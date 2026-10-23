@@ -10,8 +10,9 @@ class_name EffectContext
 
 var player: Combatant
 var target: Combatant = null
-# The enemies a card can reach: living and not buried (Combatant.buried).
-# A buried enemy is left out, so an all-enemies effect never counts it.
+# The enemies a card can reach: living and not out of reach (Combatant.
+# is_out_of_reach() - the buried). One out of reach is left out, so an
+# all-enemies effect never counts it.
 var enemies: Array[Combatant] = []
 var deck: Deck
 # The cards the player chose from the hand for a GRANT_KEEP (Bide), picked

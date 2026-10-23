@@ -3249,7 +3249,7 @@ func queued_intent_name(enemy: FieldEnemy) -> String:
 func _hittable_enemy_combatants() -> Array[Combatant]:
 	var hittable: Array[Combatant] = []
 	for combatant in _living_enemy_combatants():
-		if not combatant.buried:
+		if not combatant.is_out_of_reach():
 			hittable.append(combatant)
 	return hittable
 
@@ -3698,7 +3698,7 @@ func _refresh_enemy_rects() -> void:
 		# The buried can't be targeted: no rect, so no click, hover or
 		# default target lands on one - nor, for the armed card, one it
 		# may not land on (Deny on the already Delayed).
-		if combatant == null or combatant.hp <= 0 or combatant.buried:
+		if combatant == null or combatant.hp <= 0 or combatant.is_out_of_reach():
 			continue
 		# Armed for Devour alone: no enemy is a target.
 		if _pending_devour_only:

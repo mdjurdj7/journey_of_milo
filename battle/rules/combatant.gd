@@ -286,6 +286,12 @@ func _init(starting_hp: int = 1) -> void:
 	hp = starting_hp
 	max_hp = starting_hp
 
+# Whether no card can reach it: no target, no damage (DamagePipeline.
+# resolve()), left out of every all-enemies effect (EffectContext.
+# enemies). The buried.
+func is_out_of_reach() -> bool:
+	return buried
+
 # HP just lost to this fighter's own effect - a card's self-damage, a
 # stance's price, a status tick: the Toll it accrues, 1 per HP.
 # Every self-inflicted loss comes through here; an enemy's hit never

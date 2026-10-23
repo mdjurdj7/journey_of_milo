@@ -4,17 +4,17 @@ class_name DamagePipeline
 # Block first, then absorb, then - while its holder has a status that has
 # Toll pay (StatusData.toll_pays_damage - Thick Skin) - their Toll, then
 # whatever's left spills onto HP. Mutates `combatant` directly and returns
-# what happened, for the caller to report/signal. A buried combatant
-# (Combatant.buried) takes none of it - every card's damage comes through
-# here, so that is the whole of its immunity. What reaches HP counts
-# toward damage_taken_this_turn.
+# what happened, for the caller to report/signal. A combatant out of
+# reach (Combatant.is_out_of_reach() - the buried) takes none of it -
+# every card's damage comes through here, so that is the whole of its
+# immunity. What reaches HP counts toward damage_taken_this_turn.
 #
 # Toll paid here is spent, as a card's spend is (EffectContext.spend_
 # toll()): toll_spent_this_fight (Reckoning) and toll_spent_this_turn
 # (Gnaw) - logged against the status ("status:<id>") - but no card spent
 # it, so no Sentence is hurried.
 static func resolve(amount: int, combatant: Combatant) -> Dictionary:
-	if combatant.buried:
+	if combatant.is_out_of_reach():
 		return {"damage_to_hp": 0, "blocked": 0, "absorbed": 0, "tolled": 0}
 	var blocked: int = min(combatant.block, amount)
 	var after_block: int = amount - blocked

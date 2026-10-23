@@ -152,7 +152,7 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 # taunter lifts it at once. BattleController's targeting and the hand's
 # fade both ask here.
 static func can_target(card: CardData, combatant: Combatant, enemies: Array[Combatant] = []) -> bool:
-	if combatant == null or combatant.hp <= 0 or combatant.buried:
+	if combatant == null or combatant.hp <= 0 or combatant.is_out_of_reach():
 		return false
 	for effect in card.effects:
 		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.skips_next_turn:
@@ -171,7 +171,7 @@ static func can_target(card: CardData, combatant: Combatant, enemies: Array[Comb
 				return false
 	if card.card_type == CardData.CardType.ATTACK and card.target_type == CardData.TargetType.ENEMY and not is_taunting(combatant):
 		for other in enemies:
-			if other != null and other != combatant and other.hp > 0 and not other.buried and is_taunting(other):
+			if other != null and other != combatant and other.hp > 0 and not other.is_out_of_reach() and is_taunting(other):
 				return false
 	return true
 
