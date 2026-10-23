@@ -14,6 +14,7 @@ The Wanderer (v3) is made with:
         --accent-above 0.7 --accent-area 0.0005
         --pin-dark 0.06,0.06,0.07 --boot-color 0.27,0.20,0.14 --sole-shade 0.8
         --strap-color 0.27,0.20,0.14 --glove-color 0.52,0.48,0.40
+        --region-ao gloves=0.4
 and his sword with:
     python tools/paint_texture.py assets/models/wanderer/sword.glb
         assets/models/wanderer/sword_0.jpg assets/models/wanderer/sword_painted.png
@@ -38,7 +39,9 @@ default pass works on the mesh surface instead:
      --strap-color, and the gloves (non-slate at the ends of his arms,
      hands and cuffs) to --glove-color;
   6. ambient occlusion baked in Blender (tools/bake_ao_blender.py),
-     smoothed and normalised, multiplied in at --ao-strength, and a
+     smoothed and normalised, multiplied in at --ao-strength - a region
+     named in --region-ao at its own share of it (the gloves' curled
+     fingers would otherwise read dark against the cream) - and a
      top-down --gradient (lighter at the head, darker at the hem);
   7. the result is painted back into the same UV layout at --size,
      continuous (or posterised to --levels over the on-model range),
@@ -114,6 +117,13 @@ def bilinear(image, uv):
 def smoothstep(edge0, edge1, x):
     t = np.clip((x - edge0) / (edge1 - edge0), 0, 1)
     return t * t * (3 - 2 * t)
+
+
+def region_scale_arg(text):
+    name, _, value = text.partition("=")
+    if not value:
+        raise argparse.ArgumentTypeError("expected region=scale")
+    return name.strip(), float(value)
 
 
 def colour_arg(text):
@@ -330,6 +340,9 @@ def mesh_space(args):
                "straps": strap, "gloves": glove,
                "whole model": np.ones(count, bool)}
     before = {name: mean_rgb(original, vertex_area * mask) for name, mask in regions.items()}
+    # --region-ao names, by the masks above.
+    ao_regions = {"cloak": cloak, "inner": slate & ~cloak, "accents": accent, "hood": dark,
+                  "boots": boot, "straps": strap, "gloves": glove}
 
     # 6. Painted-in occlusion and light, before the recolours, so their
     # targets are the averages that end up on the model.
@@ -338,7 +351,16 @@ def mesh_space(args):
     if ao is not None:
         ao = smooth(ao, args.ao_passes)
         ao = np.clip(ao / max(np.percentile(ao, args.ao_open_percentile), 1e-4), 0, 1)
-        occlusion = 1 - args.ao_strength * (1 - ao)
+        # Per vertex: --ao-strength, times a --region-ao scale inside that
+        # region and nowhere else - unfeathered, so its neighbours (the
+        # gloves' slate sleeves) keep theirs; the region's own colour edge
+        # hides the step.
+        strength = np.full(count, args.ao_strength)
+        for name, scale in args.region_ao:
+            if name not in ao_regions:
+                raise SystemExit("--region-ao: no region '%s' (%s)" % (name, ", ".join(ao_regions)))
+            strength = np.where(ao_regions[name], strength * scale, strength)
+        occlusion = 1 - strength * (1 - ao)
         print("ao: shading factor median %.3f, 10th percentile %.3f" % (np.median(occlusion), np.percentile(occlusion, 10)))
         shade = shade * occlusion
     painted = painted * shade[:, None]
@@ -438,6 +460,8 @@ def main():
     parser.add_argument("--glove-radius", type=float, default=0.33, help="metres from the body's vertical axis beyond which is hand")
     parser.add_argument("--blender", help="Blender executable; bakes ambient occlusion when given")
     parser.add_argument("--ao-strength", type=float, default=0.35)
+    parser.add_argument("--region-ao", type=region_scale_arg, action="append", default=[],
+                        help="region=scale: that region's AO at scale x --ao-strength (gloves, boots, straps, cloak, inner, accents, hood); repeatable")
     parser.add_argument("--ao-distance", type=float, default=0.08, help="occlusion distance in metres")
     parser.add_argument("--ao-samples", type=int, default=64)
     parser.add_argument("--ao-passes", type=int, default=12, help="smoothing passes over the baked AO")
