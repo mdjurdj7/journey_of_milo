@@ -136,6 +136,16 @@ const TOLL_SPACER_CLOSE := " height=1 color=#00000000]res://assets/ui/toll_glyph
 const RUN_REGULAR := 0
 const RUN_BOLD := 1
 const RUN_MARK := 2
+const RUN_LIVE := 3
+# A number something outside the card has moved (NumberBreakdown.
+# differs()), as _resolve_tokens() leaves it: between one private-use
+# character that opens it and carries which of _marked_numbers it is
+# (LIVE_NUMBER_OPEN + index), and LIVE_NUMBER_CLOSE. The BBCode sets it in
+# live_number_font (_style_live_numbers()); everything that measures the
+# text takes the marks out first (_take_live_marks()).
+const LIVE_NUMBER_OPEN := 0xE100
+const LIVE_NUMBER_SLOTS := 0xFF
+const LIVE_NUMBER_CLOSE := 0xE0FF
 # The Energy owed next turn - the value of an effect applying an energy-
 # debt status (StatusData.energy_debt - Come Due's 2).
 const TOKEN_DEBT := "{debt}"
@@ -415,6 +425,41 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export var bonus_corner_px: float = 14.0
 @export var bonus_in_seconds: float = 0.2
 @export var bonus_out_seconds: float = 0.15
+
+@export_group("Live Numbers")
+# A number on the face that something outside the card has moved - the
+# weapon, a worn piece, the stance, a status on either side (Number
+# Breakdown) - up or down: set one weight heavier, in live_number_font,
+# with a dotted hairline under it in the same ink as the text round it
+# (the dormant ink inside a dormant clause). No other colour, no glow. A
+# number the card's own Chain or Energy scaling moved isn't marked; one no
+# outside source has touched reads as it always has. The hairline sits
+# live_hairline_offset_px below the baseline, live_hairline_dash_px of ink
+# then live_hairline_gap_px of none; a width of 0 or less draws one screen
+# pixel at any scale. Drawn by a "LiveMarks" child in the card's own
+# coordinates, so it scales with the card.
+# The BBCode names this font by its path, so the label loads the import
+# itself: its import must be MSDF, as the other card faces' copies are.
+@export var live_number_font: Font = load("res://assets/fonts/AlegreyaSans-Medium.ttf"):
+	set(value):
+		live_number_font = value
+		_relayout_rules()
+@export var live_hairline_offset_px: float = 2.0:
+	set(value):
+		live_hairline_offset_px = value
+		_redraw_live_marks()
+@export var live_hairline_dash_px: float = 1.0:
+	set(value):
+		live_hairline_dash_px = value
+		_redraw_live_marks()
+@export var live_hairline_gap_px: float = 1.5:
+	set(value):
+		live_hairline_gap_px = value
+		_redraw_live_marks()
+@export var live_hairline_width_px: float = -1.0:
+	set(value):
+		live_hairline_width_px = value
+		_redraw_live_marks()
 
 @export_group("Art Rule")
 # An ink rule round the art field, drawn over the image's outermost
@@ -731,6 +776,10 @@ var _bonus_state: CardBonus.State = CardBonus.State.NONE
 var _bonus_corner_blend: float = 0.0
 var _bonus_corner_tween: Tween = null
 var _bonus_corner: Control = null
+# Each number the face marks, by the index its LIVE_NUMBER_OPEN carries -
+# filled by _resolve_tokens(), so it always matches the text last read.
+var _marked_numbers: Array[NumberBreakdown] = []
+var _live_marks: Control = null
 var _art_style: StyleBoxFlat = null
 # The shared finish (rarity_finish_path) and this card's own material on
 # the name - made the first time a finished tier is shown, kept for reuse,
@@ -864,6 +913,11 @@ func _ready() -> void:
 	_bonus_corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_bonus_corner.draw.connect(_draw_bonus_corner)
 	add_child(_bonus_corner)
+	_live_marks = Control.new()
+	_live_marks.name = "LiveMarks"
+	_live_marks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_live_marks.draw.connect(_draw_live_marks)
+	add_child(_live_marks)
 	_keyword_reveal = KeywordSlip.new()
 	_keyword_reveal.name = "KeywordReveal"
 	_keyword_reveal.top_level = true
@@ -973,7 +1027,8 @@ func _refresh_dynamic_text() -> void:
 	# Read at the HP the card will have once its own costs are paid, so a
 	# Critical clause the payment itself reaches (Self-Eater's) already shows.
 	_bonus_state = CardBonus.state(card_data, _bonus_context.for_card_preview(_upfront_hp_cost())) if _bonus_context != null else CardBonus.State.NONE
-	rules_text.text = _inline_toll_prices(_style_bonus_clauses(_format_rules(_resolve_tokens(card_data.description))))
+	rules_text.text = _inline_toll_prices(_style_bonus_clauses(_style_live_numbers(_format_rules(_resolve_tokens(card_data.description)))))
+	_redraw_live_marks()
 	if _bonus_state != was:
 		_animate_bonus_corner()
 
@@ -982,6 +1037,7 @@ func _refresh_dynamic_text() -> void:
 # a mis-authored card reads as obviously wrong on its face instead of
 # quietly claiming it deals nothing.
 func _resolve_tokens(description: String) -> String:
+	_marked_numbers.clear()
 	var text: String = _select_context(description)
 	if text.contains(TOKEN_DAMAGE):
 		var damage: int = _effect_value(card_data, DAMAGE_EFFECT_TYPES)
@@ -1283,9 +1339,92 @@ func _land_on(blow: NumberBreakdown, all_enemies: bool) -> NumberBreakdown:
 	var enemy: Combatant = null if all_enemies else _bonus_context.target
 	return DamageEffect.land_on(blow, _bonus_context.player, enemy)
 
-# What a number token prints: `shown`'s total.
+# What a number token prints: `shown`'s total - between the live-number
+# marks (LIVE_NUMBER_OPEN) when something outside the card moved it.
 func _number_text(shown: NumberBreakdown) -> String:
-	return str(shown.total)
+	if not shown.differs() or _marked_numbers.size() >= LIVE_NUMBER_SLOTS:
+		return str(shown.total)
+	_marked_numbers.append(shown)
+	return char(LIVE_NUMBER_OPEN + _marked_numbers.size() - 1) + str(shown.total) + char(LIVE_NUMBER_CLOSE)
+
+# `text` with the live-number marks taken out, and where each marked
+# number then sits: {"text": String, "spans": Array[Vector3i]} - each span
+# (start, end, index into _marked_numbers), in text order.
+static func _take_live_marks(text: String) -> Dictionary:
+	var spans: Array[Vector3i] = []
+	var out: String = ""
+	var open_at: int = -1
+	var index: int = -1
+	for c: String in text:
+		var code: int = c.unicode_at(0)
+		if code >= LIVE_NUMBER_OPEN and code < LIVE_NUMBER_OPEN + LIVE_NUMBER_SLOTS:
+			open_at = out.length()
+			index = code - LIVE_NUMBER_OPEN
+			continue
+		if code == LIVE_NUMBER_CLOSE:
+			if open_at >= 0:
+				spans.append(Vector3i(open_at, out.length(), index))
+			open_at = -1
+			continue
+		out += c
+	return {"text": out, "spans": spans}
+
+# Each marked number as BBCode: in live_number_font, by its path (see
+# that export).
+func _style_live_numbers(bbcode: String) -> String:
+	var open: String = "[font=%s]" % live_number_font.resource_path if live_number_font != null else ""
+	var close: String = "[/font]" if not open.is_empty() else ""
+	var out: String = ""
+	for c: String in bbcode:
+		var code: int = c.unicode_at(0)
+		if code >= LIVE_NUMBER_OPEN and code < LIVE_NUMBER_OPEN + LIVE_NUMBER_SLOTS:
+			out += open
+		elif code == LIVE_NUMBER_CLOSE:
+			out += close
+		else:
+			out += c
+	return out
+
+# Whether each marked number, in text order, sits in a clause the face
+# shows dormant (as _style_bonus_clauses() inks it) - read off `resolved`,
+# _resolve_tokens()' text with its clause markers still in.
+func _live_numbers_dormant(resolved: String) -> Array[bool]:
+	var dormant_if: bool = _bonus_state == CardBonus.State.DORMANT
+	var dormant_else: bool = _bonus_state == CardBonus.State.LIVE and _bonus_replaces()
+	var out: Array[bool] = []
+	for at in resolved.length():
+		var code: int = resolved.unicode_at(at)
+		if code < LIVE_NUMBER_OPEN or code >= LIVE_NUMBER_OPEN + LIVE_NUMBER_SLOTS:
+			continue
+		var before: String = resolved.left(at)
+		var in_if: bool = before.count(MARK_IF_OPEN) > before.count(MARK_IF_CLOSE)
+		var in_else: bool = before.count(MARK_ELSE_OPEN) > before.count(MARK_ELSE_CLOSE)
+		out.append((dormant_if and in_if) or (dormant_else and in_else))
+	return out
+
+func _redraw_live_marks() -> void:
+	if _live_marks != null:
+		_live_marks.queue_redraw()
+
+# Under each marked number, its dotted hairline (see the Live Numbers
+# exports).
+func _draw_live_marks() -> void:
+	if card_data == null or _marked_numbers.is_empty():
+		return
+	var ink: Color = Color(ink_color, rules_alpha)
+	var dormant: Color = Color(bonus_dormant_ink, rules_alpha)
+	var dash: float = maxf(live_hairline_dash_px, 0.1)
+	var step: float = dash + maxf(live_hairline_gap_px, 0.0)
+	var width: float = live_hairline_width_px if live_hairline_width_px > 0.0 else -1.0
+	var numbers: Array[Dictionary] = _rules_geometry()["numbers"]
+	for entry in numbers:
+		var rect: Rect2 = entry["rect"]
+		var y: float = float(entry["baseline"]) + live_hairline_offset_px
+		var color: Color = dormant if bool(entry["dormant"]) else ink
+		var x: float = rect.position.x
+		while x < rect.end.x:
+			_live_marks.draw_line(Vector2(x, y), Vector2(minf(x + dash, rect.end.x), y), color, width)
+			x += step
 
 # Whether the damage effect a token reads - the first one, or with
 # `conditional` the first conditional one, as _effect_value() and
@@ -2133,31 +2272,41 @@ func keyword_rects() -> Array[Dictionary]:
 # keyword_rects() - an inline Toll mark answering as Toll among them - and
 # under "marks" each inline mark's own rect, where it draws: its ink - the
 # mark inline_toll_mark_height_fraction of the size tall - centred on the
-# x-height, at the start of its spacer.
+# x-height, at the start of its spacer - and under "numbers" each marked
+# number ({"index": into _marked_numbers, "rect": Rect2 - its ink's
+# width, the line's height - "baseline": float, "dormant": bool}).
 func _rules_geometry() -> Dictionary:
 	var found: Array[Dictionary] = []
 	var marks: Array[Rect2] = []
-	var geometry: Dictionary = {"keywords": found, "marks": marks}
+	var numbers: Array[Dictionary] = []
+	var geometry: Dictionary = {"keywords": found, "marks": marks, "numbers": numbers}
 	if card_data == null or rules_text == null:
 		return geometry
 	var text: String = rules_text.get_parsed_text()
 	# The label reads each inline mark's image as one character of its
 	# own; the plain text says which.
-	var plain: String = _strip_markers(_resolve_tokens(card_data.description))
+	var resolved: String = _resolve_tokens(card_data.description)
+	var taken: Dictionary = _take_live_marks(_strip_markers(resolved))
+	var plain: String = taken["text"]
+	var live: Array[Vector3i] = []
+	if plain.length() == text.length():
+		live = taken["spans"]
+	var dormant: Array[bool] = _live_numbers_dormant(resolved)
 	if plain.length() == text.length() and plain.contains(TOLL_MARK_CHAR):
 		var at: int = plain.find(TOLL_MARK_CHAR)
 		while at >= 0:
 			text = text.substr(0, at) + TOLL_MARK_CHAR + text.substr(at + 1)
 			at = plain.find(TOLL_MARK_CHAR, at + 1)
 	var has_mark: bool = text.contains(TOLL_MARK_CHAR)
-	if KEYWORDS.is_empty() and not has_mark:
+	if KEYWORDS.is_empty() and not has_mark and live.is_empty():
 		return geometry
 	var regular: Font = rules_text.get_theme_font("normal_font")
 	var bold: Font = rules_text.get_theme_font("bold_font")
+	var live_font: Font = live_number_font if live_number_font != null else regular
 	var font_size: int = rules_text.get_theme_font_size("normal_font_size")
 	var keyword: RegEx = KeywordTable.shared().pattern()
 	var matches: Array[RegExMatch] = keyword.search_all(text)
-	if matches.is_empty() and not has_mark:
+	if matches.is_empty() and not has_mark and live.is_empty():
 		return geometry
 	var mark_size: Vector2 = _inline_toll_mark_size(font_size)
 	var x_middle: float = regular.get_ascent(font_size) + _cap_top(rules_font, font_size, "x") / 2.0
@@ -2175,36 +2324,60 @@ func _rules_geometry() -> Dictionary:
 		for found_match in matches:
 			if found_match.get_start() < start or found_match.get_end() > span.y:
 				continue
-			var x: float = left + _shaped_width(text, start, found_match.get_start(), matches, regular, bold, font_size)
+			var x: float = left + _shaped_width(text, start, found_match.get_start(), matches, regular, bold, font_size, live, live_font)
 			var width: float = bold.get_string_size(found_match.get_string(), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 			found.append({"keyword": found_match.get_string(1), "rect": Rect2(x, y, width, height).grow(KEYWORD_HIT_PAD_PX)})
+		for k in live.size():
+			var number: Vector3i = live[k]
+			if number.x < start or number.y > span.y:
+				continue
+			var x: float = left + _shaped_width(text, start, number.x, matches, regular, bold, font_size, live, live_font)
+			var width: float = live_font.get_string_size(text.substr(number.x, number.y - number.x), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			numbers.append({
+				"index": number.z,
+				"rect": Rect2(x, y, width, height),
+				"baseline": y + regular.get_ascent(font_size),
+				"dormant": k < dormant.size() and dormant[k],
+			})
 		var mark_at: int = text.find(TOLL_MARK_CHAR, start)
 		while mark_at >= 0 and mark_at < span.y:
-			var x: float = left + _shaped_width(text, start, mark_at, matches, regular, bold, font_size)
+			var x: float = left + _shaped_width(text, start, mark_at, matches, regular, bold, font_size, live, live_font)
 			var rect := Rect2(Vector2(x, y + x_middle - mark_size.y / 2.0) + inline_toll_mark_offset_px, mark_size)
 			marks.append(rect)
 			found.append({"keyword": TOLL_KEYWORD, "rect": rect.grow(KEYWORD_HIT_PAD_PX)})
 			mark_at = text.find(TOLL_MARK_CHAR, mark_at + 1)
 	return geometry
 
-# The width of text[from, to) on one line, keywords in Bold as drawn.
-func _shaped_width(text: String, from: int, to: int, matches: Array[RegExMatch], regular: Font, bold: Font, font_size: int) -> float:
+# The width of text[from, to) on one line, keywords in Bold and marked
+# numbers (`live`) in `live_font` as drawn.
+func _shaped_width(text: String, from: int, to: int, matches: Array[RegExMatch], regular: Font, bold: Font, font_size: int, live: Array[Vector3i] = [], live_font: Font = null) -> float:
 	var line := TextLine.new()
 	var spacer: Vector2 = Vector2(float(_toll_spacer_width(font_size)), 1.0)
-	for run: Vector3i in _rules_runs(text, from, to, matches):
+	for run: Vector3i in _rules_runs(text, from, to, matches, live):
 		if run.z == RUN_MARK:
 			line.add_object("toll_mark_%d" % run.x, spacer, INLINE_ALIGNMENT_CENTER, 1)
 		else:
-			line.add_string(text.substr(run.x, run.y - run.x), bold if run.z == RUN_BOLD else regular, font_size)
+			line.add_string(text.substr(run.x, run.y - run.x), _run_font(run.z, regular, bold, live_font), font_size)
 	return line.get_line_width()
 
+# The font a run of kind `kind` (RUN_*) sets in.
+static func _run_font(kind: int, regular: Font, bold: Font, live_font: Font) -> Font:
+	if kind == RUN_BOLD:
+		return bold
+	if kind == RUN_LIVE and live_font != null:
+		return live_font
+	return regular
+
 # text[from, to) as the face sets it, in runs (start, end, RUN_*): bold
-# on keywords (`matches`), an inline Toll price's mark (TOLL_MARK_CHAR) an
+# on keywords (`matches`), a marked number (`live` - _take_live_marks()'
+# spans) in the live font, an inline Toll price's mark (TOLL_MARK_CHAR) an
 # object of its own, regular between.
-static func _rules_runs(text: String, from: int, to: int, matches: Array[RegExMatch]) -> Array[Vector3i]:
+static func _rules_runs(text: String, from: int, to: int, matches: Array[RegExMatch], live: Array[Vector3i] = []) -> Array[Vector3i]:
 	var marks: Array[Vector3i] = []
 	for found_match in matches:
 		marks.append(Vector3i(found_match.get_start(), found_match.get_end(), RUN_BOLD))
+	for number in live:
+		marks.append(Vector3i(number.x, number.y, RUN_LIVE))
 	var mark: int = text.find(TOLL_MARK_CHAR)
 	while mark >= 0:
 		marks.append(Vector3i(mark, mark + 1, RUN_MARK))
@@ -2865,6 +3038,10 @@ func _apply_layout() -> void:
 		_bonus_corner.position = Vector2.ZERO
 		_bonus_corner.size = face
 		_bonus_corner.queue_redraw()
+	if _live_marks != null:
+		_live_marks.position = Vector2.ZERO
+		_live_marks.size = face
+		_live_marks.queue_redraw()
 	if _art_rule != null:
 		_art_rule.position = Vector2.ZERO
 		_art_rule.size = face
@@ -3139,15 +3316,19 @@ func _rules_wrap(font_size: int, width: float) -> Array[PackedStringArray]:
 	var keyword: RegEx = KeywordTable.shared().pattern()
 	var plain: String = _strip_markers(_resolve_tokens(card_data.description)).strip_edges()
 	var spacer: Vector2 = Vector2(float(_toll_spacer_width(font_size)), 1.0)
-	for text in plain.split("\n"):
+	for marked in plain.split("\n"):
+		# A marked number sets in the live font, as the label draws it.
+		var taken: Dictionary = _take_live_marks(marked)
+		var text: String = taken["text"]
+		var live: Array[Vector3i] = taken["spans"]
 		var paragraph := TextParagraph.new()
 		paragraph.width = width
 		paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
-		for run: Vector3i in _rules_runs(text, 0, text.length(), keyword.search_all(text)):
+		for run: Vector3i in _rules_runs(text, 0, text.length(), keyword.search_all(text), live):
 			if run.z == RUN_MARK:
 				paragraph.add_object("toll_mark_%d" % run.x, spacer, INLINE_ALIGNMENT_CENTER, 1)
 			else:
-				paragraph.add_string(text.substr(run.x, run.y - run.x), bold if run.z == RUN_BOLD else rules_font, font_size)
+				paragraph.add_string(text.substr(run.x, run.y - run.x), _run_font(run.z, rules_font, bold, live_number_font), font_size)
 		if text.is_empty():
 			paragraph.add_string(text, rules_font, font_size)
 		var lines := PackedStringArray()

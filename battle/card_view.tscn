@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://battle/card_view.gd" id="1_card_view"]
+[ext_resource type="FontFile" uid="uid://ci5fsv1n63mtv" path="res://assets/fonts/AlegreyaSans-Medium.ttf" id="2_live_font"]
 
 [node name="CardView" type="Panel"]
 script = ExtResource("1_card_view")
@@ -9,6 +10,11 @@ keep_mark_font_size_px = 11
 keep_mark_rule_gap_px = 6.0
 keep_mark_rule_width_px = 1.0
 keep_mark_label_gap_px = 3.0
+live_number_font = ExtResource("2_live_font")
+live_hairline_offset_px = 2.0
+live_hairline_dash_px = 1.0
+live_hairline_gap_px = 1.5
+live_hairline_width_px = -1.0
 
 [node name="ShadowSoft" type="Panel" parent="."]
 show_behind_parent = true
