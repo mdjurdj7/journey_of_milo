@@ -372,12 +372,20 @@ and up the west shore north of z -27. (2026-10-17.)
 
 ## Deferred
 
-- **No walk from Region 1 into Region 2 yet.** Leaving Region 1's last
-  floor (the Greyshelf's) still ends the run, won (RunEnd). Region 2 is
-  reached only by the debug start, `--start=2:1` (RunState.debug_start),
-  until the region transition from the Greyshelf is built. RegionField
-  lists both regions (`regions`) and plays `RunState.current_region_
-  index`; nothing advances that index yet. (2026-10-23.)
+- **Region 1 goes on into Region 2 by the ordinary floor transition.**
+  Leaving Region 1's last floor (the Greyshelf's) loads Region 2's floor 1
+  the way any floor change does - the look-up toward the tower, the fade,
+  the reload - with the run carried (deck, HP, gold, the rng; Toll down to
+  its carry cap); the run is won only past the last region's last floor
+  (RegionField._on_floor_exited()). The full region transition is
+  deferred: the night fade, the world-voice line, the ~30% heal and the
+  zone intro with the region's name. Two things still key on the floor
+  index within a region, not the run's depth:
+  - **Fight card rarity** (RegionField.fight_rarity_rates()) reads the
+    region's floor number, so Region 2's floor 1 rolls floor 1's rates.
+  - **The tower** grows with RunState.floors_crossed instead, so it stays
+    at least as big in Region 2; Region 2's own tower look is open.
+  (2026-10-23.)
 - **Region 2 floor 1's reeds and pier are placeholders.** The floor is
   wired from its generator (`assets/field/masks/source/region2_floor1/`:
   `floor1_layout.json` and the masks beside region 1's). Left for later:
