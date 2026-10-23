@@ -243,8 +243,16 @@ var mounds: Array[int] = []
 var mound_guards: Array[Combatant] = []
 var true_mound: int = -1
 # A mound's own Combatant (mound_guards above): the enemy under the row
-# and which mound this is. Null / -1 for any other fighter.
-var mound_owner: Combatant = null
+# and which mound this is. Null / -1 for any other fighter. Held weakly:
+# the enemy holds its mounds (mound_guards), and a strong reference back
+# would keep both alive forever, the enemy's data with them. Null once
+# the enemy is gone.
+var mound_owner: Combatant:
+	get:
+		return _mound_owner_ref.get_ref() as Combatant if _mound_owner_ref != null else null
+	set(value):
+		_mound_owner_ref = weakref(value) if value != null else null
+var _mound_owner_ref: WeakRef = null
 var mound_index: int = -1
 # What the last hit through DamagePipeline.resolve() took past this
 # fighter's HP - a broken mound's, carried into the enemy under it.
