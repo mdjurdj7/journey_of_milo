@@ -748,6 +748,23 @@ func _on_card_view_clicked(_card_data: CardData, card_view: CardView) -> void:
 func get_rest_top_y() -> float:
 	return global_position.y - fan_arc_height + (card_size.y - hand_rest_visible_height) + card_size.y * (1.0 - hand_card_scale)
 
+# Global Y of the highest a hovered hand card reaches: the centre card at
+# hand_card_scale, lifted its hover_lift and grown its hover_scale about
+# its bottom centre - and, `with_keep_mark`, its KEEP mark over it
+# (CardView.keep_mark_height()). What a line over the hand has to clear
+# while the hand is hovered; the rest top with no card in the hand.
+func get_hover_reach_y(with_keep_mark: bool = false) -> float:
+	var views: Array[CardView] = _card_views()
+	if views.is_empty():
+		return get_rest_top_y()
+	var view: CardView = views[0]
+	var rest_bottom: float = get_rest_top_y() + card_size.y * hand_card_scale
+	var hovered_scale: float = hand_card_scale * view.hover_scale
+	var top: float = rest_bottom - view.hover_lift * hand_card_scale - card_size.y * hovered_scale
+	if with_keep_mark:
+		top -= view.keep_mark_height() * hovered_scale
+	return top
+
 # Fades every card the player can't currently afford (see CardView.
 # set_playable()) - called on BattleController.energy_changed, and
 # applied to cards drawn afterwards too.

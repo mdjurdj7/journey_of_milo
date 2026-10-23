@@ -512,8 +512,9 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export_range(0.0, 1.0) var armed_bottom_y_fraction: float = 0.86
 # Armed for a hand choice (Bide's set-aside, lift_and_hold(true)): higher,
 # clear of the resting hand, so every card it asks about stays in sight
-# and in reach of the cursor.
-@export_range(0.0, 1.0) var choice_armed_bottom_y_fraction: float = 0.66
+# and in reach of the cursor - and of the keep's prompt line over the
+# hand's hover reach (BattleOverlay.keep_prompt_*). Read as it arms.
+@export_range(0.0, 1.0) var choice_armed_bottom_y_fraction: float = 0.63
 @export var armed_duration_sec: float = 0.18
 # Lifted (hover or armed), the frame goes to full ink at this width - 1:
 # the lift is said by the shadow, not by a heavier edge.
@@ -1800,6 +1801,11 @@ func set_marked(marked: bool) -> void:
 
 func is_marked() -> bool:
 	return _marked
+
+# How far a KEEP mark reaches over this card's top edge, in 1x px: none
+# yet - the prompt over the hand clears the hover alone.
+func keep_mark_height() -> float:
+	return 0.0
 
 func _place_mark_rule() -> void:
 	if _mark_rule == null:

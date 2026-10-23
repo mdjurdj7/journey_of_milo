@@ -16,6 +16,8 @@ theme = ExtResource("3_theme")
 script = ExtResource("1_overlay")
 energy_group_offset = Vector2(-246.75, 12)
 sand_puff_tint = 0.75
+keep_prompt_font_size_px = 15
+keep_prompt_gap_px = 10.0
 
 [node name="HandContainer" type="Control" parent="." unique_id=524001564]
 anchors_preset = 0

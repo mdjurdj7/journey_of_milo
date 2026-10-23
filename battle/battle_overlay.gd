@@ -195,6 +195,37 @@ signal battle_finished(outcome: Outcome)
 		choice_prompt_tracking_em = value
 		_style_choice_prompt()
 @export var choice_prompt_gap_px: float = 12.0
+# A keep (KEEP - Frayed Cord's at the turn's end, Bide's) says why and
+# how many instead: keep_prompt_format with what asks (the keepsake's or
+# the card's name, in caps), the count and keep_prompt_card_word (one) or
+# keep_prompt_cards_word (more) - the same line however many are marked,
+# their marks and the confirm saying the rest. keep_prompt_font_size_px,
+# in the same tracked caps, centred over the hand, its bottom keep_
+# prompt_gap_px over the highest a hovered card and its KEEP mark reach
+# (HandContainer.get_hover_reach_y()) - so no hover covers it, and Bide,
+# held over the hand (CardView.choice_armed_bottom_y_fraction), clears
+# it.
+@export var keep_prompt_format: String = "%s · CHOOSE %d %s TO KEEP FOR NEXT TURN":
+	set(value):
+		keep_prompt_format = value
+		_refresh_choice_prompt()
+@export var keep_prompt_card_word: String = "CARD":
+	set(value):
+		keep_prompt_card_word = value
+		_refresh_choice_prompt()
+@export var keep_prompt_cards_word: String = "CARDS":
+	set(value):
+		keep_prompt_cards_word = value
+		_refresh_choice_prompt()
+@export var keep_prompt_font_size_px: int = 15:
+	set(value):
+		keep_prompt_font_size_px = value
+		_style_choice_prompt()
+		_refresh_choice_prompt()
+@export var keep_prompt_gap_px: float = 10.0:
+	set(value):
+		keep_prompt_gap_px = value
+		_place_choice_prompt()
 
 @export_group("Corners")
 # The fixed readouts' inset from the viewport's edges: bottom-left the
@@ -376,8 +407,11 @@ var _choice_prompt: Label = null
 var _choice_card_name: String = ""
 var _choice_verb: String = ""
 # What asks for the open choice (BattleController.hand_choice_started's
-# `source`): the armed card's name, or the keepsake's.
+# `source`): the armed card's name, or the keepsake's. And the last count
+# shown, for a live edit to redraw the line.
 var _choice_source: String = ""
+var _choice_marked_count: int = 0
+var _choice_cap: int = 0
 # The open choice's DONE (choice_done_text), made with the first choice
 # that has one; hidden while none is open or the open one has none.
 var _choice_done: EndTurnButton = null
@@ -1139,14 +1173,30 @@ func _on_hand_choice_started(confirm_label: String, _cap: int, verb: String, don
 		_choice_done.visible = done
 
 func _on_hand_choice_changed(marked: int, cap: int) -> void:
-	if _choice_prompt == null:
+	_choice_marked_count = marked
+	_choice_cap = cap
+	_refresh_choice_prompt()
+
+# The open choice's line: a keep's why and how many (keep_prompt_format),
+# any other's verb and what's left (choice_prompt_format), then what
+# confirms it when that's elsewhere.
+func _refresh_choice_prompt() -> void:
+	if _choice_prompt == null or not _choice_prompt.visible:
 		return
-	var line: String = choice_prompt_format % [_choice_verb, maxi(cap - marked, 0)]
-	if _choice_card_name != "":
-		line += choice_confirm_format % _choice_card_name.to_upper()
+	var line: String = ""
+	if _is_keep_choice():
+		line = keep_prompt_format % [_choice_source.to_upper(), _choice_cap, keep_prompt_card_word if _choice_cap == 1 else keep_prompt_cards_word]
+	else:
+		line = choice_prompt_format % [_choice_verb, maxi(_choice_cap - _choice_marked_count, 0)]
+		if _choice_card_name != "":
+			line += choice_confirm_format % _choice_card_name.to_upper()
 	_choice_prompt.text = line
 	_choice_prompt.size = Vector2.ZERO
 	_place_choice_prompt()
+
+# A keep - Frayed Cord's or Bide's - not a pick that goes on by itself.
+func _is_keep_choice() -> bool:
+	return _choice_verb == "KEEP"
 
 func _on_hand_choice_ended() -> void:
 	_choice_card_name = ""
@@ -1158,20 +1208,27 @@ func _on_hand_choice_ended() -> void:
 func _style_choice_prompt() -> void:
 	if _choice_prompt == null:
 		return
-	_choice_prompt.add_theme_font_override("font", InkType.tracked(InkType.text_bold_font(), choice_prompt_font_size_px, choice_prompt_tracking_em))
-	_choice_prompt.add_theme_font_size_override("font_size", choice_prompt_font_size_px)
+	var size_px: int = keep_prompt_font_size_px if _is_keep_choice() else choice_prompt_font_size_px
+	_choice_prompt.add_theme_font_override("font", InkType.tracked(InkType.text_bold_font(), size_px, choice_prompt_tracking_em))
+	_choice_prompt.add_theme_font_size_override("font_size", size_px)
 	_choice_prompt.add_theme_color_override("font_color", get_theme_color("ink", "Battle"))
 
-# Centred over the armed card's top edge, followed every frame while the
-# card travels to its armed pose. With no card armed (the end-of-turn
-# keep), centred over the hand's resting top edge instead.
+# A keep's line: centred over the hand, keep_prompt_gap_px over the
+# highest a hovered card and its KEEP mark reach. Any other's: centred
+# over the armed card's top edge, followed every frame while the card
+# travels to its armed pose - or with none armed (Weathered Map's pick),
+# over the hand's resting top edge.
 func _place_choice_prompt() -> void:
 	if _choice_prompt == null or not _choice_prompt.visible or battle_controller == null:
 		return
 	var card: CardView = battle_controller.get_choosing_card_view()
 	var centre_x: float = hand_container.get_global_rect().get_center().x
 	var top_y: float = hand_container.get_rest_top_y()
-	if card != null:
+	var gap: float = choice_prompt_gap_px
+	if _is_keep_choice():
+		top_y = hand_container.get_hover_reach_y(true)
+		gap = keep_prompt_gap_px
+	elif card != null:
 		var rect: Rect2 = card.get_global_rect()
 		centre_x = rect.get_center().x
 		top_y = rect.position.y
@@ -1181,7 +1238,7 @@ func _place_choice_prompt() -> void:
 	if done_shown:
 		width += choice_done_gap_px + _choice_done.size.x
 	var left: float = centre_x - width / 2.0
-	_choice_prompt.global_position = Vector2(left, top_y - choice_prompt_gap_px - _choice_prompt.size.y)
+	_choice_prompt.global_position = Vector2(left, top_y - gap - _choice_prompt.size.y)
 	if done_shown:
 		_choice_done.global_position = Vector2(left + _choice_prompt.size.x + choice_done_gap_px, _choice_prompt.global_position.y + (_choice_prompt.size.y - _choice_done.size.y) / 2.0)
 

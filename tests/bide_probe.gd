@@ -164,7 +164,7 @@ func _check_choose_two() -> void:
 		await _deal(controller, RECKONING_PATH)
 		var bide: CardData = await _deal(controller, BIDE_PATH)
 		controller.call("request_play", _view(controller, bide))
-		_expect(_prompt_text().begins_with("KEEP"), "The picker opens: %s" % _prompt_text())
+		_expect(_prompt_text().contains("TO KEEP"), "The picker opens: %s" % _prompt_text())
 		controller.call("toggle_choice", _view(controller, slash))
 		controller.call("toggle_choice", _view(controller, brace))
 		controller.call("confirm_choice")

@@ -29,8 +29,8 @@ const BRACE_PATH := "res://cards/data/brace.tres"
 const SEARCH_ROOTS: Array[String] = ["res://run", "res://battle", "res://field", "res://floors"]
 const TURN_DRAW := 5
 const HAND_LIMIT := 10
-const PROMPT_OPEN := "KEEP  ·  1 LEFT  ·  CLICK END TURN TO CONFIRM"
-const PROMPT_MARKED := "KEEP  ·  0 LEFT  ·  CLICK END TURN TO CONFIRM"
+const PROMPT_OPEN := "FRAYED CORD · CHOOSE 1 CARD TO KEEP FOR NEXT TURN"
+const PROMPT_MARKED := "FRAYED CORD · CHOOSE 1 CARD TO KEEP FOR NEXT TURN"
 const SAFETY_SECONDS := 300.0
 
 var _run_state: Node = null
@@ -119,7 +119,7 @@ func _check_keep_one() -> void:
 		var kept: CardData = view.get("card_data")
 		controller.call("toggle_choice", view)
 		_expect(bool(view.call("is_marked")), "...a click marks a card")
-		_expect_eq(_prompt_text(), PROMPT_MARKED, "...the prompt counts it")
+		_expect_eq(_prompt_text(), PROMPT_MARKED, "...the prompt holds as it is")
 		controller.call("toggle_choice", _views(controller)[0])
 		_expect_eq(_marked_count(controller), 1, "...and a second mark past the cap does nothing")
 		var discarded_copies: int = _count(deck.get("hand"), kept) - 1

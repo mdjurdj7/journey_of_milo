@@ -4,6 +4,7 @@
 
 [node name="CardView" type="Panel"]
 script = ExtResource("1_card_view")
+choice_armed_bottom_y_fraction = 0.63
 
 [node name="ShadowSoft" type="Panel" parent="."]
 show_behind_parent = true
