@@ -195,12 +195,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -100)
 
 [node name="Wanderer" type="CharacterBody3D" parent="." unique_id=577093166 groups=["wanderer"]]
 script = ExtResource("6")
-move_speed = 5.0
+move_speed = 5.5
 acceleration = 55.0
 deceleration = 55.0
 rotation_speed = 25.0
 stance_walk_speed = 5.0
 run_speed = 8.9
+walk_animation_speed = 5.0
+run_animation_speed = 8.9
 battle_exit_blend = 0.4
 battle_camera_turn_degrees = 30.0
 sword_length = 1.5

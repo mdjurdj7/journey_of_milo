@@ -65,7 +65,9 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.p
 # The sword exports a weapon's fit can set (WeaponData.field_fit()).
 const SWORD_FIT_PROPERTIES: Array[StringName] = [&"sword_length", &"grip_fraction", &"grip_axis_flip", &"hand_mount_position", &"hand_mount_rotation_degrees", &"back_mount_position", &"back_mount_rotation_degrees"]
 
-@export var move_speed: float = 4.5
+@export var move_speed: float = 4.5:
+	set(value):
+		move_speed = value
 # His speed toward what the keys (or a click) ask, metres a second per
 # second, and back down when they let go or ask for less (a run let go).
 # His direction is the keys' at once - only his speed ramps - so turning
@@ -89,6 +91,18 @@ const SWORD_FIT_PROPERTIES: Array[StringName] = [&"sword_length", &"grip_fractio
 @export var run_speed: float = 8.9:
 	set(value):
 		run_speed = value
+# The ground speed each clip plays at its own pace: Walk and Run play
+# at his speed over these (each its own playback - AnimationPlayer.play()'s
+# custom speed - so the hit-stop's hold, which stops the player as a whole,
+# still stops them, and the fight's clips are never sped up). Set to the
+# speeds they were tuned at, not their feet's: the clips are cut for a
+# slower pace than his, so matching the feet would set them racing.
+@export var walk_animation_speed: float = 5.0:
+	set(value):
+		walk_animation_speed = value
+@export var run_animation_speed: float = 8.9:
+	set(value):
+		run_animation_speed = value
 # The walk to a fight's stance round what stands in the way (enter_battle_
 # stance_along()), metres a second - its own pace, not move_speed, so the
 # field walk's speed never retimes a fight's opening. Read as the walk is
@@ -561,6 +575,9 @@ var _grounding_mixer: AnimationMixer = null
 var _camera: Camera3D
 # Running this frame: the run action held with somewhere to go.
 var _running: bool = false
+# The playback speed Walk or Run was last played at (walk_/run_animation_
+# speed), so it's only re-set when it moves.
+var _clip_speed: float = 1.0
 
 var _has_move_target: bool = false
 var _move_target: Vector3 = Vector3.ZERO
@@ -2528,7 +2545,9 @@ func _play_stance_walk(on: bool) -> void:
 			_animation_tree.set("parameters/blend_position", move_speed if on else 0.0)
 	elif _animation_player and _animation_player.has_animation(&"Walk"):
 		if on:
-			_animation_player.play("Walk", animation_blend_time)
+			# At the pace its own speed asks of the clip, as the field's walk.
+			_clip_speed = stance_walk_speed / maxf(walk_animation_speed, 0.1)
+			_animation_player.play("Walk", animation_blend_time, _clip_speed)
 
 # In a fight, his body turned to face `point` over duration - an enemy
 # that has moved (FieldEnemy.drop_off()). The model keeps its battle turn.
@@ -3181,11 +3200,17 @@ func _physics_process(delta: float) -> void:
 		# only spans 0..move_speed and models continuous Idle<->Walk
 		# blending, not a hard cut into a separate clip.
 		var next_animation: String
+		var clip_speed: float = 1.0
 		if _running:
 			next_animation = "Run"
+			clip_speed = planar_speed / maxf(run_animation_speed, 0.1)
 		elif planar_speed > walk_speed_threshold:
 			next_animation = "Walk"
+			clip_speed = planar_speed / maxf(walk_animation_speed, 0.1)
 		else:
 			next_animation = "Idle"
-		if _animation_player.current_animation != next_animation:
-			_animation_player.play(next_animation, animation_blend_time)
+		# A clip already playing takes a new speed in place (play() carries
+		# it on from where it is).
+		if _animation_player.current_animation != next_animation or absf(clip_speed - _clip_speed) > 0.01:
+			_animation_player.play(next_animation, animation_blend_time, clip_speed)
+			_clip_speed = clip_speed
