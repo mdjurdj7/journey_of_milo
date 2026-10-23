@@ -79,6 +79,8 @@ var resolving_card: CardData = null
 # Whether this card's attack bonus has been handed out already - see
 # take_attack_bonus(). Cleared per card by resolve_card().
 var attack_bonus_taken: bool = false
+# The same for its Block bonus - see take_block_bonus().
+var block_bonus_taken: bool = false
 # Whether this card has actually spent Toll (spend_toll()) - what hurries
 # a countdown, once per card. Cleared per card by resolve_card().
 var toll_spent_this_card: bool = false
@@ -169,6 +171,15 @@ func take_attack_bonus() -> int:
 	# took it - whether or not the blow lands on anyone.
 	Status.spend_attack_bonus_charges(player.statuses, player.is_critical())
 	return bonus
+
+# The worn piece's Block for the card being resolved, ONCE: the first
+# Block effect to ask gets it (Combatant.take_basic_defence_bonus() - the
+# class's basic defence card's, counting the play), every later one 0.
+func take_block_bonus() -> int:
+	if block_bonus_taken:
+		return 0
+	block_bonus_taken = true
+	return player.take_basic_defence_bonus(resolving_card) if player != null else 0
 
 # The attack bonus for a REPEATED hit of the card being resolved (Card
 # Effect.repeat_per_earlier_play_tag - Lash): the ongoing part alone (Attack

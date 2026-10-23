@@ -1023,6 +1023,10 @@ func _resolve_tokens(description: String) -> String:
 		if block >= 0:
 			block += _chain_bonus(BLOCK_EFFECT_TYPES)
 			block += _energy_bonus(BLOCK_EFFECT_TYPES)
+			# The worn piece's Block on the class's basic defence card at
+			# this fight's count (the Harness) - what BlockEffect will add.
+			if _bonus_context != null and _bonus_context.player != null:
+				block += _bonus_context.player.basic_defence_bonus_for(card_data)
 			text = text.replace(TOKEN_BLOCK, str(0 if no_block else block))
 	if text.contains(TOKEN_ALT_BLOCK) or text.contains(TOKEN_BONUS_BLOCK):
 		var bonus_block: int = _bonus_effect_value(card_data, BLOCK_EFFECT_TYPES)

@@ -84,6 +84,15 @@ class_name TrinketData
 #                        its attack and mark bonuses and before the
 #                        enemy's Covered/Exposed and Block; spent once that
 #                        Attack card has resolved, whatever it dealt
+#   basic_defence_block_start, _step, _cap  the class's basic defence card
+#                        (CharacterData.basic_defence_card - Endure, the
+#                        Samurai's Stillness) gains Block each time it is
+#                        played this fight: start on the first play, step
+#                        more on each after, never past cap (0 = no cap) -
+#                        taken as its first Block effect resolves
+#                        (EffectContext.take_block_bonus()), counted on the
+#                        fight's Combatant, so it starts again each fight.
+#                        Read live from this resource. 0 start = none
 #
 # Every hook reads both slots (RunState.held_pieces()), so any field works
 # in either; the worn ones are written for armor.
@@ -114,6 +123,10 @@ enum Slot { KEEPSAKE, WORN }
 #   {cost_nth}  discount_on_card_count as an ordinal ("third")
 #   {cost_cut}  card_count_discount
 #   {skill_draw}  draw_on_skill_after_attack
+#   {defence}  the run's basic defence card by name (RunState.character's
+#            basic_defence_card), else "basic defence card"
+#   {start}  basic_defence_block_start   {step}  basic_defence_block_step
+#   {cap}    basic_defence_block_cap
 #   {s}      "s" unless the count token before it is 1
 @export_multiline var description: String = ""
 # The shortened line for where it's shown small - the "currently held"
@@ -188,6 +201,22 @@ enum Slot { KEEPSAKE, WORN }
 	set(value):
 		first_attack_multiplier = value
 		emit_changed()
+@export var basic_defence_block_start: int = 0:
+	set(value):
+		basic_defence_block_start = value
+		emit_changed()
+@export var basic_defence_block_step: int = 0:
+	set(value):
+		basic_defence_block_step = value
+		emit_changed()
+@export var basic_defence_block_cap: int = 0:
+	set(value):
+		basic_defence_block_cap = value
+		emit_changed()
+
+# What {defence} reads with no run character, or one with no basic
+# defence card.
+const DEFENCE_FALLBACK := "basic defence card"
 
 # The status first_attack_multiplier puts on as the fight opens - its
 # magnitude set from the multiplier, so the number lives here.
@@ -200,6 +229,27 @@ func find_name() -> String:
 
 func describe() -> String:
 	return _fill(description)
+
+# The Block the basic defence card gains on its next play, `plays` plays
+# into the fight: basic_defence_block_start, basic_defence_block_step more
+# for each play before, capped at basic_defence_block_cap (0 = none). 0
+# when this piece upgrades nothing.
+func basic_defence_block_bonus(plays: int) -> int:
+	if basic_defence_block_start <= 0:
+		return 0
+	var bonus: int = basic_defence_block_start + basic_defence_block_step * maxi(plays, 0)
+	return mini(bonus, basic_defence_block_cap) if basic_defence_block_cap > 0 else bonus
+
+# The run's basic defence card by name, for {defence}. RunState is read
+# untyped, so probes that name TrinketData still compile without the
+# autoload.
+static func _defence_name() -> String:
+	var tree := Engine.get_main_loop() as SceneTree
+	var run_state: Node = tree.root.get_node_or_null("RunState") if tree != null else null
+	var character: CharacterData = run_state.get("character") as CharacterData if run_state != null else null
+	if character == null or character.basic_defence_card == null:
+		return DEFENCE_FALLBACK
+	return character.basic_defence_card.card_name
 
 func describe_short() -> String:
 	return _fill(short_description) if not short_description.is_empty() else describe()
@@ -227,6 +277,10 @@ func _fill(template: String) -> String:
 		"cost_nth": Status.ordinal_word(discount_on_card_count),
 		"cost_cut": card_count_discount,
 		"skill_draw": draw_on_skill_after_attack,
+		"defence": _defence_name(),
+		"start": basic_defence_block_start,
+		"step": basic_defence_block_step,
+		"cap": basic_defence_block_cap,
 	})
 
 # The fight is opening: this trinket's status, if it has one, onto the

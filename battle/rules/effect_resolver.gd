@@ -60,6 +60,7 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	ctx.card_is_attack = card.card_type == CardData.CardType.ATTACK
 	ctx.resolving_card = card
 	ctx.attack_bonus_taken = false
+	ctx.block_bonus_taken = false
 	ctx.toll_spent_this_card = false
 	ctx.hp_dealt_this_card = 0
 	ctx.attack_card_extra_this_card = 0

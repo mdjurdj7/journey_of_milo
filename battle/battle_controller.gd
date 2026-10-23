@@ -473,6 +473,13 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 			player.big_hit_reduction = piece.big_hit_reduction
 			player.big_hit_threshold = maxi(piece.big_hit_threshold, 0)
 		player.hit_back_damage += maxi(piece.hit_back_damage, 0)
+		# The first piece that upgrades the basic defence card, read live:
+		# an edit to it re-reads the hand's faces.
+		if piece.basic_defence_block_start > 0 and player.basic_defence_piece == null:
+			player.basic_defence_piece = piece
+			player.basic_defence_character = RunState.character
+			if not piece.changed.is_connected(status_changed.emit):
+				piece.changed.connect(status_changed.emit)
 	player.block += opening_block
 	opening_block_gained = opening_block
 	if not held.is_empty():

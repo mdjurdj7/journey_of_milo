@@ -198,6 +198,14 @@ var big_hit_spent: bool = false
 var self_loss_attack_bonus: int = 0
 var self_loss_attack_tag: StringName = &""
 var self_loss_attack_stacks: int = 0
+# The worn piece that upgrades the class's basic defence card (Trinket
+# Data.basic_defence_block_* - the Harness), read live, the class it reads
+# that card from, and how many times this fight the card has taken the
+# piece's Block. A fight's Combatant is its own, so the count starts again
+# each fight. Null piece = none.
+var basic_defence_piece: TrinketData = null
+var basic_defence_character: CharacterData = null
+var basic_defence_plays: int = 0
 # The worn piece's damage back (TrinketData.hit_back_damage): this much
 # to an enemy, through its Block, once for each of its attacks that lands
 # on this fighter (EnemyTurn.land_attack()). 0 = none.
@@ -332,6 +340,20 @@ func self_loss_attack_bonus_for(card: CardData, arming: bool = false) -> int:
 	if self_loss_attack_bonus <= 0 or card == null or self_loss_attack_tag == &"" or not card.has_tag(self_loss_attack_tag):
 		return 0
 	return self_loss_attack_bonus * (self_loss_attack_stacks + (1 if arming else 0))
+
+# The Block the worn piece adds to `card`'s next play: its bonus at this
+# fight's count, when `card` is the class's basic defence card; else 0.
+func basic_defence_bonus_for(card: CardData) -> int:
+	if basic_defence_piece == null or basic_defence_character == null or not basic_defence_character.is_basic_defence(card):
+		return 0
+	return basic_defence_piece.basic_defence_block_bonus(basic_defence_plays)
+
+# The same, taken by the card resolving: one more play counted.
+func take_basic_defence_bonus(card: CardData) -> int:
+	var bonus: int = basic_defence_bonus_for(card)
+	if bonus > 0:
+		basic_defence_plays += 1
+	return bonus
 
 # The same, spent: the card takes all of it and the store is empty.
 func take_self_loss_attack_bonus(card: CardData) -> int:
