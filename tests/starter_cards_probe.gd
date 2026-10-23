@@ -58,7 +58,7 @@ const TEMPERED_DIR := "res://cards/tempered/"
 # Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price, Bide,
 # Deny, Refuse the End, With Regards, Last Resort, Dying Light, Blood
 # Advance, Second Swing, Garnish, Claw Back, Gnaw, Settled Account and
-# the neutral Endure. Every other card has none yet.
+# the neutrals Endure and Samphire. Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"in_the_red": "res://cards/art/Wanderer/In the Red.png",
 	"not_so": "res://cards/art/Wanderer/Not So.png",
@@ -104,6 +104,7 @@ const CARD_ART: Dictionary = {
 	"gnaw": "res://cards/art/Wanderer/Gnaw.png",
 	"settled_account": "res://cards/art/Wanderer/Settled Account.png",
 	"endure": "res://cards/art/Wanderer/Endure.png",
+	"samphire": "res://cards/art/Wanderer/Samphire.png",
 }
 
 var _failures: int = 0
