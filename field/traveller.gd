@@ -1,6 +1,8 @@
 extends Node3D
 class_name Traveller
 
+# The Iron Pilgrim.
+
 # Someone glimpsed on arrival (FloorData.traveller_glimpse): already walking
 # away up the floor, his whole body in frame just under its top edge, as
 # the floor fades in - and out through that edge before the player can
@@ -17,11 +19,13 @@ class_name Traveller
 # the frame's top edge, so it never happens on screen, and a player who
 # runs after him finds the way empty.
 #
-# The body is a model scene (model_scene_path) - today a placeholder
-# (traveller_placeholder.tscn: a capsule, a small head, a flat disc hat);
-# the real traveller is a path swap. Every mesh under it wears the painted
-# shader at figure_ink; no fog - the arrival fade is what softens him. His
-# walk is a tweened bob and sway on the model, no rig.
+# The body is a model scene (model_scene_path): the Iron Pilgrim's rigged
+# glb, or the placeholder (traveller_placeholder.tscn: a capsule, a small
+# head, a flat disc hat). Every mesh under it wears the painted shader on
+# the model's own colour map (colour_map_path) times tint - or flat at
+# figure_ink with no map; no fog - the arrival fade is what softens him. A
+# model with its own walk clip (walk_clip) walks on it and stands on its
+# idle clip; one without (the placeholder) walks on a tweened bob and sway.
 
 # Floors with a glimpse already stood on this run, "<region>:<floor>" -
 # shown or not - a static set like Hull._findings_shown, so a floor stood
@@ -61,43 +65,71 @@ static func reset_glimpses() -> void:
 	_shown_this_run = false
 
 # The body. Loaded at runtime; a change swaps it live.
-@export_file("*.tscn", "*.glb") var model_scene_path: String = "res://field/traveller_placeholder.tscn":
+@export_file("*.tscn", "*.glb") var model_scene_path: String = "res://assets/models/iron_pilgrim/iron_pilgrim.glb":
 	set(value):
 		model_scene_path = value
 		if is_inside_tree():
 			_build_model()
 # Yaw of the model under this node so its front lies on the node's -Z, the
-# way he walks. 0 for the placeholder; a Mixamo-style rig facing +Z wants
-# 180.
-@export var model_yaw_offset_degrees: float = 0.0:
+# way he walks. 180 for the Iron Pilgrim's rig (Mixamo-style, facing +Z);
+# 0 for the placeholder.
+@export var model_yaw_offset_degrees: float = 180.0:
 	set(value):
 		model_yaw_offset_degrees = value
 		if _model != null:
 			_model.rotation_degrees.y = model_yaw_offset_degrees
-# The darkest figure ink (the art bible's UI ink), times the painted
-# shader's light.
+# The model's own colour map: its glb's albedo, extracted once on import
+# (the glb's other maps are discarded - the painted shader takes none).
+# Empty for flat figure_ink (the placeholder).
+@export_file("*.jpg", "*.png") var colour_map_path: String = "res://assets/models/iron_pilgrim/iron_pilgrim_texture_0.png":
+	set(value):
+		colour_map_path = value
+		if is_inside_tree():
+			_build_model()
+# Multiplied into the colour map - white is the map as painted.
+@export var tint: Color = Color(1.0, 1.0, 1.0):
+	set(value):
+		tint = value
+		if _material != null and not _inked:
+			_material.set_shader_parameter("albedo_tint", tint)
+# With no colour map: the darkest figure ink (the art bible's UI ink),
+# times the painted shader's light.
 @export var figure_ink: Color = Color(0.165, 0.165, 0.18):
 	set(value):
 		figure_ink = value
-		if _material != null:
+		if _material != null and _inked:
 			_material.set_shader_parameter("albedo_tint", figure_ink)
 
 @export_group("Walk")
-# One step: the body rises bob_height and settles once a step, and sways
-# sway_degrees to one side and back over each step, the other side the
-# next - a walking cadence for speed ~1.3 m/s.
+# The model's own clips, looped: walk_clip while he walks, idle_clip while
+# he stands (the start delay, the path's end). A model without walk_clip
+# walks on the bob and sway below instead.
+@export var walk_clip: StringName = &"Walking":
+	set(value):
+		walk_clip = value
+		_loop_clips()
+		_start_walk_motion()
+@export var idle_clip: StringName = &"Idle_12":
+	set(value):
+		idle_clip = value
+		_loop_clips()
+		_start_walk_motion()
+# For a model without walk_clip - one step: the body rises bob_height and
+# settles once a step, and sways sway_degrees to one side and back over
+# each step, the other side the next - a walking cadence for speed
+# ~1.3 m/s.
 @export var step_seconds: float = 0.55:
 	set(value):
 		step_seconds = value
-		_start_walk_tweens()
+		_start_walk_motion()
 @export var bob_height: float = 0.035:
 	set(value):
 		bob_height = value
-		_start_walk_tweens()
+		_start_walk_motion()
 @export var sway_degrees: float = 2.0:
 	set(value):
 		sway_degrees = value
-		_start_walk_tweens()
+		_start_walk_motion()
 @export_group("")
 
 var _glimpse: TravellerGlimpse = null
@@ -109,6 +141,10 @@ var _delay_left: float = 0.0
 var _walking: bool = false
 var _model: Node3D = null
 var _material: ShaderMaterial = null
+# The material is flat figure_ink, not a colour map.
+var _inked: bool = false
+# The model's AnimationPlayer; null for a model with none.
+var _player: AnimationPlayer = null
 # The model's bounds in this node's space - what the frustum test reads.
 var _bounds: AABB = AABB()
 var _bob_tween: Tween = null
@@ -135,7 +171,7 @@ func walk(glimpse: TravellerGlimpse, origin: Vector2) -> void:
 		queue_free()
 		return
 	_place()
-	_start_walk_tweens()
+	_start_walk_motion()
 
 func _physics_process(delta: float) -> void:
 	if _glimpse == null:
@@ -145,7 +181,7 @@ func _physics_process(delta: float) -> void:
 		if _delay_left > 0.0:
 			_delay_left -= delta
 			if _delay_left <= 0.0:
-				_start_walk_tweens()
+				_start_walk_motion()
 		else:
 			_advance(maxf(_glimpse.speed, 0.0) * delta)
 	_place()
@@ -164,7 +200,7 @@ func _advance(metres: float) -> void:
 			# The last point: he stops there.
 			_along = length
 			_walking = false
-			_start_walk_tweens()
+			_start_walk_motion()
 			return
 		_along -= length
 		_segment += 1
@@ -218,21 +254,39 @@ func _build_model() -> void:
 	_model.name = "Model"
 	add_child(_model)
 	_model.rotation_degrees.y = model_yaw_offset_degrees
-	var shader := load(PaintedProp.PAINTED_SHADER_PATH) as Shader
-	if shader != null:
-		_material = ShaderMaterial.new()
-		_material.shader = shader
-		_material.set_shader_parameter("albedo_tint", figure_ink)
+	_material = PaintedProp.material(colour_map_path, tint) if not colour_map_path.is_empty() else null
+	_inked = _material == null
+	if _inked:
+		var shader := load(PaintedProp.PAINTED_SHADER_PATH) as Shader
+		if shader != null:
+			_material = ShaderMaterial.new()
+			_material.shader = shader
+			_material.set_shader_parameter("albedo_tint", figure_ink)
 	_bounds = PaintedProp.dress_model(_model, _material, self)
 	# No cast shadow: a shadow stretched past him would stay in frame
 	# after he is freed and vanish there.
 	for node in _model.find_children("*", "MeshInstance3D", true, false):
 		(node as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_start_walk_tweens()
+	var players: Array[Node] = _model.find_children("*", "AnimationPlayer", true, false)
+	_player = players[0] as AnimationPlayer if not players.is_empty() else null
+	_loop_clips()
+	_start_walk_motion()
 
-# The bob and the sway, looping while he walks; settled while he stands
-# (the start delay, the path's end).
-func _start_walk_tweens() -> void:
+# Imported clips come in unlooped; walk_clip and idle_clip loop.
+func _loop_clips() -> void:
+	if _player == null:
+		return
+	for clip: StringName in [walk_clip, idle_clip]:
+		if _player.has_animation(clip):
+			_player.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
+
+func _has_walk_clip() -> bool:
+	return _player != null and _player.has_animation(walk_clip)
+
+# walk_clip while he walks, idle_clip while he stands (the start delay,
+# the path's end) - or, for a model without walk_clip, the bob and the
+# sway, looping while he walks and settled while he stands.
+func _start_walk_motion() -> void:
 	if _bob_tween != null:
 		_bob_tween.kill()
 		_bob_tween = null
@@ -243,7 +297,15 @@ func _start_walk_tweens() -> void:
 		return
 	_model.position.y = 0.0
 	_model.rotation_degrees.z = 0.0
-	if not _walking or _delay_left > 0.0 or step_seconds <= 0.0:
+	var walking: bool = _walking and _delay_left <= 0.0
+	if _has_walk_clip():
+		var clip: StringName = walk_clip if walking else idle_clip
+		if _player.has_animation(clip) and _player.current_animation != clip:
+			_player.play(clip)
+		elif not _player.has_animation(clip):
+			_player.stop()
+		return
+	if not walking or step_seconds <= 0.0:
 		return
 	var half: float = step_seconds * 0.5
 	# Mid-stride from the first frame: the bob starts at its top.
