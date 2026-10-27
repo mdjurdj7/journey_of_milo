@@ -42,6 +42,9 @@ const KIND_BEDROLL := 4
 const PURSE := 5000
 const REWARD_WAIT_SECONDS := 8.0
 const SAFETY_SECONDS := 180.0
+# Real time for the audio thread to drop stopped playbacks before quit
+# (_quiet_audio()).
+const AUDIO_DROP_MSEC := 100
 
 var _run_state: Node = null
 var _field: Node = null
@@ -66,6 +69,7 @@ func _initialize() -> void:
 	_check_temper()
 	if _cases != 6:
 		_fail("%d of 6 cases ran to their end" % _cases)
+	await _quiet_audio()
 	if _failures == 0:
 		print("economy_probe: PASSED")
 		quit(0)
@@ -353,6 +357,20 @@ func _teardown() -> void:
 	_field = null
 	for i in 5:
 		await process_frame
+
+# The take sounds (TakeFeedback.play_sound()) play on players directly
+# under root, which _teardown() leaves: quitting while the collector's
+# last ones still play leaks their playbacks, counted as ObjectDB leaks
+# over run_probes' baseline. Stopped and freed, then a moment of real
+# time - the audio thread mixes in it - for the playbacks to be dropped.
+func _quiet_audio() -> void:
+	for child in root.get_children():
+		var player := child as AudioStreamPlayer
+		if player != null:
+			player.stop()
+			player.free()
+	OS.delay_msec(AUDIO_DROP_MSEC)
+	await process_frame
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
