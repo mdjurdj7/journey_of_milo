@@ -171,6 +171,121 @@ class_name FloorData
 @export var fog_depth_begin: float = 0.0
 @export var fog_depth_end: float = 0.0
 
+@export_group("Light")
+# This floor's sun and ambient over the scene's own (OvercastLight,
+# RegionSky): a negative value (the default) keeps the scene's, a colour
+# with alpha 0 keeps it. Pushed by RegionField in _enter_tree(), before
+# either node builds from its exports in _ready(); live - a value set
+# back to negative restores the scene's.
+@export var sun_elevation_degrees: float = -1.0:
+	set(value):
+		sun_elevation_degrees = value
+		emit_changed()
+@export var sun_energy: float = -1.0:
+	set(value):
+		sun_energy = value
+		emit_changed()
+@export var sun_color: Color = Color(0.0, 0.0, 0.0, 0.0):
+	set(value):
+		sun_color = value
+		emit_changed()
+# OvercastLight.shadow_darkness - the sun's shadow opacity.
+@export var shadow_darkness: float = -1.0:
+	set(value):
+		shadow_darkness = value
+		emit_changed()
+@export var ambient_energy: float = -1.0:
+	set(value):
+		ambient_energy = value
+		emit_changed()
+
+@export_group("Water")
+# This floor's sea colour and depth over the scene's own Sea (its Depth
+# Color group): a negative value (the default) keeps the scene's, a
+# colour with alpha 0 keeps it, an absorption with any negative channel
+# keeps it. Pushed by RegionField in _enter_tree(), before Sea builds
+# its material in _ready(); live - set back to "keep" restores the
+# scene's. depth_opaque is the depth deep colour and full opacity are
+# reached at, so it wants to sit near this floor's real seabed depth.
+@export var sea_shallow_color: Color = Color(0.0, 0.0, 0.0, 0.0):
+	set(value):
+		sea_shallow_color = value
+		emit_changed()
+@export var sea_deep_color: Color = Color(0.0, 0.0, 0.0, 0.0):
+	set(value):
+		sea_deep_color = value
+		emit_changed()
+@export var sea_shallow_alpha: float = -1.0:
+	set(value):
+		sea_shallow_alpha = value
+		emit_changed()
+@export var sea_depth_opaque: float = -1.0:
+	set(value):
+		sea_depth_opaque = value
+		emit_changed()
+@export var sea_absorption: Vector3 = Vector3(-1.0, -1.0, -1.0):
+	set(value):
+		sea_absorption = value
+		emit_changed()
+# Any other Sea or Ground export for this floor, by property name - the
+# waves, highlight, foam and run-up (as FloorProp.overrides does for a
+# prop). Set over the scene's in _enter_tree(), after the fields above;
+# live - a key taken out restores the scene's value.
+@export var sea_overrides: Dictionary = {}:
+	set(value):
+		sea_overrides = value
+		emit_changed()
+@export var ground_overrides: Dictionary = {}:
+	set(value):
+		ground_overrides = value
+		emit_changed()
+
+@export_group("Sand Texture")
+# This floor's sand colour map and normal map over the procedural sand
+# (Ground's Sand Texture group, ground.gdshader's sand_texture_enabled
+# doc). Off, or either map unset (the default), is the procedural sand
+# alone. Pushed by RegionField in _enter_tree(); live.
+@export var sand_texture_enabled: bool = false:
+	set(value):
+		sand_texture_enabled = value
+		emit_changed()
+@export var sand_albedo_texture: Texture2D = null:
+	set(value):
+		sand_albedo_texture = value
+		emit_changed()
+@export var sand_normal_texture: Texture2D = null:
+	set(value):
+		sand_normal_texture = value
+		emit_changed()
+@export var sand_texture_tile_m: float = 3.0:
+	set(value):
+		sand_texture_tile_m = value
+		emit_changed()
+@export_range(0.0, 1.0) var sand_texture_color_blend: float = 0.35:
+	set(value):
+		sand_texture_color_blend = value
+		emit_changed()
+@export_range(0.0, 2.0) var sand_texture_normal_strength: float = 0.5:
+	set(value):
+		sand_texture_normal_strength = value
+		emit_changed()
+@export var sand_texture_fade_distance: Vector2 = Vector2(20.0, 35.0):
+	set(value):
+		sand_texture_fade_distance = value
+		emit_changed()
+@export var sand_texture_coverage_scale: float = 7.0:
+	set(value):
+		sand_texture_coverage_scale = value
+		emit_changed()
+@export_range(0.0, 1.0) var sand_texture_coverage_floor: float = 0.3:
+	set(value):
+		sand_texture_coverage_floor = value
+		emit_changed()
+@export var sand_texture_coverage_edges: Vector2 = Vector2(0.35, 0.65):
+	set(value):
+		sand_texture_coverage_edges = value
+		emit_changed()
+
 @export_group("Layout")
 # The Wanderer's start, world XZ. Every floor so far spawns at the
 # origin and lets mask_origin do the shifting, which keeps the

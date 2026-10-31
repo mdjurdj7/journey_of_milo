@@ -12,6 +12,11 @@
 [ext_resource type="Resource" path="res://cards/pools/floor1_pool.tres" id="10_floor1_pool"]
 [ext_resource type="Script" uid="uid://bp8hnb8ai830l" path="res://floors/scatter/scatter_set.gd" id="11_scatter_set"]
 [ext_resource type="Resource" uid="uid://d01nm80nur52n" path="res://floors/scatter/floor1_pristine.tres" id="12_wet_scatter"]
+[ext_resource type="Texture2D" uid="uid://bfjna5b5luo27" path="res://assets/textures/ground/beach_sand_v1/sand_albedo.png" id="13_sand_albedo"]
+[ext_resource type="Texture2D" uid="uid://bpw181mlx5cxv" path="res://assets/textures/ground/beach_sand_v1/sand_normal_opengl.png" id="14_sand_normal"]
+[ext_resource type="Texture2D" uid="uid://bxggsibi5knjd" path="res://assets/textures/water/foam_mask_v1.png" id="15_foam_mask"]
+[ext_resource type="PackedScene" path="res://floors/dressing/floor1_hull3_dressing.tscn" id="16_hull3_dressing"]
+[ext_resource type="Texture2D" uid="uid://d24wb0pgddq68" path="res://assets/textures/ground/sand_broken_ripples_v1/sand_broken_ripples_v1.png" id="17_ripple_patch"]
 [ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
 [ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
 
@@ -21,6 +26,9 @@ scene = ExtResource("6_hull")
 position = Vector3(-10.5, 0, -1.25)
 yaw_degrees = 8.0
 roll_degrees = 8.0
+overrides = {
+"use_textured_material": true
+}
 
 [sub_resource type="Resource" id="FloorProp_bird"]
 script = ExtResource("3_floor_prop")
@@ -39,6 +47,9 @@ position = Vector3(-7.5, 0, -0.25)
 yaw_degrees = 33.0
 roll_degrees = -12.0
 world_line = "Hauled up past the tide, and left."
+overrides = {
+"use_textured_material": true
+}
 
 [sub_resource type="Resource" id="FloorProp_hull3"]
 script = ExtResource("3_floor_prop")
@@ -46,6 +57,14 @@ scene = ExtResource("6_hull")
 position = Vector3(-8.2, 0, -9)
 yaw_degrees = -90.0
 roll_degrees = -10.0
+overrides = {
+"use_textured_material": true
+}
+
+[sub_resource type="Resource" id="FloorProp_hull3_dressing"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("16_hull3_dressing")
+position = Vector3(-8.2, 0, -9)
 
 [sub_resource type="Resource" id="FloorProp_keeper"]
 script = ExtResource("3_floor_prop")
@@ -77,7 +96,7 @@ script = ExtResource("1_floor_data")
 mask = ExtResource("4_map2")
 mask_origin = Vector2(0.49, 0.828)
 slots = Array[ExtResource("90_encounter_slot")]([SubResource("EncounterSlot_crab")])
-props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_hull1"), SubResource("FloorProp_bird"), SubResource("FloorProp_hull2"), SubResource("FloorProp_hull3"), SubResource("FloorProp_keeper")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_hull1"), SubResource("FloorProp_bird"), SubResource("FloorProp_hull2"), SubResource("FloorProp_hull3"), SubResource("FloorProp_keeper"), SubResource("FloorProp_hull3_dressing")])
 gate_bar_axis_offset = 0.85
 wear_path_override = null
 scatter_sets = Array[ExtResource("11_scatter_set")]([ExtResource("12_wet_scatter")])
@@ -85,3 +104,58 @@ scatter_budget = 22
 reward_pool = ExtResource("10_floor1_pool")
 gold_max = 15
 wear_darken = 0.08
+sun_elevation_degrees = 35.0
+sun_energy = 1.1
+sun_color = Color(1, 0.95, 0.88, 1)
+shadow_darkness = 0.6
+ambient_energy = 0.5
+sand_texture_enabled = true
+sand_albedo_texture = ExtResource("13_sand_albedo")
+sand_normal_texture = ExtResource("14_sand_normal")
+caustic_strength = 0.07
+sea_shallow_color = Color(0.42, 0.74, 0.72, 1)
+sea_deep_color = Color(0.07, 0.32, 0.45, 1)
+sea_shallow_alpha = 0.15
+sea_depth_opaque = 1.0
+sea_absorption = Vector3(1.8, 0.65, 0.5)
+sea_overrides = {
+"crest_calm": 0.4,
+"crest_period_s": 10.0,
+"crest_shore_start": 4.0,
+"crest_spacing_m": 6.0,
+"crest_tail": 0.15,
+"crests_enabled": true,
+"foam_breakup": 0.55,
+"foam_color": Color(0.92, 0.94, 0.93, 1),
+"foam_mask": ExtResource("15_foam_mask"),
+"foam_mask_enabled": true,
+"foam_mask_scale_m": 3.0,
+"foam_mask_strength": 1.0,
+"foam_travel_m": 0.8,
+"foam_strength": 0.75,
+"foam_width": 0.18,
+"long_wave_amplitude": 0.1,
+"noise_amplitude": 0.03,
+"sea_roughness": 0.55,
+"sea_specular": 0.3,
+"short_wave_amplitude": 0.03,
+"surface_pattern_scale": 5.0,
+"surface_pattern_strength": 0.05,
+"swash_breakup": 0.7,
+"swash_color": Color(0.9, 0.93, 0.92, 1)
+}
+ground_overrides = {
+"damp_shore_edge_m": 0.8,
+"damp_shore_enabled": true,
+"ripple_patch_edges": Vector2(0.47, 0.63),
+"ripple_patch_enabled": true,
+"ripple_patch_offset_m": Vector2(31, -23),
+"ripple_patch_route_margin_m": 1.0,
+"ripple_patch_route_quiet": 0.3,
+"ripple_patch_scale": 5.0,
+"ripple_patch_texture": ExtResource("17_ripple_patch"),
+"swash_color": Color(0.9, 0.92, 0.9, 1),
+"swash_edge_breakup": 0.7,
+"swash_sheet_alpha": 0.12,
+"swash_sheet_color": Color(0.62, 0.74, 0.72, 1)
+}

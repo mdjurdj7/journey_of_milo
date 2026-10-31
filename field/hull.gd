@@ -6,8 +6,9 @@ class_name Hull
 # under this node, applies the project's flat matte material (same shape
 # as Wanderer._build_flat_material() - one StandardMaterial3D via
 # material_override on every mesh, roughness 1, no specular; the glb's own
-# PBR textures are ignored - the hull keeps this flat tint until it is
-# regenerated textured for the painted shader, Field Asset Spec §3),
+# PBR textures are ignored unless use_textured_material is on - see its
+# doc - until it is regenerated for the painted shader, Field Asset Spec
+# §3),
 # faces its bow seaward, and sits on the relief minus sink_depth of its
 # own height.
 # Solid to the Wanderer at the gunwale (see collision_inset).
@@ -85,6 +86,24 @@ const MODEL_SCENE_PATH := "res://assets/models/hull/hull.glb"
 		hull_tint = value
 		if _material != null:
 			_material.albedo_color = value
+# The glb's own textured materials instead of the flat tint: each mesh
+# surface keeps its own imported material (base colour hull_0, roughness/
+# metallic hull_1, normal hull_2 - one slot today), as this hull's
+# duplicate so textured_tint never touches the shared import. Off = the
+# flat material above, as before. Geometry, scale, grounding and
+# collision are the same either way.
+@export var use_textured_material: bool = false:
+	set(value):
+		use_textured_material = value
+		_apply_material()
+# Multiplies the textured base colour (white = the texture as painted).
+# Only read while use_textured_material is on.
+@export var textured_tint: Color = Color(1.0, 1.0, 1.0):
+	set(value):
+		textured_tint = value
+		for material in _textured_materials:
+			if material != _material:
+				material.albedo_color = value
 # Instances live under RegionField/Hulls, so Ground and RegionField are
 # two levels up.
 @export var ground_path: NodePath = ^"../../Ground"
@@ -141,6 +160,9 @@ static func _get_shared_flat_material() -> StandardMaterial3D:
 var _model: Node3D = null
 # This hull's own tinted duplicate of _shared_flat_material.
 var _material: StandardMaterial3D = null
+# This hull's duplicates of the glb's surface materials, one per surface
+# in mesh order, built on first use (see _apply_material()).
+var _textured_materials: Array[BaseMaterial3D] = []
 var _approach_area: Area3D = null
 var _approach_shape: SphereShape3D = null
 var _collision_body: StaticBody3D = null
@@ -191,10 +213,34 @@ func _spawn_model() -> void:
 	_material.albedo_color = hull_tint
 	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
 		var mi := mesh_instance as MeshInstance3D
-		mi.material_override = _material
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	_apply_material()
 
 	_apply_model_transform()
+
+# Flat: _material over every mesh (material_override). Textured: no
+# override, and each surface its own duplicate of the glb's material for
+# that slot, tinted by textured_tint - a surface whose import has no
+# BaseMaterial3D keeps the flat one. No-op until _spawn_model() has run.
+func _apply_material() -> void:
+	if _model == null:
+		return
+	var build: bool = use_textured_material and _textured_materials.is_empty()
+	var slot: int = 0
+	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
+		var mi := mesh_instance as MeshInstance3D
+		mi.material_override = null if use_textured_material else _material
+		for surface in mi.mesh.get_surface_count():
+			if build:
+				var imported := mi.mesh.surface_get_material(surface) as BaseMaterial3D
+				var copy: BaseMaterial3D = _material
+				if imported != null:
+					copy = imported.duplicate() as BaseMaterial3D
+					copy.albedo_color = textured_tint
+				_textured_materials.append(copy)
+			var textured: BaseMaterial3D = _textured_materials[slot] if slot < _textured_materials.size() else null
+			mi.set_surface_override_material(surface, textured if use_textured_material else null)
+			slot += 1
 
 # The approach trigger: a sphere of approach_radius around the hull's
 # origin, watching for the Wanderer (group "wanderer", a CharacterBody3D

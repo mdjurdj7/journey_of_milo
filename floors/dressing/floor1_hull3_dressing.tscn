@@ -1,0 +1,152 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://b64oeejbo4412" path="res://field/dressing_group.gd" id="1_group"]
+[ext_resource type="Script" uid="uid://ckc8ajm8lgne5" path="res://field/dressing_item.gd" id="2_item"]
+[ext_resource type="Texture2D" uid="uid://c7cdqgdd6tysc" path="res://assets/textures/ground/seaweed_wrack_v1/seaweed_wrack_v1.png" id="3_wrack"]
+
+[sub_resource type="Resource" id="Bow_tuft_large"]
+script = ExtResource("2_item")
+card_texture_path = "res://assets/models/props/scatter/grass_tuft_large.png"
+offset = Vector2(-1.6, 0.9)
+yaw_degrees = 8.0
+size = 0.55
+
+[sub_resource type="Resource" id="Bow_tuft_medium"]
+script = ExtResource("2_item")
+card_texture_path = "res://assets/models/props/scatter/grass_tuft_medium.png"
+offset = Vector2(-1.3, 1.0)
+yaw_degrees = -12.0
+size = 0.42
+mirrored = true
+
+[sub_resource type="Resource" id="Bow_tuft_small"]
+script = ExtResource("2_item")
+card_texture_path = "res://assets/models/props/scatter/grass_tuft_small.png"
+offset = Vector2(-1.65, -1.1)
+yaw_degrees = 5.0
+size = 0.3
+
+[sub_resource type="Resource" id="Bow_stone_pair"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_pair.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_pair_albedo.jpg"
+offset = Vector2(-2.15, 0.45)
+yaw_degrees = 35.0
+tilt_degrees = Vector2(4, -6)
+size = 0.42
+sink_fraction = 0.45
+
+[sub_resource type="Resource" id="Bow_slab"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_slab.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_slab_albedo.jpg"
+offset = Vector2(-2.35, 0.15)
+yaw_degrees = -20.0
+tilt_degrees = Vector2(8, 0)
+size = 0.3
+sink_fraction = 0.5
+
+[sub_resource type="Resource" id="Bow_cluster"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_cluster.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_cluster_albedo.jpg"
+offset = Vector2(-1.95, 0.65)
+yaw_degrees = 110.0
+size = 0.22
+sink_fraction = 0.4
+
+[sub_resource type="Resource" id="Bow_pebble_a"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_slab.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_slab_albedo.jpg"
+offset = Vector2(-2.05, 0.1)
+yaw_degrees = 70.0
+tilt_degrees = Vector2(0, 10)
+size = 0.22
+sink_fraction = 0.35
+
+[sub_resource type="Resource" id="Bow_pebble_b"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_slab.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_slab_albedo.jpg"
+offset = Vector2(0.58, -1.5)
+yaw_degrees = 15.0
+size = 0.2
+sink_fraction = 0.3
+
+[sub_resource type="Resource" id="Upper_stone_pair"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_pair.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_pair_albedo.jpg"
+offset = Vector2(0.65, -1.25)
+yaw_degrees = -15.0
+tilt_degrees = Vector2(6, 0)
+size = 0.45
+sink_fraction = 0.4
+
+[sub_resource type="Resource" id="Upper_slab"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_slab.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_slab_albedo.jpg"
+offset = Vector2(1.05, -1.45)
+yaw_degrees = 50.0
+size = 0.24
+sink_fraction = 0.35
+
+[sub_resource type="Resource" id="Upper_cluster"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_cluster.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_cluster_albedo.jpg"
+offset = Vector2(0.35, -1.05)
+yaw_degrees = 200.0
+size = 0.24
+sink_fraction = 0.45
+
+[sub_resource type="Resource" id="Lower_tuft"]
+script = ExtResource("2_item")
+card_texture_path = "res://assets/models/props/scatter/grass_tuft_medium.png"
+offset = Vector2(0.85, -1.5)
+yaw_degrees = -6.0
+size = 0.4
+mirrored = true
+
+[sub_resource type="Resource" id="Lower_pebble_a"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_slab.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_slab_albedo.jpg"
+offset = Vector2(-0.4, 1.25)
+yaw_degrees = 30.0
+size = 0.2
+sink_fraction = 0.4
+
+[sub_resource type="Resource" id="Lower_pebble_b"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/scatter/stone_slab.glb"
+colour_map_path = "res://assets/models/props/scatter/stone_slab_albedo.jpg"
+offset = Vector2(-2.6, 0.65)
+yaw_degrees = -40.0
+tilt_degrees = Vector2(0, 8)
+size = 0.16
+sink_fraction = 0.3
+
+[sub_resource type="Resource" id="Bow_driftwood"]
+script = ExtResource("2_item")
+model_path = "res://assets/models/props/driftwood/driftwood_v1.glb"
+colour_map_path = "res://assets/models/props/driftwood/driftwood_v1_Image_0.jpg"
+offset = Vector2(-1.15, 1.9)
+yaw_degrees = 198.0
+tilt_degrees = Vector2(0, -8.5)
+size = 0.42
+sink_fraction = 0.14
+
+[node name="Dressing" type="Node3D"]
+script = ExtResource("1_group")
+items = Array[ExtResource("2_item")]([SubResource("Bow_tuft_large"), SubResource("Bow_tuft_medium"), SubResource("Bow_tuft_small"), SubResource("Bow_stone_pair"), SubResource("Bow_slab"), SubResource("Bow_cluster"), SubResource("Bow_pebble_a"), SubResource("Bow_pebble_b"), SubResource("Upper_stone_pair"), SubResource("Upper_slab"), SubResource("Upper_cluster"), SubResource("Lower_tuft"), SubResource("Lower_pebble_a"), SubResource("Lower_pebble_b"), SubResource("Bow_driftwood")])
+
+[node name="Wrack" type="Decal" parent="."]
+transform = Transform3D(0.906308, 0, -0.422618, 0, 1, 0, 0.422618, 0, 0.906308, -1.3, 0, 1.5)
+size = Vector3(0.7, 2, 0.7)
+texture_albedo = ExtResource("3_wrack")
+upper_fade = 0.0
+lower_fade = 0.0
+cull_mask = 262144

@@ -372,6 +372,41 @@ and up the west shore north of z -27. (2026-10-17.)
 
 ## Deferred
 
+- **Floor 1 beach look (Bible §6a), lighting first.** The target image
+  is approved; this pass changes floor 1's light only, through
+  FloorData's Light group (sun elevation, energy, colour, shadow
+  opacity, ambient energy - trial values, under review). Deferred to
+  their own passes: the sand's surface detail (first prototype in:
+  `assets/textures/ground/beach_sand_v1/`, FloorData's Sand Texture
+  group - under review; the tile's repeated ripple clusters and baked
+  shading are known and not yet solved), the water's colours, foam and wet shoreline (Sea's scene values), the
+  hulls' textures (`hull.glb`'s own maps are ignored for a flat tint),
+  and tonemapper, exposure, saturation, fog and SSAO, kept as they are
+  for the first comparison. (2026-10-29)
+  - **Foam mask v1 under review** (`assets/textures/water/foam_mask_v1.png`,
+    AI-generated, Sea's foam_mask exports via floor 1's sea_overrides).
+    A faint seam at its left/right wrap (wrap jump ~2x the image's
+    average), not blurred away; a cleaner tile would fix it. Fixed with
+    it: Sea dropped Ground's enclosure grid (pushed before Sea's
+    material existed), so every pool on every floor had the sea's surf.
+  - **Beach experiment checkpoint (2026-10-30), working baseline.** On
+    top of the light: the beach_sand_v1 tile, a broken-ripple patch
+    layer (`sand_broken_ripples_v1`, Ground's ripple_patch_* - rotated
+    86 degrees so its baked light agrees with the sun, in separated
+    patches set by scale/edges/offset), damp sand along the waterline
+    (damp_shore_*), open-water crests (Sea's crest_*), the foam mask,
+    textured hulls, hull 3's dressing (DressingGroup/DressingItem: the
+    wrack decal and driftwood_v1). All floor 1 opt-ins through its
+    overrides; other floors unchanged.
+  - **Striped shadows on the ground, unresolved.** Under floor 1's trial
+    light, the Wanderer's and the hulls' shadows read as fine stripes
+    on the sand to their left (the sun's side away), seen on the left of
+    the map. Suspected, not confirmed: the sun's soft shadows
+    (`shadow_softness` 3, `shadow_blur` 4, filter quality 3) spread
+    over the longer 35-degree shadow. Next tests, one at a time: his
+    ContactShadow hidden; his meshes' Cast Shadow off; then
+    `shadow_blur` 4 -> 1, `shadow_softness` 3 -> 1. Not yet known
+    whether it showed before the lighting change.
 - **The Samurai is a shell; these are left as they are.** She is a
   second CharacterData (`run/data/samurai.tres`), selected by
   RegionField's `starting_character` export, with no cards, mechanics or

@@ -154,6 +154,35 @@ uniform float surface_pattern_strength : hint_range(0.0, 0.5) = 0.10;
 uniform float surface_pattern_scale = 3.0;
 uniform float surface_pattern_speed = 0.4;
 
+// Open-water crests: broad pale bands on the open sea, running along the
+// floor mask's shore-distance contours (so parallel to the shore however
+// it curves) and rolling in toward it - one every crest_spacing_m metres
+// of shore distance, one passing any point every crest_period_s seconds.
+// Each band has a soft shoreward front (crest_front of a spacing) and a
+// longer fade seaward (crest_tail), and is cut along its length into
+// stretches by noise every crest_breakup_scale metres, kept where it
+// clears crest_breakup, a different cut per crest - so a few long crests
+// with quiet water between, not stripes. Painted toward crest_color by up
+// to crest_strength, as an overlay like the surface pattern; crest_calm
+// takes that much of the surface pattern away between crests. Starts
+// crest_shore_start metres out from the waterline (fading in over
+// crest_shore_fade), so the foam line and swash are untouched; off over
+// pools, and faded out near the grid's edge, where its distance stops
+// growing. Off unless crests_enabled. crest_period_s should divide
+// sea.gd's sea_time_period (7000) so the bands don't jump at the wrap.
+uniform bool crests_enabled = false;
+uniform vec4 crest_color : source_color = vec4(0.86, 0.9, 0.9, 1.0);
+uniform float crest_strength : hint_range(0.0, 1.0) = 0.3;
+uniform float crest_spacing_m = 9.0;
+uniform float crest_period_s = 14.0;
+uniform float crest_front : hint_range(0.0, 0.5) = 0.05;
+uniform float crest_tail : hint_range(0.0, 1.0) = 0.25;
+uniform float crest_breakup : hint_range(0.0, 1.0) = 0.45;
+uniform float crest_breakup_scale = 7.0;
+uniform float crest_shore_start = 3.0;
+uniform float crest_shore_fade = 3.0;
+uniform float crest_calm : hint_range(0.0, 1.0) = 0.0;
+
 // Foam: a thin bright line at the waterline - foam_width metres of water
 // DEPTH wide (~2-3x that laterally at the beach's slope), hugging the
 // true waterline however it curves. A touch lighter than shallow_color,
@@ -182,6 +211,34 @@ uniform vec4 foam_color : source_color = vec4(0.66, 0.70, 0.70, 1.0);
 uniform float foam_width = 0.25;
 uniform float foam_strength : hint_range(0.0, 1.0) = 0.35;
 uniform float edge_noise_scale = 4.0;
+// Broken foam: above 0, the foam line is cut into lace - two octaves of
+// value noise every foam_breakup_scale metres, drifting along the long
+// wave at foam_drift_speed, kept only where they clear foam_breakup
+// (eased over foam_breakup_softness) - in place of the edge noise's
+// gentle 60-100% patchiness. swash_breakup shares the same lace into the
+// swash front, at a lower cut so more of it stays. 0 (the default) is
+// the continuous line and front as they were.
+uniform float foam_breakup : hint_range(0.0, 1.0) = 0.0;
+uniform float foam_breakup_scale = 1.2;
+uniform float foam_breakup_softness = 0.12;
+uniform float foam_drift_speed = 0.05;
+uniform float swash_breakup : hint_range(0.0, 1.0) = 0.0;
+// Textured foam: with foam_mask_enabled, a tiling greyscale foam mask
+// (white = foam) cuts the foam line and - swash_breakup of the way - the
+// swash front, IN PLACE of the procedural lace above, one tile every
+// foam_mask_scale_m metres of world XZ, its value times foam_mask_
+// strength. Only inside those two bands, never the open sea. Static in
+// world space - the bands move over it - and sampled at the same XZ by
+// ground.gdshader's run-up edge (Sea.set_foam_mask() hands it over), so
+// sea foam and run-up show the same lace. Read as linear data, red only.
+uniform bool foam_mask_enabled = false;
+uniform sampler2D foam_mask : hint_default_black, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float foam_mask_scale_m = 3.0;
+uniform float foam_mask_strength = 1.0;
+// The mask's motion with the swash (see foam_mask_motion()): metres the
+// lace is carried shoreward at the top of each run-up, along the floor
+// mask's own shoreward direction. 0 (the default) leaves it still.
+uniform float foam_travel_m = 0.0;
 
 // Swash: a periodic wash of foam-coloured water that advances from
 // swash_start_depth to the waterline over the first part of each
@@ -257,6 +314,34 @@ float value_noise(vec2 p) {
 	float b = hash(i + vec2(1.0, 0.0));
 	float c = hash(i + vec2(0.0, 1.0));
 	float d = hash(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+// The foam lace's own noise (see foam_breakup's doc). Not hash() /
+// value_noise() above: their float hash magnifies the last bit of its
+// input, and neighbouring cells reach a shared corner by different
+// arithmetic (floor(p) against i + 1), so corners disagree and the noise
+// steps along its lattice - hard-edged squares once thresholded, worse
+// as the drift carries p into hundreds of cells. Those two stay as they
+// are because landmass_side_distance() mirrors ground.gd's GDScript copy.
+// This is ground.gdshader's integer hash, exact at every corner.
+float lace_hash(vec2 p) {
+	uvec2 q = uvec2(ivec2(floor(p + 0.5)) + ivec2(1 << 20));
+	uint h = q.x * 1597334677u ^ q.y * 3812015801u;
+	h = h * 747796405u + 2891336453u;
+	h = ((h >> ((h >> 28u) + 4u)) ^ h) * 277803737u;
+	h = (h >> 22u) ^ h;
+	return float(h) * (1.0 / 4294967295.0);
+}
+
+float lace_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = lace_hash(i);
+	float b = lace_hash(i + vec2(1.0, 0.0));
+	float c = lace_hash(i + vec2(0.0, 1.0));
+	float d = lace_hash(i + vec2(1.0, 1.0));
 	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
@@ -380,6 +465,100 @@ void swash_centre_and_intensity(float phase, out float centre, out float intensi
 		centre = swash_start_depth;
 		intensity = 0.0;
 	}
+}
+
+// --- Foam mask motion - the same math as ground.gdshader's copy, so the
+// sea's swash foam and the ground's run-up edge move as one. ---
+// How far the lace has been carried this cycle, 0..1: pushed in through
+// the advance and the run-up's climb, drawn back over the rest of the
+// cycle (slower), home at the wrap.
+const float FOAM_PUSH_END = 0.52;
+float foam_travel(float phase) {
+	if (phase < FOAM_PUSH_END) {
+		return smoothstep(0.0, FOAM_PUSH_END, phase);
+	}
+	return 1.0 - smoothstep(FOAM_PUSH_END, 1.0, phase);
+}
+
+// How far the surf's lace has dissolved, 0..1: gone at the wrap (so the
+// next wave's fresh lace can't pop), dense by the advance, thinning out
+// from the recede (SWASH_HOLD_END) to nothing just before the wrap.
+float foam_dissolve(float phase) {
+	return max(1.0 - smoothstep(0.0, 0.08, phase), smoothstep(SWASH_HOLD_END, 0.95, phase));
+}
+
+// The floor mask's signed shore distance (r; ground's sign: negative on
+// sand, positive in water). Not landmass_distance(), which is the old
+// built-in coastline.
+float mask_shore_distance_at(vec2 world_xz) {
+	vec2 uv = ((world_xz - landmass_distance_origin) / max(landmass_distance_cell, 0.001) + 0.5) / max(landmass_distance_dims, vec2(1.0));
+	return texture(landmass_distance_tex, uv).r;
+}
+
+// 0..1, the open-water crests here (see crests_enabled's doc), before
+// strength, colour and the pool gate; zone is how far into the open
+// water the crests run here (0 near the shore, off, or past the grid).
+float open_crest_at(vec2 world_xz, float time, out float zone) {
+	zone = 0.0;
+	if (!crests_enabled || !landmass_distance_ready) {
+		return 0.0;
+	}
+	float d = mask_shore_distance_at(world_xz);
+	float shore_in = smoothstep(crest_shore_start, crest_shore_start + max(crest_shore_fade, 0.001), d);
+	// The grid's own edge: within 4 m of it the distance is clamped, so
+	// the contours stop following the shore.
+	vec2 grid_size = landmass_distance_dims * max(landmass_distance_cell, 0.001);
+	vec2 from_origin = world_xz - landmass_distance_origin;
+	vec2 to_edge = min(from_origin, grid_size - from_origin);
+	float in_grid = smoothstep(0.0, 4.0, min(to_edge.x, to_edge.y));
+	zone = shore_in * in_grid;
+	float phase = d / max(crest_spacing_m, 0.001) + time / max(crest_period_s, 0.001);
+	float s = fract(phase);
+	float front = max(crest_front, 0.001);
+	float band = smoothstep(0.0, front, s) * (1.0 - smoothstep(front, front + max(crest_tail, 0.001), s));
+	float crest_index = floor(phase);
+	vec2 cut_p = world_xz / max(crest_breakup_scale, 0.001) + vec2(crest_index * 7.31, crest_index * -3.17);
+	float cut = lace_noise(cut_p) * 0.7 + lace_noise(cut_p * 2.3 + vec2(5.7, 1.9)) * 0.3;
+	float keep = smoothstep(crest_breakup - 0.12, crest_breakup + 0.12, cut);
+	return band * keep * zone;
+}
+
+// Unit XZ toward land, down the mask distance's slope; zero where it is
+// flat or there is no grid.
+vec2 shoreward_at(vec2 world_xz) {
+	if (!landmass_distance_ready) {
+		return vec2(0.0);
+	}
+	float e = max(landmass_distance_cell, 0.01);
+	vec2 g = vec2(
+		mask_shore_distance_at(world_xz + vec2(e, 0.0)) - mask_shore_distance_at(world_xz - vec2(e, 0.0)),
+		mask_shore_distance_at(world_xz + vec2(0.0, e)) - mask_shore_distance_at(world_xz - vec2(0.0, e)));
+	return length(g) > 0.00001 ? -normalize(g) : vec2(0.0);
+}
+
+// The mask's uvs at this XZ: line_uv for the waterline's foam - carried
+// in and back, never reshuffled, so it can't pop - and surf_uv for the
+// swash and run-up - carried the same, plus a fresh tile offset each
+// cycle, swapped while dissolve is 1. The cycle is swash_cycle_
+// amplitude()'s, phase offset included. All still at foam_travel_m 0.
+void foam_mask_motion(vec2 world_xz, float phase, float time, out vec2 line_uv, out vec2 surf_uv, out float dissolve) {
+	float scale = max(foam_mask_scale_m, 0.01);
+	vec2 carried = shoreward_at(world_xz) * foam_travel(phase) * foam_travel_m;
+	line_uv = (world_xz - carried) / scale;
+	surf_uv = line_uv;
+	dissolve = 0.0;
+	if (foam_travel_m > 0.0) {
+		float offset = (texture(surface_noise, world_xz / max(swash_phase_noise_scale, 0.001)).r - 0.5) * swash_phase_spread;
+		float cycle = floor(time / max(swash_period, 0.001) + offset);
+		surf_uv += vec2(lace_hash(vec2(cycle, 3.0)), lace_hash(vec2(cycle, 11.0)));
+		dissolve = foam_dissolve(phase);
+	}
+}
+
+// The surf's mask value dissolved: holes widen and strands thin as
+// dissolve rises (the faint parts go first), none left at 1.
+float foam_surf_mask(float value, float dissolve) {
+	return clamp((value - dissolve) / max(1.0 - dissolve, 0.001), 0.0, 1.0);
 }
 
 // 0 at the inland wall's own Z (landmass_inland_z), 1 at the curve's
@@ -562,6 +741,13 @@ void fragment() {
 	float pattern = smoothstep(0.45, 0.85, pattern_a * 0.6 + pattern_b * 0.4);
 	float pattern_amount = pattern * surface_pattern_strength * 2.0 * edge_alpha;
 
+	// Open-water crests (see crests_enabled's doc): off over pools, and
+	// crest_calm quiets the surface pattern between them.
+	float crest_zone;
+	float crest = open_crest_at(v_world_xz, sea_time, crest_zone) * (1.0 - landmass_enclosure_at(v_world_xz));
+	float crest_amount = crest * crest_strength * edge_alpha;
+	pattern_amount *= 1.0 - crest_calm * crest_zone * (1.0 - crest);
+
 	// Foam: a band foam_width of water depth wide right at the true
 	// waterline, patchy via value noise, breathing with the long wave's
 	// own height at this point (not a generic timer). Computed here,
@@ -579,7 +765,29 @@ void fragment() {
 
 	float foam_noise = value_noise(v_world_xz / max(edge_noise_scale, 0.001));
 	float foam_edge = smoothstep(0.0, 0.05, water_depth) * (1.0 - smoothstep(0.05, max(foam_width, 0.06), water_depth));
-	float foam_amount = foam_edge * mix(0.6, 1.0, foam_noise) * mix(0.7, 1.0, breathe) * foam_strength * sea_open;
+	// The foam mask (see foam_mask_enabled's doc), else the procedural
+	// lace (see foam_breakup's doc), else the old patchiness. Sampled
+	// outside the branch so its mip selection keeps its derivatives.
+	float foam_patch = mix(0.6, 1.0, foam_noise);
+	float swash_patch = 1.0;
+	float swash_ph = swash_phase(v_world_xz, sea_time);
+	vec2 foam_line_uv;
+	vec2 foam_surf_uv;
+	float foam_surf_dissolve;
+	foam_mask_motion(v_world_xz, swash_ph, sea_time, foam_line_uv, foam_surf_uv, foam_surf_dissolve);
+	float foam_mask_value = clamp(texture(foam_mask, foam_line_uv).r * foam_mask_strength, 0.0, 1.0);
+	float foam_surf_value = foam_surf_mask(texture(foam_mask, foam_surf_uv).r * foam_mask_strength, foam_surf_dissolve);
+	if (foam_mask_enabled) {
+		foam_patch = foam_mask_value;
+		swash_patch = mix(1.0, foam_surf_value, swash_breakup);
+	} else if (foam_breakup > 0.0) {
+		vec2 lace_p = v_world_xz / max(foam_breakup_scale, 0.001) + normalize(long_wave_direction) * foam_drift_speed * sea_time;
+		float lace = lace_noise(lace_p) * 0.6 + lace_noise(lace_p * 2.7 + vec2(13.1, -7.3)) * 0.4;
+		float lace_soft = max(foam_breakup_softness, 0.001);
+		foam_patch = smoothstep(foam_breakup - lace_soft, foam_breakup + lace_soft, lace);
+		swash_patch = mix(1.0, smoothstep(foam_breakup - 0.15 - lace_soft, foam_breakup - 0.15 + lace_soft, lace), swash_breakup);
+	}
+	float foam_amount = foam_edge * foam_patch * mix(0.7, 1.0, breathe) * foam_strength * sea_open;
 
 	// Swash (see swash_color's own doc): the front's leading edge is the
 	// shoreward (shallower) side of the cycle's centre depth, crisp over
@@ -587,14 +795,13 @@ void fragment() {
 	// toward deeper water. No patch noise - the cycle amplitude and the
 	// phase offset already vary it along the shore. Gated off dry sand by
 	// depth like the foam; composited below as its own overlay above the
-	// foam line.
-	float swash_ph = swash_phase(v_world_xz, sea_time);
+	// foam line. swash_ph is computed above, with the foam mask's motion.
 	float swash_centre;
 	float swash_intensity;
 	swash_centre_and_intensity(swash_ph, swash_centre, swash_intensity);
 	float swash_lead = smoothstep(swash_centre - max(swash_edge_width, 0.001), swash_centre, water_depth);
 	float swash_trail = 1.0 - smoothstep(swash_centre, swash_centre + max(swash_band_width, 0.001), water_depth);
-	float swash_amount = swash_lead * swash_trail * swash_intensity * swash_cycle_amplitude(v_world_xz, sea_time) * swash_strength * smoothstep(0.0, 0.03, water_depth) * sea_open;
+	float swash_amount = swash_lead * swash_trail * swash_intensity * swash_cycle_amplitude(v_world_xz, sea_time) * swash_strength * smoothstep(0.0, 0.03, water_depth) * sea_open * swash_patch;
 
 	// Composite (see refraction_strength's own doc): water_amount is what
 	// ALPHA used to be. The see-through part is the screen texture behind
@@ -615,14 +822,16 @@ void fragment() {
 	behind *= transmittance;
 
 	// Overlays paint over the whole mix, in order: the surface pattern
-	// (toward the sky colour), the foam line, then the swash front on top.
+	// (toward the sky colour), the open-water crests, the foam line, then
+	// the swash front on top.
 	// Each replaces its amount of both the lit surface term and the see-
 	// through term, so all read at full strength even where the water
 	// itself is nearly transparent.
 	vec3 surface = mix(albedo * water_amount, sky_reflect_color.rgb, pattern_amount);
+	surface = mix(surface, crest_color.rgb, crest_amount);
 	surface = mix(surface, foam_color.rgb, foam_amount);
 	surface = mix(surface, swash_color.rgb, swash_amount);
-	float overlay_amount = 1.0 - (1.0 - pattern_amount) * (1.0 - foam_amount) * (1.0 - swash_amount);
+	float overlay_amount = 1.0 - (1.0 - pattern_amount) * (1.0 - crest_amount) * (1.0 - foam_amount) * (1.0 - swash_amount);
 	// Fog last, over everything, the way the environment fogs the opaque
 	// pass: the lit term and the specular scale down by (1 - fog_t), the
 	// unlit EMISSION carries the flat fog colour in. (The see-through

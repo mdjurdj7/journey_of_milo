@@ -228,6 +228,111 @@ const SEA_BUS_NAME := &"Sea"
 	set(value):
 		foam_strength = value
 		_apply_uniform("foam_strength", value)
+# Broken foam - see sea.gdshader's foam_breakup doc: the cut (0 = the
+# continuous line), the lace's metres per feature, its edge softness, its
+# drift along the long wave, and how much of it reaches the swash front.
+@export_range(0.0, 1.0) var foam_breakup: float = 0.0:
+	set(value):
+		foam_breakup = value
+		_apply_uniform("foam_breakup", value)
+@export var foam_breakup_scale: float = 1.2:
+	set(value):
+		foam_breakup_scale = value
+		_apply_uniform("foam_breakup_scale", value)
+@export var foam_breakup_softness: float = 0.12:
+	set(value):
+		foam_breakup_softness = value
+		_apply_uniform("foam_breakup_softness", value)
+@export var foam_drift_speed: float = 0.05:
+	set(value):
+		foam_drift_speed = value
+		_apply_uniform("foam_drift_speed", value)
+@export_range(0.0, 1.0) var swash_breakup: float = 0.0:
+	set(value):
+		swash_breakup = value
+		_apply_uniform("swash_breakup", value)
+# Textured foam - see sea.gdshader's foam_mask_enabled doc: a greyscale
+# mask (white = foam) in place of the lace above, metres per tile, and a
+# multiplier on its value. Enabled needs the mask; off is the comparison.
+# Handed to Ground too (set_foam_mask()) for the run-up edge.
+@export var foam_mask_enabled: bool = false:
+	set(value):
+		foam_mask_enabled = value
+		_push_foam_mask()
+@export var foam_mask: Texture2D = null:
+	set(value):
+		foam_mask = value
+		_push_foam_mask()
+@export var foam_mask_scale_m: float = 3.0:
+	set(value):
+		foam_mask_scale_m = value
+		_push_foam_mask()
+@export var foam_mask_strength: float = 1.0:
+	set(value):
+		foam_mask_strength = value
+		_push_foam_mask()
+# The mask's motion with the swash (see sea.gdshader's foam_mask_
+# motion()): metres it is carried shoreward at the top of each run-up;
+# above 0 the surf's lace also dissolves as the water recedes and comes
+# back fresh each wave. 0 keeps it still.
+@export var foam_travel_m: float = 0.0:
+	set(value):
+		foam_travel_m = value
+		_push_foam_mask()
+
+@export_group("Open crests")
+# Broad pale crests on the open sea, rolling in along the floor mask's
+# shore-distance contours and broken into stretches - see sea.gdshader's
+# crests_enabled doc. Off by default; a floor turns them on through
+# sea_overrides. crest_period_s should divide sea_time_period.
+@export var crests_enabled: bool = false:
+	set(value):
+		crests_enabled = value
+		_apply_uniform("crests_enabled", value)
+@export var crest_color: Color = Color(0.86, 0.9, 0.9):
+	set(value):
+		crest_color = value
+		_apply_uniform("crest_color", value)
+@export_range(0.0, 1.0) var crest_strength: float = 0.3:
+	set(value):
+		crest_strength = value
+		_apply_uniform("crest_strength", value)
+@export var crest_spacing_m: float = 9.0:
+	set(value):
+		crest_spacing_m = value
+		_apply_uniform("crest_spacing_m", value)
+@export var crest_period_s: float = 14.0:
+	set(value):
+		crest_period_s = value
+		_apply_uniform("crest_period_s", value)
+@export_range(0.0, 0.5) var crest_front: float = 0.05:
+	set(value):
+		crest_front = value
+		_apply_uniform("crest_front", value)
+@export_range(0.0, 1.0) var crest_tail: float = 0.25:
+	set(value):
+		crest_tail = value
+		_apply_uniform("crest_tail", value)
+@export_range(0.0, 1.0) var crest_breakup: float = 0.45:
+	set(value):
+		crest_breakup = value
+		_apply_uniform("crest_breakup", value)
+@export var crest_breakup_scale: float = 7.0:
+	set(value):
+		crest_breakup_scale = value
+		_apply_uniform("crest_breakup_scale", value)
+@export var crest_shore_start: float = 3.0:
+	set(value):
+		crest_shore_start = value
+		_apply_uniform("crest_shore_start", value)
+@export var crest_shore_fade: float = 3.0:
+	set(value):
+		crest_shore_fade = value
+		_apply_uniform("crest_shore_fade", value)
+@export_range(0.0, 1.0) var crest_calm: float = 0.0:
+	set(value):
+		crest_calm = value
+		_apply_uniform("crest_calm", value)
 
 @export_group("Swash")
 # A periodic wash advancing from swash_start_depth to the waterline,
@@ -439,6 +544,12 @@ var _current_volume_db: float
 var _forward: Vector3 = Vector3.FORWARD
 var _ready_complete: bool = false
 var _sea_time: float = 0.0
+# Ground's landmass distance grid as last handed over - see
+# _push_landmass_distance().
+var _landmass_distance_texture: Texture2D = null
+var _landmass_distance_origin: Vector2 = Vector2.ZERO
+var _landmass_distance_cell: float = 0.25
+var _landmass_distance_dims: Vector2 = Vector2.ONE
 # Set by duck(): the distance fade below stops writing the volume so the
 # duck's own tween owns it until this node goes with the floor.
 var _ducked: bool = false
@@ -551,11 +662,36 @@ func _push_swash_source() -> void:
 # hookup DESIGN.md parked: the texture is here now, and calming the waves
 # themselves over the same signal is a second consumer away.
 func set_landmass_distance(texture: Texture2D, origin: Vector2, cell: float, dims: Vector2) -> void:
-	_apply_uniform("landmass_distance_tex", texture)
-	_apply_uniform("landmass_distance_origin", origin)
-	_apply_uniform("landmass_distance_cell", cell)
-	_apply_uniform("landmass_distance_dims", dims)
-	_apply_uniform("landmass_distance_ready", texture != null)
+	_landmass_distance_texture = texture
+	_landmass_distance_origin = origin
+	_landmass_distance_cell = cell
+	_landmass_distance_dims = dims
+	_push_landmass_distance()
+
+# Kept, and re-applied from _apply_all_uniforms(): Ground builds the grid
+# in its own _ready(), before this node's material exists, and a push
+# then would be dropped - leaving every pool with the open sea's surf.
+func _push_landmass_distance() -> void:
+	_apply_uniform("landmass_distance_tex", _landmass_distance_texture)
+	_apply_uniform("landmass_distance_origin", _landmass_distance_origin)
+	_apply_uniform("landmass_distance_cell", _landmass_distance_cell)
+	_apply_uniform("landmass_distance_dims", _landmass_distance_dims)
+	_apply_uniform("landmass_distance_ready", _landmass_distance_texture != null)
+
+# The foam mask onto this material and Ground's (its run-up edge reads
+# the same lace) - see sea.gdshader's foam_mask_enabled doc. On only with
+# a mask set. Ground's own _apply_uniform() no-ops until its material
+# exists; _ready() pushes again once both do.
+func _push_foam_mask() -> void:
+	var enabled: bool = foam_mask_enabled and foam_mask != null
+	_apply_uniform("foam_mask_enabled", enabled)
+	_apply_uniform("foam_mask", foam_mask)
+	_apply_uniform("foam_mask_scale_m", foam_mask_scale_m)
+	_apply_uniform("foam_mask_strength", foam_mask_strength)
+	_apply_uniform("foam_travel_m", foam_travel_m)
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		ground.set_foam_mask(foam_mask, enabled, foam_mask_scale_m, foam_mask_strength, foam_travel_m)
 
 func _push_sea_time() -> void:
 	var ground := get_node_or_null(ground_path) as Ground
@@ -805,9 +941,29 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("surface_pattern_scale", surface_pattern_scale)
 	_apply_uniform("surface_pattern_speed", surface_pattern_speed)
 
+	_apply_uniform("crests_enabled", crests_enabled)
+	_apply_uniform("crest_color", crest_color)
+	_apply_uniform("crest_strength", crest_strength)
+	_apply_uniform("crest_spacing_m", crest_spacing_m)
+	_apply_uniform("crest_period_s", crest_period_s)
+	_apply_uniform("crest_front", crest_front)
+	_apply_uniform("crest_tail", crest_tail)
+	_apply_uniform("crest_breakup", crest_breakup)
+	_apply_uniform("crest_breakup_scale", crest_breakup_scale)
+	_apply_uniform("crest_shore_start", crest_shore_start)
+	_apply_uniform("crest_shore_fade", crest_shore_fade)
+	_apply_uniform("crest_calm", crest_calm)
+
 	_apply_uniform("foam_color", foam_color)
 	_apply_uniform("foam_width", foam_width)
 	_apply_uniform("foam_strength", foam_strength)
+	_apply_uniform("foam_breakup", foam_breakup)
+	_apply_uniform("foam_breakup_scale", foam_breakup_scale)
+	_apply_uniform("foam_breakup_softness", foam_breakup_softness)
+	_apply_uniform("foam_drift_speed", foam_drift_speed)
+	_apply_uniform("swash_breakup", swash_breakup)
+	_push_foam_mask()
+	_push_landmass_distance()
 	_apply_uniform("edge_noise_scale", edge_noise_scale)
 
 	_apply_uniform("swash_color", swash_color)
