@@ -417,7 +417,20 @@ and up the west shore north of z -27. (2026-10-17.)
     not yet known which term carries it (the veil, the sheen, the
     filter's lift of the bed, or the bed's own wet tone). Next look:
     each of those one at a time from Sea's Pool water group, live.
-  - **Striped shadows on the ground, unresolved.** Under floor 1's trial
+  - **Lighting and upper-boat dressing reviewed (2026-10-31): accepted
+    intermediate state, not yet a match to the target.** Floor 1's light:
+    sun elevation 45 (from 35; azimuth 70, energy 1.1, colour kept),
+    shadow softness 0.5 deg and blur 1.0 (FloorData shadow_softness/
+    shadow_blur, new; the scene's 3 deg / 4.0 had drawn the dotted,
+    striped shadows), darkness 0.6, ambient 0.35 (from 0.5); the
+    region's fog unchanged. Two diagnostics, off by default:
+    OvercastLight.shadow_diagnostic_hard and RegionSky.fog_diagnostic_off.
+    Hull 3's dressing gained a Gathered group (its own toggle): debris
+    tight round the bow and stern, wrack inside the hull, a bare middle.
+    Known limits: one wrack painting for all seven decals, its strands
+    ~1-2 px at the field camera; samphire flat-tinted.
+  - **Striped shadows on the ground: resolved on floor 1 (2026-10-31).**
+    Under floor 1's trial
     light, the Wanderer's and the hulls' shadows read as fine stripes
     on the sand to their left (the sun's side away), seen on the left of
     the map. Suspected, not confirmed: the sun's soft shadows
@@ -425,7 +438,9 @@ and up the west shore north of z -27. (2026-10-17.)
     over the longer 35-degree shadow. Next tests, one at a time: his
     ContactShadow hidden; his meshes' Cast Shadow off; then
     `shadow_blur` 4 -> 1, `shadow_softness` 3 -> 1. Not yet known
-    whether it showed before the lighting change.
+    whether it showed before the lighting change. Resolved: the hard
+    diagnostic (softness 0, blur 1) drew a clean shadow, and floor 1 now
+    keeps 0.5 deg / 1.0. Other floors keep the scene's 3 / 4.
 - **The Samurai is a shell; these are left as they are.** She is a
   second CharacterData (`run/data/samurai.tres`), selected by
   RegionField's `starting_character` export, with no cards, mechanics or

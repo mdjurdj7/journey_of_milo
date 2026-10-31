@@ -194,6 +194,16 @@ class_name FloorData
 	set(value):
 		shadow_darkness = value
 		emit_changed()
+# OvercastLight.shadow_softness (degrees of penumbra) and
+# shadow_blur_amount.
+@export var shadow_softness: float = -1.0:
+	set(value):
+		shadow_softness = value
+		emit_changed()
+@export var shadow_blur: float = -1.0:
+	set(value):
+		shadow_blur = value
+		emit_changed()
 @export var ambient_energy: float = -1.0:
 	set(value):
 		ambient_energy = value

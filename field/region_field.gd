@@ -510,6 +510,8 @@ var _scene_sun_elevation_degrees: float = 0.0
 var _scene_sun_energy: float = 0.0
 var _scene_sun_color: Color = Color.WHITE
 var _scene_shadow_darkness: float = 0.0
+var _scene_shadow_softness: float = 0.0
+var _scene_shadow_blur: float = 0.0
 var _scene_ambient_energy: float = 0.0
 var _scene_light_captured: bool = false
 # The scene's own sea colour and depth, likewise - see
@@ -2320,6 +2322,8 @@ func _capture_scene_light() -> void:
 		_scene_sun_energy = sun.energy
 		_scene_sun_color = sun.color
 		_scene_shadow_darkness = sun.shadow_darkness
+		_scene_shadow_softness = sun.shadow_softness
+		_scene_shadow_blur = sun.shadow_blur_amount
 	var sky := get_region_sky()
 	if sky != null:
 		_scene_ambient_energy = sky.ambient_energy
@@ -2338,6 +2342,8 @@ func _apply_floor_light() -> void:
 		sun.energy = floor_data.sun_energy if floor_data.sun_energy >= 0.0 else _scene_sun_energy
 		sun.color = floor_data.sun_color if floor_data.sun_color.a > 0.0 else _scene_sun_color
 		sun.shadow_darkness = floor_data.shadow_darkness if floor_data.shadow_darkness >= 0.0 else _scene_shadow_darkness
+		sun.shadow_softness = floor_data.shadow_softness if floor_data.shadow_softness >= 0.0 else _scene_shadow_softness
+		sun.shadow_blur_amount = floor_data.shadow_blur if floor_data.shadow_blur >= 0.0 else _scene_shadow_blur
 	var sky := get_region_sky()
 	if sky != null:
 		sky.ambient_energy = floor_data.ambient_energy if floor_data.ambient_energy >= 0.0 else _scene_ambient_energy

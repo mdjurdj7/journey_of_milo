@@ -72,6 +72,15 @@ signal fog_changed()
 	set(value):
 		fog_light_energy = value
 		_apply_fog()
+# Diagnostic, off by default: while on, no depth fog anywhere - the
+# environment's fog is off and current_fog_depth_begin()/end() report a
+# range past any view, so the fog's copies (the Sea's, the enemies' and
+# the Wanderer's overlays, all synced on fog_changed) clear with it. No
+# fog export is touched, so turning it off restores them exactly.
+@export var fog_diagnostic_off: bool = false:
+	set(value):
+		fog_diagnostic_off = value
+		_apply_fog()
 # Flat color fill instead of the sky's own color - AMBIENT_SOURCE_SKY was
 # tinting every surface (sand most of all) noticeably blue, since the
 # procedural sky's horizon/top colors lean cool. Neutral grey (no warm
@@ -173,6 +182,9 @@ signal fog_changed()
 		_apply_adjustments()
 
 var _environment: Environment
+# fog_diagnostic_off's fog range, camera metres: past anything on screen.
+const FOG_DIAGNOSTIC_FAR := 1000000.0
+
 # The zone intro's borrowed depth fog while it runs (set_fog_override()).
 var _override_active: bool = false
 var _override_begin: float = 0.0
@@ -209,9 +221,13 @@ func _ready() -> void:
 # The depth fog on screen now: the override while one is up, else the
 # exports.
 func current_fog_depth_begin() -> float:
+	if fog_diagnostic_off:
+		return FOG_DIAGNOSTIC_FAR
 	return _override_begin if _override_active else fog_depth_begin
 
 func current_fog_depth_end() -> float:
+	if fog_diagnostic_off:
+		return FOG_DIAGNOSTIC_FAR + 1.0
 	return _override_end if _override_active else fog_depth_end
 
 # The zone intro's borrowed depth fog: on screen at once, the exports
@@ -245,6 +261,7 @@ func _apply_ambient() -> void:
 func _apply_fog() -> void:
 	if _environment == null:
 		return
+	_environment.fog_enabled = not fog_diagnostic_off
 	_environment.fog_mode = fog_mode
 	_environment.fog_light_color = fog_color
 	_environment.fog_light_energy = fog_light_energy
