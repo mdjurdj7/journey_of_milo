@@ -334,6 +334,93 @@ const SEA_BUS_NAME := &"Sea"
 		crest_calm = value
 		_apply_uniform("crest_calm", value)
 
+@export_group("Pool water")
+# Clearer water over enclosed pools - see sea.gdshader's pool_clarity_
+# enabled doc. The pool_bed_* and pool_bank_* values are Ground's half,
+# pushed with it (Ground.set_pool_clarity()). Off by default; a floor
+# turns it on through sea_overrides. The open sea is untouched.
+@export var pool_clarity_enabled: bool = false:
+	set(value):
+		pool_clarity_enabled = value
+		_push_pool_clarity()
+@export var pool_tint_color: Color = Color(0.48, 0.78, 0.74):
+	set(value):
+		pool_tint_color = value
+		_apply_uniform("pool_tint_color", value)
+# The water's own colour over a pool, a veil over the bed, in place of
+# shallow_alpha.
+@export_range(0.0, 1.0) var pool_tint: float = 0.06:
+	set(value):
+		pool_tint = value
+		_apply_uniform("pool_tint", value)
+# How far the bed seen through a pool is coloured toward pool_tint_color
+# - a filter, so the bed keeps its contrast.
+@export_range(0.0, 1.0) var pool_filter: float = 0.3:
+	set(value):
+		pool_filter = value
+		_apply_uniform("pool_filter", value)
+# Water depth (m) over which a pool's waterline fades in, in place of
+# shore_fade_width.
+@export var pool_edge_depth_m: float = 0.04:
+	set(value):
+		pool_edge_depth_m = value
+		_apply_uniform("pool_edge_depth_m", value)
+# Fraction of absorption a pool's bed is seen through.
+@export_range(0.0, 1.0) var pool_absorption_scale: float = 0.5:
+	set(value):
+		pool_absorption_scale = value
+		_apply_uniform("pool_absorption_scale", value)
+# The pool's own surface (see sea.gdshader's pool_sheen doc): a moving
+# sky sheen, and fine moving glint lines over it.
+@export_range(0.0, 1.0) var pool_sheen: float = 0.14:
+	set(value):
+		pool_sheen = value
+		_apply_uniform("pool_sheen", value)
+@export var pool_glint_color: Color = Color(0.96, 0.97, 0.95):
+	set(value):
+		pool_glint_color = value
+		_apply_uniform("pool_glint_color", value)
+@export_range(0.0, 1.0) var pool_glint_strength: float = 0.35:
+	set(value):
+		pool_glint_strength = value
+		_apply_uniform("pool_glint_strength", value)
+@export var pool_glint_scale_m: float = 3.0:
+	set(value):
+		pool_glint_scale_m = value
+		_apply_uniform("pool_glint_scale_m", value)
+@export_range(0.0, 1.0) var pool_glint_width: float = 0.2:
+	set(value):
+		pool_glint_width = value
+		_apply_uniform("pool_glint_width", value)
+@export var pool_glint_speed: float = 0.06:
+	set(value):
+		pool_glint_speed = value
+		_apply_uniform("pool_glint_speed", value)
+# Ground: the pool bed's wet darkening under the water, in place of its
+# wet_darken.
+@export_range(0.0, 1.0) var pool_bed_wet_darken: float = 0.9:
+	set(value):
+		pool_bed_wet_darken = value
+		_push_pool_clarity()
+# Ground: the wet bank's darkening just above a pool's waterline, in place
+# of its wet_darken - the narrow wet edge.
+@export_range(0.0, 1.0) var pool_bank_wet_darken: float = 0.8:
+	set(value):
+		pool_bank_wet_darken = value
+		_push_pool_clarity()
+# Ground: how much of the dry sand's own detail (texture, ripple patches,
+# grain, wind ripples) the pool's bed and bank keep.
+@export_range(0.0, 1.0) var pool_bed_detail: float = 0.85:
+	set(value):
+		pool_bed_detail = value
+		_push_pool_clarity()
+# Ground: the damp bank's height band round a pool, as a fraction of its
+# shore_slope_start - narrower, so the bank reads as a rim.
+@export_range(0.0, 1.0) var pool_bank_wet_scale: float = 0.35:
+	set(value):
+		pool_bank_wet_scale = value
+		_push_pool_clarity()
+
 @export_group("Swash")
 # A periodic wash advancing from swash_start_depth to the waterline,
 # holding, receding - see sea.gdshader's swash_strength doc. Ground's wet
@@ -693,6 +780,14 @@ func _push_foam_mask() -> void:
 	if ground != null:
 		ground.set_foam_mask(foam_mask, enabled, foam_mask_scale_m, foam_mask_strength, foam_travel_m)
 
+# The pool clarity switch onto this material and Ground's half onto its
+# own (see the Pool water group). Same timing as _push_foam_mask().
+func _push_pool_clarity() -> void:
+	_apply_uniform("pool_clarity_enabled", pool_clarity_enabled)
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		ground.set_pool_clarity(pool_clarity_enabled, pool_bed_wet_darken, pool_bank_wet_darken, pool_bed_detail, pool_bank_wet_scale)
+
 func _push_sea_time() -> void:
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground != null:
@@ -953,6 +1048,18 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("crest_shore_start", crest_shore_start)
 	_apply_uniform("crest_shore_fade", crest_shore_fade)
 	_apply_uniform("crest_calm", crest_calm)
+	_apply_uniform("pool_tint_color", pool_tint_color)
+	_apply_uniform("pool_tint", pool_tint)
+	_apply_uniform("pool_filter", pool_filter)
+	_apply_uniform("pool_edge_depth_m", pool_edge_depth_m)
+	_apply_uniform("pool_absorption_scale", pool_absorption_scale)
+	_apply_uniform("pool_sheen", pool_sheen)
+	_apply_uniform("pool_glint_color", pool_glint_color)
+	_apply_uniform("pool_glint_strength", pool_glint_strength)
+	_apply_uniform("pool_glint_scale_m", pool_glint_scale_m)
+	_apply_uniform("pool_glint_width", pool_glint_width)
+	_apply_uniform("pool_glint_speed", pool_glint_speed)
+	_push_pool_clarity()
 
 	_apply_uniform("foam_color", foam_color)
 	_apply_uniform("foam_width", foam_width)

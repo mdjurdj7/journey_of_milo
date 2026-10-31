@@ -136,6 +136,8 @@ sea_overrides = {
 "foam_width": 0.18,
 "long_wave_amplitude": 0.1,
 "noise_amplitude": 0.03,
+"pool_clarity_enabled": true,
+"pool_glint_strength": 0.15,
 "sea_roughness": 0.55,
 "sea_specular": 0.3,
 "short_wave_amplitude": 0.03,

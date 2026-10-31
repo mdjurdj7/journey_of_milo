@@ -424,6 +424,20 @@ uniform float damp_shore_width_m = 2.0;
 uniform float damp_shore_breakup : hint_range(0.0, 1.0) = 0.5;
 uniform float damp_shore_breakup_scale = 4.0;
 uniform float damp_shore_edge_m = 0.35;
+// Pool clarity, Ground's half (pushed by Sea - see sea.gdshader's
+// pool_clarity_enabled doc), by the enclosure grid: a pool's bed and bank
+// are wet-darkened in place of wet_darken - the bed under the water by
+// pool_bed_wet_darken, the bank above it by pool_bank_wet_darken, so the
+// waterline keeps a narrow wet edge - and keep
+// pool_bed_detail of the dry sand's own detail (its texture, ripple
+// patches, grain and wind ripples), which wet and submerged sand
+// otherwise lose; the height-band damp bank round it is
+// pool_bank_wet_scale as tall. The open shore is untouched.
+uniform bool pool_clarity_enabled = false;
+uniform float pool_bed_wet_darken : hint_range(0.0, 1.0) = 0.9;
+uniform float pool_bank_wet_darken : hint_range(0.0, 1.0) = 0.8;
+uniform float pool_bed_detail : hint_range(0.0, 1.0) = 0.85;
+uniform float pool_bank_wet_scale : hint_range(0.0, 1.0) = 0.35;
 // Wind ripples on dry open sand: a fine wave along one world direction,
 // wind_ripple_angle degrees from +X toward +Z (its crests run across it),
 // wind_ripple_scale metres crest to crest, warped by slow noise
@@ -1526,6 +1540,10 @@ void fragment() {
 
 	float base_wetness = wetness_mask(v_world_xz);
 	float band_height = shore_band_height(shore_distance, runup_max, swash_ph, swash_amp, open);
+	// Pool clarity (see its doc): the damp bank's band narrowed round a
+	// pool.
+	float pool_clear = pool_clarity_enabled ? enclosure : 0.0;
+	band_height = mix(band_height, max(band_height * pool_bank_wet_scale, 0.001), pool_clear);
 	float sand_wetness = sand_wetness_mask(v_world_xz, v_world_height, band_height);
 	// The run-up's own wet mark, on top of the height band: as far as the
 	// sheet reached this cycle, drying back over wet_dry_time.
@@ -1535,6 +1553,11 @@ void fragment() {
 	// A stamped pool's damp rim, and the pool itself further down.
 	float pool_stamp_d = pool_stamp_distance(v_world_xz);
 	sand_wetness = max(sand_wetness, 1.0 - smoothstep(0.0, max(pool_stamp_rim, 0.001), pool_stamp_d));
+	// The dry detail's own gates, relaxed by pool_bed_detail over a pool
+	// (see pool_clarity_enabled's doc).
+	float pool_keep = pool_clear * pool_bed_detail;
+	float detail_wetness = sand_wetness * (1.0 - pool_keep);
+	float detail_dry = (1.0 - detail_wetness) * (1.0 - smoothstep(0.0, 0.05, sea_level - v_world_height) * (1.0 - pool_keep));
 
 	// VERTEX in fragment() is view-space; its length is distance from the camera.
 	float dist = length(VERTEX);
@@ -1574,7 +1597,7 @@ void fragment() {
 	vec3 ripple_patch_color = texture(ripple_patch_texture, ripple_patch_uv(v_world_xz)).rgb;
 	float ripple_patch_weight = 0.0;
 	if (sand_texture_enabled && ripple_patch_enabled) {
-		float ripple_patch_dry = (1.0 - sand_wetness) * (1.0 - smoothstep(0.0, 0.05, sea_level - v_world_height));
+		float ripple_patch_dry = detail_dry;
 		float ripple_patch_near = 1.0 - smoothstep(ripple_patch_fade_distance.x, max(ripple_patch_fade_distance.y, ripple_patch_fade_distance.x + 0.001), dist);
 		ripple_patch_weight = ripple_patch_coverage(v_world_xz) * ripple_patch_dry * ripple_patch_near * sand_detail * (1.0 - rock);
 		if (ripple_patch_weight > 0.001 && wear_enabled) {
@@ -1584,7 +1607,7 @@ void fragment() {
 		}
 	}
 	if (sand_texture_enabled) {
-		float sand_texture_dry = (1.0 - sand_wetness) * (1.0 - smoothstep(0.0, 0.05, sea_level - v_world_height));
+		float sand_texture_dry = detail_dry;
 		float sand_texture_near = 1.0 - smoothstep(sand_texture_fade_distance.x, max(sand_texture_fade_distance.y, sand_texture_fade_distance.x + 0.001), dist);
 		sand_texture_weight = sand_texture_coverage(v_world_xz) * sand_texture_dry * sand_texture_near * sand_detail;
 		// Its colour thinned under the patches as its normal is below, so
@@ -1625,7 +1648,8 @@ void fragment() {
 	float tone_value = dot(dry, vec3(0.299, 0.587, 0.114));
 	dry = mix(dry, vec3(tone_value) * lee_shade_cool_tint, clamp(lee_shade_cool * tone.x, 0.0, 1.0));
 	dry *= distance_tint;
-	vec3 wet = dry * wet_darken;
+	float pool_wet_darken = mix(pool_bank_wet_darken, pool_bed_wet_darken, smoothstep(0.0, 0.02, sea_level - v_world_height));
+	vec3 wet = dry * mix(wet_darken, pool_wet_darken, pool_clear);
 
 	vec3 sand_albedo = mix(dry, wet, sand_wetness);
 
@@ -1650,7 +1674,7 @@ void fragment() {
 	// grainy - by the same sand_wetness driving the dry/wet blend above,
 	// and quieted again on a walked band, which is packed for the same
 	// reason.
-	float grain_suppression = (1.0 - sand_wetness) * wear_smoothing * sand_detail;
+	float grain_suppression = (1.0 - detail_wetness) * wear_smoothing * sand_detail;
 	float grain = grain_value(v_world_xz) * grain_strength * grain_suppression;
 	sand_albedo *= 1.0 + grain;
 
@@ -1676,7 +1700,7 @@ void fragment() {
 		float wind_aa = 1.0 - smoothstep(0.25, 0.5, fwidth(wind_phase));
 		float wind_wave = sin(wind_phase * 6.2831853);
 		wind_wave *= abs(wind_wave);
-		float ripple_suppression = (1.0 - sand_wetness) * (1.0 - wear * wear_ripple_flatten) * sand_detail;
+		float ripple_suppression = (1.0 - detail_wetness) * (1.0 - wear * wear_ripple_flatten) * sand_detail;
 		sand_albedo *= 1.0 + wind_ripple_strength * wind_wave * wind_aa * (1.0 - slope_t) * ripple_suppression * form_fade;
 	}
 

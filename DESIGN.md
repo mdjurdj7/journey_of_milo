@@ -398,6 +398,25 @@ and up the west shore north of z -27. (2026-10-17.)
     textured hulls, hull 3's dressing (DressingGroup/DressingItem: the
     wrack decal and driftwood_v1). All floor 1 opt-ins through its
     overrides; other floors unchanged.
+  - **Floor 1's enclosed pool: clarity pass (2026-10-31).** The pool by
+    the crab is 5 x 3 m and 7 cm deep on average, inside the sea's 0.3 m
+    shore_fade_width, so the open sea's depth curve left it ~2% water:
+    wet-darkened sand under a faint cyan shift, ringed by a wide wet band
+    (the slopes are gentle). Sea's Pool water group (off by default;
+    floor 1 opts in through sea_overrides, pool_glint_strength 0.15),
+    scaled by the enclosure grid so the open sea is untouched: the pool's
+    own waterline fade (pool_edge_depth_m), a light veil (pool_tint) and
+    a colour filter on the bed (pool_filter) in place of a painted tint,
+    halved absorption, a moving sky sheen and fine drifting glint lines;
+    and, pushed to Ground, the bed and bank keep most of the dry sand's
+    detail (pool_bed_detail), a lighter bed, a narrow wet edge above the
+    waterline. The mask's square lower-left corner of that pool is
+    rounded (Map2_mask.png, ~1.5 m round world (-4.0, -11.5); depth and
+    enclosure unchanged).
+  - **Deferred: the pool still reads soft and milky.** Accepted for now;
+    not yet known which term carries it (the veil, the sheen, the
+    filter's lift of the bed, or the bed's own wet tone). Next look:
+    each of those one at a time from Sea's Pool water group, live.
   - **Striped shadows on the ground, unresolved.** Under floor 1's trial
     light, the Wanderer's and the hulls' shadows read as fine stripes
     on the sand to their left (the sun's side away), seen on the left of

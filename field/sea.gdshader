@@ -183,6 +183,36 @@ uniform float crest_shore_start = 3.0;
 uniform float crest_shore_fade = 3.0;
 uniform float crest_calm : hint_range(0.0, 1.0) = 0.0;
 
+// Pool clarity: a pool's water, by the enclosure grid, is a few cm deep -
+// inside shore_fade_width, so the open sea's depth curve leaves it all
+// but invisible. Over a pool instead: the waterline softener runs over
+// pool_edge_depth_m; the bed seen through it is coloured toward
+// pool_tint_color by pool_filter (a filter, the colour scaled to its
+// brightest channel, so the bed keeps its contrast) and absorbed at
+// pool_absorption_scale of absorption; and the water's own colour, a
+// veil over the bed, starts at pool_tint in place of shallow_alpha.
+// Ground's half (the bed's and bank's detail and darkening) is pushed
+// from Sea's same group. Off unless pool_clarity_enabled.
+uniform bool pool_clarity_enabled = false;
+uniform vec4 pool_tint_color : source_color = vec4(0.48, 0.78, 0.74, 1.0);
+uniform float pool_tint : hint_range(0.0, 1.0) = 0.06;
+uniform float pool_filter : hint_range(0.0, 1.0) = 0.3;
+uniform float pool_edge_depth_m = 0.04;
+uniform float pool_absorption_scale : hint_range(0.0, 1.0) = 0.5;
+// The pool's own surface, so it reads as water over the bed rather than a
+// tint on it: pool_sheen of sky_reflect_color, swelling and thinning with
+// the same drifting ripple field the normal uses; and fine
+// glints toward pool_glint_color - thin lines where a drifting noise every
+// pool_glint_scale_m metres crosses its midline, within pool_glint_width of
+// it, broken by a second layer, moving at pool_glint_speed - at up to
+// pool_glint_strength. Both fade in with the pool's own waterline.
+uniform float pool_sheen : hint_range(0.0, 1.0) = 0.14;
+uniform vec4 pool_glint_color : source_color = vec4(0.96, 0.97, 0.95, 1.0);
+uniform float pool_glint_strength : hint_range(0.0, 1.0) = 0.35;
+uniform float pool_glint_scale_m = 3.0;
+uniform float pool_glint_width : hint_range(0.0, 1.0) = 0.2;
+uniform float pool_glint_speed = 0.06;
+
 // Foam: a thin bright line at the waterline - foam_width metres of water
 // DEPTH wide (~2-3x that laterally at the beach's slope), hugging the
 // true waterline however it curves. A touch lighter than shallow_color,
@@ -709,6 +739,14 @@ void fragment() {
 	// Edge: the thin waterline softener (see shore_fade_width's own doc).
 	float edge_alpha = smoothstep(0.0, max(shore_fade_width, 0.001), water_depth);
 
+	// Pool clarity (see pool_clarity_enabled's doc): scaled by the
+	// enclosure, so the open sea is untouched and nothing draws an edge
+	// where a pool meets it.
+	float pool_clear = pool_clarity_enabled ? landmass_enclosure_at(v_world_xz) : 0.0;
+	edge_alpha = mix(edge_alpha, smoothstep(0.0, max(pool_edge_depth_m, 0.001), water_depth), pool_clear);
+	water_rgb = mix(water_rgb, pool_tint_color.rgb, pool_clear);
+	depth_alpha = mix(depth_alpha, mix(pool_tint, 1.0, depth_t), pool_clear);
+
 	// Sky reflection: Schlick with a floor (see sky_reflect_color's own
 	// doc), then modulated by the same ripple field the normal above was
 	// perturbed by - h_c is sea_height()'s two-octave sum, range ~[0, 1.5]
@@ -747,6 +785,17 @@ void fragment() {
 	float crest = open_crest_at(v_world_xz, sea_time, crest_zone) * (1.0 - landmass_enclosure_at(v_world_xz));
 	float crest_amount = crest * crest_strength * edge_alpha;
 	pattern_amount *= 1.0 - crest_calm * crest_zone * (1.0 - crest);
+
+	// The pool's surface (see pool_sheen's doc): the sheen joins the
+	// surface pattern (both toward the sky colour), the glints go on top.
+	float pool_surface = edge_alpha * pool_clear;
+	float pool_sheen_amount = pool_sheen * pool_surface * smoothstep(-0.6, 0.8, ripple);
+	pattern_amount = 1.0 - (1.0 - pattern_amount) * (1.0 - pool_sheen_amount);
+	vec2 glint_p = v_world_xz / max(pool_glint_scale_m, 0.01);
+	float glint_a = surface_noise_rotated(glint_p, 0.37, vec2(0.6, 0.2) * pool_glint_speed * sea_time);
+	float glint_b = surface_noise_rotated(glint_p * 1.37, 1.91, vec2(-0.3, 0.5) * pool_glint_speed * sea_time);
+	float glint_ridge = 1.0 - abs(glint_a * 2.0 - 1.0);
+	float pool_glint_amount = pool_glint_strength * pool_surface * smoothstep(1.0 - max(pool_glint_width, 0.001), 1.0, glint_ridge) * smoothstep(0.45, 0.75, glint_b);
 
 	// Foam: a band foam_width of water depth wide right at the true
 	// waterline, patchy via value noise, breathing with the long wave's
@@ -818,8 +867,10 @@ void fragment() {
 	// Absorption through this fragment's own column of water (see
 	// absorption's doc) - the depth at SCREEN_UV, not at the refracted UV;
 	// the offset is a few pixels, the difference is nothing.
-	vec3 transmittance = exp(-water_depth * max(absorption, vec3(0.0)));
+	vec3 transmittance = exp(-water_depth * max(absorption, vec3(0.0)) * mix(1.0, pool_absorption_scale, pool_clear));
 	behind *= transmittance;
+	vec3 pool_filter_color = pool_tint_color.rgb / max(max(pool_tint_color.r, max(pool_tint_color.g, pool_tint_color.b)), 0.001);
+	behind *= mix(vec3(1.0), pool_filter_color, pool_filter * edge_alpha * pool_clear);
 
 	// Overlays paint over the whole mix, in order: the surface pattern
 	// (toward the sky colour), the open-water crests, the foam line, then
@@ -829,9 +880,10 @@ void fragment() {
 	// itself is nearly transparent.
 	vec3 surface = mix(albedo * water_amount, sky_reflect_color.rgb, pattern_amount);
 	surface = mix(surface, crest_color.rgb, crest_amount);
+	surface = mix(surface, pool_glint_color.rgb, pool_glint_amount);
 	surface = mix(surface, foam_color.rgb, foam_amount);
 	surface = mix(surface, swash_color.rgb, swash_amount);
-	float overlay_amount = 1.0 - (1.0 - pattern_amount) * (1.0 - crest_amount) * (1.0 - foam_amount) * (1.0 - swash_amount);
+	float overlay_amount = 1.0 - (1.0 - pattern_amount) * (1.0 - crest_amount) * (1.0 - pool_glint_amount) * (1.0 - foam_amount) * (1.0 - swash_amount);
 	// Fog last, over everything, the way the environment fogs the opaque
 	// pass: the lit term and the specular scale down by (1 - fog_t), the
 	// unlit EMISSION carries the flat fog colour in. (The see-through

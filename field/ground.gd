@@ -1651,6 +1651,16 @@ func set_foam_mask(mask: Texture2D, enabled: bool, scale_m: float, strength: flo
 	_apply_uniform("foam_mask_strength", strength)
 	_apply_uniform("foam_travel_m", travel_m)
 
+# Called by sea.gd (its _push_pool_clarity()): its pool clarity switch and
+# the bed's and bank's values - see ground.gdshader's pool_clarity_enabled
+# doc. Just pushes uniforms; Sea pushes again from its _ready().
+func set_pool_clarity(enabled: bool, bed_wet_darken: float, bank_wet_darken: float, bed_detail: float, bank_wet_scale: float) -> void:
+	_apply_uniform("pool_clarity_enabled", enabled)
+	_apply_uniform("pool_bed_wet_darken", bed_wet_darken)
+	_apply_uniform("pool_bank_wet_darken", bank_wet_darken)
+	_apply_uniform("pool_bed_detail", bed_detail)
+	_apply_uniform("pool_bank_wet_scale", bank_wet_scale)
+
 # The walked band's centreline, in world XZ, from its start to its end
 # through every point between. Three points: start, a point it passes
 # THROUGH, end - one curve. Four to WEAR_MAX_POINTS: a smooth chain
