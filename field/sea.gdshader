@@ -183,6 +183,35 @@ uniform float crest_shore_start = 3.0;
 uniform float crest_shore_fade = 3.0;
 uniform float crest_calm : hint_range(0.0, 1.0) = 0.0;
 
+// Wave faces: small readable waves on the open sea, in place of the
+// crests' pale bands and the surface pattern's blotches. Nine short
+// waves spread +-63 degrees around long_wave_direction, from about half
+// to 1.2 x wave_face_length_m, each at its own period (shorter ones
+// slower), so they cross into short, irregular faces of varied width
+// whose direction drifts across the water. Straight waves summed, no
+// warp, so the normal is the drawn surface's exact slope. Faces turned
+// away from the camera and crests lighten the water's colour, faces
+// turned toward it and troughs darken it, by up to wave_face_shade
+// either way. Highlights in crest_color by wave_face_highlight (0 by
+// default, pending review): thin lines along the strongest wave's crest
+// (its top wave_face_highlight_width), broken where the others pull the
+// water down and cut by crest_breakup. The crests' rolling bands become
+// groups for the normal and highlights (not the shading): full strength
+// in each set, wave_face_quiet of it between. Same open-water zone as
+// the crests: off near the shore and over pools. Off unless
+// wave_faces_enabled; off, every term is the crests' and pattern's own.
+// Periods are rounded to whole cycles of sea_time_period, so nothing
+// jumps at the time wrap.
+uniform bool wave_faces_enabled = false;
+uniform float wave_face_length_m = 1.6;
+uniform float wave_face_period_s = 2.4;
+uniform float wave_face_steepness = 0.15;
+uniform float wave_face_shade : hint_range(0.0, 1.0) = 0.3;
+uniform float wave_face_highlight : hint_range(0.0, 1.0) = 0.0;
+uniform float wave_face_highlight_width : hint_range(0.02, 0.5) = 0.06;
+uniform float wave_face_quiet : hint_range(0.0, 1.0) = 0.3;
+uniform float sea_time_period = 7000.0;
+
 // Pool clarity: a pool's water, by the enclosure grid, is a few cm deep -
 // inside shore_fade_width, so the open sea's depth curve leaves it all
 // but invisible. Over a pool instead: the waterline softener runs over
@@ -525,6 +554,37 @@ float mask_shore_distance_at(vec2 world_xz) {
 	return texture(landmass_distance_tex, uv).r;
 }
 
+// The crests' open water: 0 within crest_shore_start of the waterline,
+// in over crest_shore_fade, and out again within 4 m of the grid's own
+// edge, where the distance is clamped and the contours stop following
+// the shore. 0 with no grid.
+float open_water_zone(vec2 world_xz) {
+	if (!landmass_distance_ready) {
+		return 0.0;
+	}
+	float d = mask_shore_distance_at(world_xz);
+	float shore_in = smoothstep(crest_shore_start, crest_shore_start + max(crest_shore_fade, 0.001), d);
+	vec2 grid_size = landmass_distance_dims * max(landmass_distance_cell, 0.001);
+	vec2 from_origin = world_xz - landmass_distance_origin;
+	vec2 to_edge = min(from_origin, grid_size - from_origin);
+	float in_grid = smoothstep(0.0, 4.0, min(to_edge.x, to_edge.y));
+	return shore_in * in_grid;
+}
+
+// Crest spacings out from the shore plus crest periods elapsed: its
+// whole part numbers the crest, its fraction is where in the spacing.
+float crest_phase_at(vec2 world_xz, float time) {
+	return mask_shore_distance_at(world_xz) / max(crest_spacing_m, 0.001) + time / max(crest_period_s, 0.001);
+}
+
+// A crest's cut along its length, a different one per crest_index: 1
+// where kept, 0 in the quiet stretches between.
+float crest_keep(vec2 world_xz, float crest_index) {
+	vec2 cut_p = world_xz / max(crest_breakup_scale, 0.001) + vec2(crest_index * 7.31, crest_index * -3.17);
+	float cut = lace_noise(cut_p) * 0.7 + lace_noise(cut_p * 2.3 + vec2(5.7, 1.9)) * 0.3;
+	return smoothstep(crest_breakup - 0.12, crest_breakup + 0.12, cut);
+}
+
 // 0..1, the open-water crests here (see crests_enabled's doc), before
 // strength, colour and the pool gate; zone is how far into the open
 // water the crests run here (0 near the shore, off, or past the grid).
@@ -533,24 +593,85 @@ float open_crest_at(vec2 world_xz, float time, out float zone) {
 	if (!crests_enabled || !landmass_distance_ready) {
 		return 0.0;
 	}
-	float d = mask_shore_distance_at(world_xz);
-	float shore_in = smoothstep(crest_shore_start, crest_shore_start + max(crest_shore_fade, 0.001), d);
-	// The grid's own edge: within 4 m of it the distance is clamped, so
-	// the contours stop following the shore.
-	vec2 grid_size = landmass_distance_dims * max(landmass_distance_cell, 0.001);
-	vec2 from_origin = world_xz - landmass_distance_origin;
-	vec2 to_edge = min(from_origin, grid_size - from_origin);
-	float in_grid = smoothstep(0.0, 4.0, min(to_edge.x, to_edge.y));
-	zone = shore_in * in_grid;
-	float phase = d / max(crest_spacing_m, 0.001) + time / max(crest_period_s, 0.001);
+	zone = open_water_zone(world_xz);
+	float phase = crest_phase_at(world_xz, time);
 	float s = fract(phase);
 	float front = max(crest_front, 0.001);
 	float band = smoothstep(0.0, front, s) * (1.0 - smoothstep(front, front + max(crest_tail, 0.001), s));
-	float crest_index = floor(phase);
-	vec2 cut_p = world_xz / max(crest_breakup_scale, 0.001) + vec2(crest_index * 7.31, crest_index * -3.17);
-	float cut = lace_noise(cut_p) * 0.7 + lace_noise(cut_p * 2.3 + vec2(5.7, 1.9)) * 0.3;
-	float keep = smoothstep(crest_breakup - 0.12, crest_breakup + 0.12, cut);
-	return band * keep * zone;
+	return band * crest_keep(world_xz, floor(phase)) * zone;
+}
+
+// The wave faces' set here (see wave_faces_enabled's doc): 0..1 across
+// each crest spacing, peaking midway and 0 where one crest's cut hands
+// over to the next, so the sets roll in with the crests' timing without
+// a seam.
+float wave_group_at(vec2 world_xz, float time) {
+	float phase = crest_phase_at(world_xz, time);
+	float swell = sin(PI * fract(phase));
+	return swell * swell * crest_keep(world_xz, floor(phase));
+}
+
+// Rounded to a whole number of cycles per sea_time_period, so a phase
+// read at the wrap continues seamlessly.
+float wrap_safe_rate(float period_s) {
+	float cycles = max(round(max(sea_time_period, 1.0) / max(period_s, 0.001)), 1.0);
+	return cycles / max(sea_time_period, 1.0);
+}
+
+// The wave faces' directional spread (see wave_faces_enabled's doc):
+// each wave's heading off long_wave_direction (radians) and its length
+// as a fraction of wave_face_length_m. Neither a whole-number ratio nor a
+// repeated heading, so the sum has no visible period, and spread to
+// +-63 degrees so no single heading runs the whole sea.
+const int WAVE_FACE_COUNT = 9;
+const float WAVE_FACE_ANGLES[WAVE_FACE_COUNT] = float[](0.0, 0.663, -0.541, 1.100, -0.995, 0.297, -0.209, 0.855, -0.768);
+const float WAVE_FACE_LENGTHS[WAVE_FACE_COUNT] = float[](1.0, 0.83, 0.71, 0.62, 1.18, 0.55, 0.91, 0.67, 0.77);
+
+// The waves' sum, exact: returns height over 3.5 standard deviations of
+// the sum (the earlier three waves' typical spread, so the shading keeps
+// its contrast), clamped to -1..1,
+// and writes height_m (the same in metres), its true slope (dh/dx, dh/dz,
+// metres per metre) and ridge (0..1, highest along the crest of the
+// strongest wave here). Each wave's slope is set so the whole field's
+// RMS slope is wave_face_steepness; waves nearer base carry more.
+float wave_faces_at(vec2 world_xz, float time, out vec2 slope, out float height_m, out float ridge) {
+	vec2 base = normalize(long_wave_direction);
+	float length_m = max(wave_face_length_m, 0.05);
+	float weight_sq = 0.0;
+	for (int i = 0; i < WAVE_FACE_COUNT; i++) {
+		float w = 0.6 + 0.4 * cos(WAVE_FACE_ANGLES[i]);
+		weight_sq += w * w;
+	}
+	// Sum of s^2 / 2 over the waves = steepness^2.
+	float slope_unit = wave_face_steepness * sqrt(2.0 / max(weight_sq, 0.0001));
+	float h = 0.0;
+	float variance = 0.0;
+	slope = vec2(0.0);
+	ridge = 0.0;
+	for (int i = 0; i < WAVE_FACE_COUNT; i++) {
+		float c = cos(WAVE_FACE_ANGLES[i]);
+		float s = sin(WAVE_FACE_ANGLES[i]);
+		vec2 dir = vec2(c * base.x - s * base.y, s * base.x + c * base.y);
+		float k = TAU / (length_m * WAVE_FACE_LENGTHS[i]);
+		float wave_slope = slope_unit * (0.6 + 0.4 * c);
+		// Shorter waves are slower to pass, as in deep water.
+		float rate = wrap_safe_rate(wave_face_period_s * sqrt(WAVE_FACE_LENGTHS[i]));
+		float phase = k * dot(world_xz, dir) - TAU * rate * time;
+		float amplitude = wave_slope / k;
+		h += amplitude * sin(phase);
+		slope += wave_slope * cos(phase) * dir;
+		variance += 0.5 * amplitude * amplitude;
+		ridge = max(ridge, (0.6 + 0.4 * c) * (0.5 + 0.5 * sin(phase)));
+	}
+	height_m = h;
+	return clamp(h / max(3.5 * sqrt(variance), 0.0001), -1.0, 1.0);
+}
+
+// How much of the wave faces run here: the open-water zone, off over
+// pools, full in each set and wave_face_quiet of it between.
+float wave_face_strength_at(vec2 world_xz, float time) {
+	float zone = open_water_zone(world_xz) * (1.0 - landmass_enclosure_at(world_xz));
+	return zone > 0.0 ? zone * mix(wave_face_quiet, 1.0, wave_group_at(world_xz, time)) : 0.0;
 }
 
 // Unit XZ toward land, down the mask distance's slope; zero where it is
@@ -698,10 +819,37 @@ void fragment() {
 	float h_x = sea_height(v_world_xz + vec2(epsilon, 0.0), sea_time);
 	float h_z = sea_height(v_world_xz + vec2(0.0, epsilon), sea_time);
 
+	// Wave faces (see wave_faces_enabled's doc). The normal takes the
+	// exact slope of the height drawn: the waves' own slope scaled by
+	// face_strength, plus their height times face_strength's gradient
+	// (the product rule), the gradient by finite difference over 0.25 m -
+	// the strength changes over metres, so that is close to exact.
+	float face_zone = 0.0;
+	float face_group = 0.0;
+	float face_strength = 0.0;
+	float face_h = 0.0;
+	float face_height_m = 0.0;
+	float face_ridge = 0.0;
+	vec2 face_slope = vec2(0.0);
+	vec2 face_normal_slope = vec2(0.0);
+	if (wave_faces_enabled) {
+		face_zone = open_water_zone(v_world_xz) * (1.0 - landmass_enclosure_at(v_world_xz));
+		if (face_zone > 0.0) {
+			face_group = wave_group_at(v_world_xz, sea_time);
+			face_strength = face_zone * mix(wave_face_quiet, 1.0, face_group);
+			face_h = wave_faces_at(v_world_xz, sea_time, face_slope, face_height_m, face_ridge);
+			float e = 0.25;
+			vec2 strength_gradient = vec2(
+				wave_face_strength_at(v_world_xz + vec2(e, 0.0), sea_time) - face_strength,
+				wave_face_strength_at(v_world_xz + vec2(0.0, e), sea_time) - face_strength) / e;
+			face_normal_slope = face_slope * face_strength + face_height_m * strength_gradient;
+		}
+	}
+
 	vec3 world_normal = normalize(vec3(
-		-wave_slope.x + (h_c - h_x) * noise_amplitude / epsilon,
+		-wave_slope.x + (h_c - h_x) * noise_amplitude / epsilon - face_normal_slope.x,
 		1.0,
-		-wave_slope.y + (h_c - h_z) * noise_amplitude / epsilon
+		-wave_slope.y + (h_c - h_z) * noise_amplitude / epsilon - face_normal_slope.y
 	));
 	vec3 view_normal = normalize(mat3(VIEW_MATRIX) * world_normal);
 	NORMAL = view_normal;
@@ -760,6 +908,21 @@ void fragment() {
 	float sky_t = clamp(fresnel * (1.0 + ripple * ripple_strength), 0.0, 1.0);
 	vec3 albedo = mix(water_rgb, sky_reflect_color.rgb, sky_t);
 
+	// Wave faces' shading (see wave_faces_enabled's doc): a face turned
+	// away from the camera (its normal leaning along the view ray) and a
+	// crest lighten the water's own colour, a face turned toward it and a
+	// trough darken it, by the same factor either way - so the mean is
+	// unchanged and the light side doesn't outweigh the dark. Scaled by
+	// the zone only, not the sets: the sets' swell runs parallel to the
+	// shore, and shading by it drew bands.
+	float face_tone = 0.0;
+	if (face_zone > 0.0) {
+		vec2 ray_across = ray_world.xz / max(length(ray_world.xz), 0.0001);
+		float away = clamp(-dot(face_slope, ray_across) / max(wave_face_steepness * 1.8, 0.0001), -1.0, 1.0);
+		face_tone = clamp(away * 0.6 + face_h * 0.4, -1.0, 1.0) * face_zone;
+		albedo *= 1.0 + wave_face_shade * face_tone;
+	}
+
 	// Distance fog amount (see fog_color's own doc) - applied at the very
 	// end of the composite below, not here.
 	float fog_t = smoothstep(fog_near_distance, fog_far_distance, length(VERTEX)) * fog_strength;
@@ -785,6 +948,23 @@ void fragment() {
 	float crest = open_crest_at(v_world_xz, sea_time, crest_zone) * (1.0 - landmass_enclosure_at(v_world_xz));
 	float crest_amount = crest * crest_strength * edge_alpha;
 	pattern_amount *= 1.0 - crest_calm * crest_zone * (1.0 - crest);
+
+	// fwidth() outside the branch: derivatives need every pixel of the quad.
+	float face_aa = fwidth(face_ridge);
+	// Under the wave faces, their highlights take the crests' place and
+	// their shading the surface pattern's, by face_zone - so both hand
+	// back smoothly toward the shore. A highlight is a thin line along the
+	// strongest wave's crest (the top wave_face_highlight_width of ridge),
+	// widened by its own screen derivative so it can't shimmer, broken
+	// wherever the other waves pull the water down beneath it, and only
+	// in a set.
+	if (face_zone > 0.0) {
+		float width = max(wave_face_highlight_width, 0.02);
+		float line = smoothstep(1.0 - width - face_aa, 1.0 - width * 0.25 + face_aa, face_ridge);
+		float highlight = line * smoothstep(0.1, 0.45, face_h) * face_group;
+		crest_amount = mix(crest_amount, highlight * wave_face_highlight * edge_alpha, face_zone);
+		pattern_amount *= 1.0 - face_zone;
+	}
 
 	// The pool's surface (see pool_sheen's doc): the sheen joins the
 	// surface pattern (both toward the sky colour), the glints go on top.

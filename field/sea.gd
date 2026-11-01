@@ -205,7 +205,10 @@ const SEA_BUS_NAME := &"Sea"
 # lengths/scales change - the arithmetic above is specific to the
 # defaults. Precision at 7000 s: the largest drift is 0.612 x 7000 =
 # 4284 tiles, where float32 resolves ~0.0005 tiles = 0.1 texel - fine.
-@export var sea_time_period: float = 7000.0
+@export var sea_time_period: float = 7000.0:
+	set(value):
+		sea_time_period = value
+		_apply_uniform("sea_time_period", value)
 
 @export_group("Foam")
 # A thin bright line at the waterline: foam_width metres of water DEPTH
@@ -333,6 +336,47 @@ const SEA_BUS_NAME := &"Sea"
 	set(value):
 		crest_calm = value
 		_apply_uniform("crest_calm", value)
+
+@export_group("Wave faces")
+# Small readable waves on the open sea (nine crossing short waves), with
+# dark sides and narrow broken highlights, in place of the open crests'
+# pale bands and the surface pattern - see sea.gdshader's
+# wave_faces_enabled doc. They roll in sets
+# on the crests' spacing, period and breakup, over the crests' open
+# water. Off by default (every other floor, and the way back to the
+# plain crests); a floor turns them on through sea_overrides.
+@export var wave_faces_enabled: bool = false:
+	set(value):
+		wave_faces_enabled = value
+		_apply_uniform("wave_faces_enabled", value)
+@export var wave_face_length_m: float = 1.6:
+	set(value):
+		wave_face_length_m = value
+		_apply_uniform("wave_face_length_m", value)
+@export var wave_face_period_s: float = 2.4:
+	set(value):
+		wave_face_period_s = value
+		_apply_uniform("wave_face_period_s", value)
+@export_range(0.0, 1.0) var wave_face_steepness: float = 0.15:
+	set(value):
+		wave_face_steepness = value
+		_apply_uniform("wave_face_steepness", value)
+@export_range(0.0, 1.0) var wave_face_shade: float = 0.3:
+	set(value):
+		wave_face_shade = value
+		_apply_uniform("wave_face_shade", value)
+@export_range(0.0, 1.0) var wave_face_highlight: float = 0.0:
+	set(value):
+		wave_face_highlight = value
+		_apply_uniform("wave_face_highlight", value)
+@export_range(0.02, 0.5) var wave_face_highlight_width: float = 0.06:
+	set(value):
+		wave_face_highlight_width = value
+		_apply_uniform("wave_face_highlight_width", value)
+@export_range(0.0, 1.0) var wave_face_quiet: float = 0.3:
+	set(value):
+		wave_face_quiet = value
+		_apply_uniform("wave_face_quiet", value)
 
 @export_group("Pool water")
 # Clearer water over enclosed pools - see sea.gdshader's pool_clarity_
@@ -1048,6 +1092,15 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("crest_shore_start", crest_shore_start)
 	_apply_uniform("crest_shore_fade", crest_shore_fade)
 	_apply_uniform("crest_calm", crest_calm)
+	_apply_uniform("wave_faces_enabled", wave_faces_enabled)
+	_apply_uniform("wave_face_length_m", wave_face_length_m)
+	_apply_uniform("wave_face_period_s", wave_face_period_s)
+	_apply_uniform("wave_face_steepness", wave_face_steepness)
+	_apply_uniform("wave_face_shade", wave_face_shade)
+	_apply_uniform("wave_face_highlight", wave_face_highlight)
+	_apply_uniform("wave_face_highlight_width", wave_face_highlight_width)
+	_apply_uniform("wave_face_quiet", wave_face_quiet)
+	_apply_uniform("sea_time_period", sea_time_period)
 	_apply_uniform("pool_tint_color", pool_tint_color)
 	_apply_uniform("pool_tint", pool_tint)
 	_apply_uniform("pool_filter", pool_filter)

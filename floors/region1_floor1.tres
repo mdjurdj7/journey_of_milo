@@ -146,7 +146,8 @@ sea_overrides = {
 "surface_pattern_scale": 5.0,
 "surface_pattern_strength": 0.05,
 "swash_breakup": 0.7,
-"swash_color": Color(0.9, 0.93, 0.92, 1)
+"swash_color": Color(0.9, 0.93, 0.92, 1),
+"wave_faces_enabled": true
 }
 ground_overrides = {
 "damp_shore_edge_m": 0.8,
