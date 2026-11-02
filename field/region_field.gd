@@ -1225,8 +1225,10 @@ func _walk_planned() -> void:
 # The planned way from `from` to `to`, world points with `from` first and
 # the reached point last: round every living enemy's contact zone (grown
 # by nav_contact_margin) but `target_enemy`'s and its pack's, and the
-# standing Blocker. Empty when the grid isn't built or nothing can be
-# reached. `with_zones` false plans on the ground alone.
+# standing Blocker - a pack's zone its PackContact hull, so the way goes
+# round the pack, never between its members. Empty when the grid isn't
+# built or nothing can be reached. `with_zones` false plans on the ground
+# alone.
 func plan_path(from: Vector3, to: Vector3, target_enemy: FieldEnemy = null, with_zones: bool = true) -> PackedVector3Array:
 	var points := PackedVector3Array()
 	if _nav == null:
@@ -1237,10 +1239,17 @@ func plan_path(from: Vector3, to: Vector3, target_enemy: FieldEnemy = null, with
 			var enemy := node as FieldEnemy
 			if enemy == null or enemy.is_defeated() or enemy.is_queued_for_deletion() or enemy == target_enemy:
 				continue
-			# Its pack fights with it: walking into one of them is the same fight.
-			if target_enemy != null and target_enemy.group != &"" and enemy.group == target_enemy.group:
+			# A pack's zone is its hull, below.
+			if _pack_contact_for(enemy) != null:
 				continue
 			zones.append([Vector2(enemy.global_position.x, enemy.global_position.z), enemy.contact_radius + nav_contact_margin])
+		for pack in _pack_contacts:
+			if not is_instance_valid(pack):
+				continue
+			# Its pack fights with it: walking into one of them is the same fight.
+			if target_enemy != null and pack.get_members().has(target_enemy):
+				continue
+			zones.append_array(PackContact.zone_circles(pack.get_points(), pack.get_margin() + nav_contact_margin))
 	var path: PackedVector2Array = _nav.find_path(Vector2(from.x, from.z), Vector2(to.x, to.z), zones, _nav_dynamic_shapes())
 	for i in path.size():
 		var cell: Vector2i = _nav.world_to_cell(path[i])
