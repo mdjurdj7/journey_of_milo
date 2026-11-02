@@ -76,9 +76,9 @@ enum CardReward { ROLLED, TOP_TIER_FIRST }
 # member nearest the Wanderer at contact anchors. Floor 2's crab anchors
 # its Sputter, so the stance never lands up the shelf's rise behind it.
 # The line runs through the members' authored positions, so lay an
-# option out roughly as it should stand; their contact areas
-# (contact_radius, 2 m) are the zone, so keep members within 2 x that of
-# a neighbour or the zone has a hole.
+# option out roughly as it should stand. The contact zone is the hull of
+# the members grown by the option's margin (EncounterOption.
+# contact_margin_m, PackContact), so between them is inside it.
 @export var anchor: bool = false
 # An encounter's rule for an enemy that picks its moves at random
 # (EnemyData.erratic_intent_selection): while another enemy in its fight

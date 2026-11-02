@@ -1181,6 +1181,11 @@ func _contact_feet() -> Vector3:
 		return global_position
 	return Vector3(_model.global_position.x, global_position.y, _model.global_position.z)
 
+# His body's own radius, metres - what an enemy's contact sphere meets
+# (PackContact adds it to a pack's margin for the same reach).
+func get_body_radius() -> float:
+	return _capsule_radius
+
 func _find_capsule_radius() -> float:
 	for child in get_children():
 		var collision_shape := child as CollisionShape3D

@@ -79,6 +79,13 @@ const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
 # one member, else empty (fights alone) - set at spawn. RegionField reads
 # it off the "enemies" group to find this enemy's cluster on contact.
 @export var group: StringName = &""
+# A cluster member's contact is its pack's (PackContact, which sets this
+# at spawn): its own contact area stays off, on the ground or in the air.
+var pack_contact: bool = false:
+	set(value):
+		pack_contact = value
+		if is_node_ready():
+			contact_area.monitoring = not pack_contact and not _airborne
 # FloorEnemy.anchor, mirrored the same way - read at contact.
 @export var anchor: bool = false
 # FloorEnemy.excluded_intent / excluded_while_packmate_intent, mirrored
@@ -807,6 +814,7 @@ func _ready() -> void:
 
 	contact_area.body_entered.connect(_on_body_entered)
 	contact_area.body_exited.connect(_on_body_exited)
+	contact_area.monitoring = not pack_contact
 	# _process() is the flight's own; nothing runs there on the ground.
 	set_process(false)
 
@@ -1965,7 +1973,7 @@ func _on_landed() -> void:
 	_restore_contact()
 
 func _restore_contact() -> void:
-	contact_area.monitoring = true
+	contact_area.monitoring = not pack_contact
 
 func _kill_flight() -> void:
 	if _flight_tween != null and _flight_tween.is_valid():

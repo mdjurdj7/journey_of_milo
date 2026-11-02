@@ -737,6 +737,9 @@ var _debug_keepsake_index: int = 0
 var _debug_card_picker: OptionButton = null
 # One PackPatrol per chosen option with a route - see _spawn_floor_patrols().
 var _patrols: Array[PackPatrol] = []
+# One PackContact per chosen option of more than one member - see
+# _spawn_pack_contacts().
+var _pack_contacts: Array[PackContact] = []
 # Those routes' waypoints by slot id, floor frame - get_patrol_routes().
 var _patrol_routes: Dictionary = {}
 
@@ -968,6 +971,7 @@ func _ready() -> void:
 	_refresh_enemy_fog()
 	_sync_sea_fog()
 	_spawn_floor_patrols()
+	_spawn_pack_contacts()
 	_spawn_floor_ledges()
 
 	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
@@ -1920,6 +1924,36 @@ func _spawn_floor_patrols() -> void:
 		patrol.setup(members, waypoints, route.dwell_min_seconds, route.dwell_max_seconds)
 		_patrols.append(patrol)
 
+# Each cluster's one contact zone (PackContact): the hull of its living
+# members grown by its option's margin, in place of their own areas. A
+# lone member keeps its own contact area.
+func _spawn_pack_contacts() -> void:
+	for encounter in _encounters:
+		if encounter.option.members.size() < 2:
+			continue
+		var members: Array[FieldEnemy] = []
+		for member in encounter.members:
+			if is_instance_valid(member):
+				members.append(member)
+		if members.is_empty():
+			continue
+		var pack := PackContact.new()
+		pack.name = "PackContact_%s" % encounter.slot.slot_id
+		add_child(pack)
+		pack.setup(members, encounter.option)
+		pack.contacted.connect(_on_enemy_contacted)
+		_pack_contacts.append(pack)
+
+# The zone a cluster member's contact is part of, or null for a lone
+# enemy.
+func _pack_contact_for(enemy: FieldEnemy) -> PackContact:
+	if enemy == null or enemy.group == &"":
+		return null
+	for pack in _pack_contacts:
+		if is_instance_valid(pack) and pack.name == "PackContact_%s" % enemy.group:
+			return pack
+	return null
+
 # The route a slot's encounter flies, if any.
 func _patrol_for(slot_id: StringName) -> PackPatrol:
 	for patrol in _patrols:
@@ -2837,8 +2871,8 @@ func _fog_colour() -> Color:
 # standing, else nearest-to-the-Wanderer first - the first is who the
 # Wanderer steps up to and what the camera's fit takes its axis from
 # (CameraRig.enter_battle()); the rest follow in the order they will
-# stand along the line (see _place_cluster_line()). The contact zone is
-# the union of the members' own contact areas - no merged shape.
+# stand along the line (see _place_cluster_line()). A cluster's contact
+# zone is its PackContact's: the members' hull grown by its margin.
 func _battle_members_for(enemy: FieldEnemy) -> Array[FieldEnemy]:
 	var members: Array[FieldEnemy] = [enemy]
 	if enemy.group == &"":
