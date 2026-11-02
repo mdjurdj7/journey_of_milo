@@ -4785,7 +4785,10 @@ func _apply_consumed_removals(fight_deck: Deck) -> void:
 # the two), or the Wanderer lands back inside an Area3D and either
 # re-triggers contact immediately or can't leave it. push_warning when
 # the export didn't clear on its own, so a misconfigured pair is loud,
-# not a silent soft-lock. Empty list (nothing left to escape from): no
+# not a silent soft-lock. A cluster's zone is its PackContact's hull, so
+# its push goes on along the same line until clear of that - the hull of
+# where they stand and where they go back to, by its margin +
+# escape_clearance_margin. Empty list (nothing left to escape from): no
 # push.
 func _push_wanderer_away_from(enemies: Array[FieldEnemy], from: Vector3) -> void:
 	var pushed: Vector3 = escape_push_target(from, enemies)
@@ -4802,7 +4805,8 @@ func escape_position(from: Vector3, enemies: Array[FieldEnemy]) -> Vector3:
 
 # `target` when it's valid fight ground; else the nearest valid ground
 # outside every enemy's contact clearance (where it stands and where it
-# goes back to); else `target` as it was.
+# goes back to - for a cluster, its PackContact hull over both); else
+# `target` as it was.
 func escape_correction(target: Vector3, enemies: Array[FieldEnemy]) -> Vector3:
 	if is_valid_fight_ground(target):
 		return target
@@ -4812,6 +4816,11 @@ func escape_correction(target: Vector3, enemies: Array[FieldEnemy]) -> Vector3:
 		avoid.append([Vector2(enemy.global_position.x, enemy.global_position.z), clearance])
 		var home: Vector3 = enemy.get_field_position()
 		avoid.append([Vector2(home.x, home.z), clearance])
+	var pack: PackContact = null
+	if not enemies.is_empty():
+		pack = _pack_contact_for(enemies[0])
+	if pack != null:
+		avoid.append_array(PackContact.zone_circles(pack.get_points(true), pack.get_margin() + escape_clearance_margin))
 	var nearest: PackedVector3Array = nearest_valid_fight_ground(target, avoid)
 	return nearest[0] if not nearest.is_empty() else target
 
@@ -4855,6 +4864,23 @@ func escape_push_target(from: Vector3, enemies: Array[FieldEnemy]) -> Vector3:
 			push_warning("RegionField: escape_push_distance (%.2f) does not clear enemy '%s' contact_radius (%.2f); pushing %.2f." % [push_distance, enemy.enemy_id, enemy.contact_radius, needed])
 			push_distance = maxf(push_distance, needed)
 			target = anchor.global_position + push_dir * push_distance
+
+	var pack: PackContact = _pack_contact_for(anchor)
+	if pack != null:
+		var points: PackedVector2Array = pack.get_points(true)
+		var clearance: float = pack.get_margin() + escape_clearance_margin
+		var start_distance: float = push_distance
+		# A ray out of a bounded hull always leaves it; the cap only
+		# guards a degenerate input.
+		var steps: int = 0
+		while PackContact.distance_to_zone(Vector2(target.x, target.z), points) < clearance and steps < 2000:
+			push_distance += 0.05
+			target = anchor.global_position + push_dir * push_distance
+			steps += 1
+		# Expected, not a misconfiguration: a pack's hull reaches further
+		# than one member's circle.
+		if push_distance > start_distance:
+			print("RegionField: the escape clears pack '%s' zone (margin %.2f): pushing %.2f, not %.2f." % [anchor.group, pack.get_margin(), push_distance, start_distance])
 
 	# On the surface as drawn there (Ground.get_walk_height_at()), not at
 	# the anchor's height - on a dune's rise that would leave him inside
