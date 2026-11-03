@@ -160,6 +160,13 @@ const ZONE_ROCK_EDGE := 32
 	set(value):
 		area = value
 		emit_changed()
+# Cluster centres only where this painting is past half - on the landmass
+# canvas, as Ground's wear_mask is, so an outline with holes in it is
+# drawn as it is meant. With `area` too, both must hold. Null = anywhere.
+@export var area_mask: Texture2D = null:
+	set(value):
+		area_mask = value
+		emit_changed()
 # Nothing within this of any enemy - a tideline kept off the water's edge
 # beside a fight. 0 = only the floor's battle-frame exclusions.
 @export var enemy_clearance_m: float = 0.0:

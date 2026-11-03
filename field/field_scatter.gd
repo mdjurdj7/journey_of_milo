@@ -1161,6 +1161,9 @@ func _zone_centres(entry: ScatterEntry, rng: RandomNumberGenerator, spread_range
 		# Not a bounding box: is_point_in_polygon() takes the odd cell well
 		# outside the area as in (floor 3's path_boulders_left has one), and
 		# the placement keeps it.
+		# area_mask likewise, one read, before either.
+		if entry.area_mask != null and (_ground == null or _ground.get_canvas_painting_at(entry.area_mask, _grid_point(i)) < 0.5):
+			continue
 		if (polygon.size() < 3 or Geometry2D.is_point_in_polygon(_grid_point(i), polygon)) and _centre_allowed(entry, i):
 			cells.append(i)
 			weighted += weights[i] if not weights.is_empty() else 1.0
