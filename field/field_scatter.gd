@@ -1154,7 +1154,14 @@ func _zone_centres(entry: ScatterEntry, rng: RandomNumberGenerator, spread_range
 	for i in _cell_zone.size():
 		if not weights.is_empty() and weights[i] <= 0.0:
 			continue
-		if _centre_allowed(entry, i) and (polygon.size() < 3 or Geometry2D.is_point_in_polygon(_grid_point(i), polygon)):
+		# The area first: one polygon test, where _centre_allowed() runs
+		# every keep-out near a ledge - so a small area's entry pays for its
+		# own cells, not the whole grid's. Both draw nothing and change
+		# nothing, so the cells kept and every draw after are as they were.
+		# Not a bounding box: is_point_in_polygon() takes the odd cell well
+		# outside the area as in (floor 3's path_boulders_left has one), and
+		# the placement keeps it.
+		if (polygon.size() < 3 or Geometry2D.is_point_in_polygon(_grid_point(i), polygon)) and _centre_allowed(entry, i):
 			cells.append(i)
 			weighted += weights[i] if not weights.is_empty() else 1.0
 	if cells.is_empty():
