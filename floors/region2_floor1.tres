@@ -14,29 +14,31 @@
 [ext_resource type="Script" uid="uid://bp8hnb8ai830l" path="res://floors/scatter/scatter_set.gd" id="11_scatter_set"]
 [ext_resource type="Resource" path="res://floors/scatter/region2_floor1_reeds.tres" id="12_reeds"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="13_wanderer_pool"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/strawcrown.tres" id="14_strawcrown"]
+[ext_resource type="PackedScene" path="res://field/nest_scrape.tscn" id="15_nest_scrape"]
 
 [sub_resource type="Resource" id="FloorProp_pier"]
 script = ExtResource("6_floor_prop")
 scene = ExtResource("7_pier")
 overrides = {
 "colour_map_path": "res://assets/models/props/pier/pier_albedo.png",
-"deck_end": Vector2(-5, -32),
-"deck_height_m": 3.956,
-"deck_root": Vector2(-18, -16),
+"deck_end": Vector2(-7, -35),
+"deck_height_m": 3.996,
+"deck_root": Vector2(-20.5, -23),
 "deck_width_m": 2,
 "model_path": "res://assets/models/props/pier/pier.glb",
-"platform": Rect2(-7, -34, 4, 4),
-"rails": Array[PackedVector2Array]([PackedVector2Array(-18.3978, -17.0963, -7.1014, -30.9995), PackedVector2Array(-16.8455, -15.8351, -5.4229, -29.8936), PackedVector2Array(-7, -34, -3, -34), PackedVector2Array(-7, -34, -7, -31.6), PackedVector2Array(-5, -30, -3, -30), PackedVector2Array(-3, -34, -3, -32.8), PackedVector2Array(-3, -31.2, -3, -30)]),
-"steps_foot_height_m": 2.032,
-"steps_from": Vector2(-3, -32),
-"steps_to": Vector2(1.5, -32),
+"platform": Rect2(-9, -37, 4, 4),
+"rails": Array[PackedVector2Array]([PackedVector2Array(-20.7159, -24.146, -9.1, -34.4713), PackedVector2Array(-19.3872, -22.6512, -7.8366, -32.9184, -7, -33), PackedVector2Array(-9, -37, -5, -37), PackedVector2Array(-9, -37, -9, -34.6), PackedVector2Array(-7, -33, -5, -33), PackedVector2Array(-5, -37, -5, -35.8), PackedVector2Array(-5, -34.2, -5, -33)]),
+"steps_foot_height_m": 1.824,
+"steps_from": Vector2(-5, -35),
+"steps_to": Vector2(-0.5, -35),
 "steps_width_m": 1.4
 }
 
 [sub_resource type="Resource" id="FloorEnemy_clearing"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("8_dunecur")
-yaw_degrees = 55.3
+yaw_degrees = -40.8
 
 [sub_resource type="Resource" id="EncounterOption_clearing"]
 script = ExtResource("10_encounter_option")
@@ -46,8 +48,37 @@ members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_clearing"
 [sub_resource type="Resource" id="EncounterSlot_clearing"]
 script = ExtResource("9_encounter_slot")
 slot_id = &"clearing"
-position = Vector2(4, -41.5)
+position = Vector2(4, -45)
 options = Array[ExtResource("10_encounter_option")]([SubResource("EncounterOption_clearing")])
+
+[sub_resource type="Resource" id="FloorEnemy_heron"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("14_strawcrown")
+yaw_degrees = -123.7
+
+[sub_resource type="Resource" id="EncounterOption_heron"]
+script = ExtResource("10_encounter_option")
+option_id = &"heron"
+weight = 0.5
+members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_heron")])
+
+[sub_resource type="Resource" id="FloorProp_nest_scrape"]
+script = ExtResource("6_floor_prop")
+scene = ExtResource("15_nest_scrape")
+position = Vector3(0.2, 0, 0.6)
+
+[sub_resource type="Resource" id="EncounterOption_heron_gone"]
+script = ExtResource("10_encounter_option")
+option_id = &"heron_gone"
+weight = 0.5
+props = Array[ExtResource("6_floor_prop")]([SubResource("FloorProp_nest_scrape")])
+
+[sub_resource type="Resource" id="EncounterSlot_terrace_heron"]
+script = ExtResource("9_encounter_slot")
+slot_id = &"terrace_heron"
+position = Vector2(-13, -51)
+required = false
+options = Array[ExtResource("10_encounter_option")]([SubResource("EncounterOption_heron"), SubResource("EncounterOption_heron_gone")])
 
 [resource]
 script = ExtResource("1_floor_data")
@@ -56,25 +87,26 @@ elevation_mask = ExtResource("4_elev")
 elevation_max_height = 5.2
 wear_mask = ExtResource("5_wear")
 outer_mask = ExtResource("5_outer")
-mask_origin = Vector2(0.63158, 0.86567)
+mask_origin = Vector2(0.5, 0.7407)
 mask_beyond_is_land = true
 interior_height = 0.8
 relief_amplitude = 0.12
 caustic_strength = 0.0
-relief_extent = Vector2(72, 156)
-relief_subdivisions = Vector2i(206, 446)
+relief_extent = Vector2(100, 184)
+relief_subdivisions = Vector2i(286, 526)
 ambience_sea_db = -80.0
 ambience_sea_lowpass_hz = 1000.0
 fog_depth_begin = 22.0
 fog_depth_end = 44.0
-slots = Array[ExtResource("9_encounter_slot")]([SubResource("EncounterSlot_clearing")])
+slots = Array[ExtResource("9_encounter_slot")]([SubResource("EncounterSlot_clearing"), SubResource("EncounterSlot_terrace_heron")])
 props = Array[ExtResource("6_floor_prop")]([SubResource("FloorProp_pier")])
-ledges = Array[PackedVector2Array]([PackedVector2Array(1.825, -33.334, 3.167, -33.917, 3.483, -34.167, 3.583, -34.867, 3.417, -36.067, 3.2, -36.383, 1.467, -36.917, 0, -37.817, -0.817, -38.667, -1.25, -39.4, -1.517, -40.233, -1.583, -41.067, -1.25, -42.433, -0.55, -43.567, 0.7, -44.717, 2.233, -45.483, 2.483, -45.767, 2.283, -50.2, 2.35, -55.1, 2.583, -55.8, 3.067, -56.35, 3.733, -56.65, 4.333, -56.65, 4.8, -56.483, 5.317, -56.033, 5.55, -55.633, 5.717, -54.9, 5.75, -48.833, 5.55, -45.833, 5.733, -45.583, 7.5, -44.717, 8.45, -43.833, 9.25, -42.5, 9.55, -40.967, 9.317, -39.7, 8.717, -38.6, 7.733, -37.617, 6.217, -36.633, 6.65, -30.933, 6.483, -25.767, 6.117, -24.867, 3.917, -21.233, 2.55, -18.6, 1.45, -14.967, 0.95, -12.733, 0.95, -12.1, 1.083, -11.733, 3.35, -7.033, 3.583, -6.3, 3.45, -5.067, 2.217, -0.967, 2.383, 0.6, 2.283, 3.6, 11.2, 3.617, 11.633, 3.717, 12.15, 4.133, 12.317, 4.567, 12.35, 7.433, 12.183, 7.867, 11.867, 8.183, 10.8, 8.417, -6.233, 8.317, -10.067, 8.45, -16.067, 8.283, -20.233, 8.383, -20.967, 8.183, -21.25, 7.9, -21.417, 7.467, -21.517, -20.433, -21.383, -23.533, -21.45, -37.3, -21.35, -49.433, -20.967, -50.117, -20.333, -50.383, -16.767, -50.417, -16.133, -50.217, -15.817, -49.9, -15.65, -49.4, -15.59, -20.733), PackedVector2Array(-4.017, 3.633, -2.517, 3.6, -2.45, 0.467, -2.317, -0.267, -1.45, -1.833, -0.15, -5.633, -0.217, -6.2, -1.717, -9.1, -1.867, -9.25, -2.533, -8.617, -3.5, -8.017, -5.3, -7.55, -6.233, -7.55, -7.533, -7.817, -9.533, -8.85, -15.633, -9.05, -15.65, 3.533, -15.433, 3.65, -4.017, 3.633), PackedVector2Array(-15.614, -17.293, -15.65, -12.033, -12.8, -12.183, -10.233, -12.15, -8.533, -13.583, -7.433, -14.05, -6.5, -14.25, -4.667, -14.183, -2.833, -13.483, -2.533, -13.483, -2.083, -14.133, -1.617, -15.333, -0.417, -19.5, 2.15, -23.8, 3.483, -26.433, 3.317, -31.267, 2.233, -30.969)])
+ledges = Array[PackedVector2Array]([PackedVector2Array(2.167, 11.05, -1.7, 10.75, -6.2, 11.017, -7.467, 10.75, -9.767, 9.717, -12.033, 8.417, -13.6, 7.283, -14.717, 6.167, -15.783, 4.633, -16.783, 2.7, -18.517, -1.633, -19.15, -2.6, -21.017, -4.8, -22.05, -6.8, -22.583, -8.533, -23.217, -11.5, -24.25, -14.633, -24.75, -16.633, -25.217, -19.333, -25.283, -21.4, -24.917, -23.467, -23.483, -28.333, -22.65, -34.167, -21.55, -37.933, -20.417, -42.7, -19.517, -45.5, -18.917, -46.8, -18.15, -48.067, -16.767, -49.65, -15.233, -50.917, -12.233, -52.783, -10.233, -54.217, -9.633, -54.383, -9.367, -54.283, -9.017, -53.9, -8.783, -52.867, -9.783, -50.1, -10.717, -48.033, -7, -46.95, -6.683, -48.033, -8.233, -48.583, -8.583, -48.9, -8.717, -49.267, -8.55, -50, -7.583, -52.5, -7.55, -53.667, -7.417, -54.033, -5.667, -55.55, -3.933, -57.417, -2.7, -58.217, -1.633, -58.483, -0.7, -58.483, 2.033, -57.983, 2.883, -61.267, 3.083, -63.733, 3.317, -64.767, 3.683, -65.433, 4.267, -66.017, 5.067, -66.45, 6.067, -66.617, 6.867, -66.483, 7.633, -66.117, 8.217, -65.5, 8.65, -64.2, 8.55, -61.567, 7.25, -55.8, 9.733, -53.117, 12.167, -51.217, 13.45, -50, 15.683, -47.033, 17.25, -44.433, 17.85, -43.1, 17.683, -42.467, 15.85, -40.533, 15.683, -40.133, 15.783, -39.2, 16.317, -38.367, 17.133, -37.65, 18.133, -37.183, 19.633, -36.983, 20.15, -36.4, 20.55, -34.6, 21.617, -31.667, 21.95, -29.767, 21.55, -23.367, 21.55, -19.5, 21.083, -16.033, 20.583, -13.967, 20.05, -12.4, 19.633, -12.017, 18.633, -11.583, 16.933, -10.217, 15.1, -9.15, 14.467, -9.117, 13.167, -9.65, 12.1, -9.683, 11.333, -9.483, 10.6, -9.083, 10.117, -8.567, 9.883, -7.967, 9.917, -7.167, 10.483, -5.933, 10.283, -5.333, 6.2, -1.45, 4.9, -0.417, 4.2, -0.25, 3.967, -0.35, 3.467, -0.983, 2.433, -0.95, 2.383, 1.633, 4.567, 1.117, 5.867, 0.417, 11.767, -4.983, 12.333, -5.35, 13.533, -5.617, 14.367, -6.05, 14.95, -6.7, 15.35, -7.667, 15.667, -8.017, 17.633, -9.217, 19.367, -10.483, 19.733, -10.55, 20.233, -10.35, 21.217, -9.4, 21.35, -8.9, 21.283, -7.3, 21.017, -5.7, 20.55, -4.633, 18.25, -1.733, 17.283, -0.3, 16.65, 1.033, 15.683, 4.3, 15.05, 5.433, 14.233, 6.283, 12.767, 7.15, 10.6, 7.983, 5.4, 10.35, 3.8, 10.85, 2.167, 11.05), PackedVector2Array(14.983, -15.533, 15.083, -15.633, 15.083, -17.8, 15.25, -18.333, 15.633, -18.717, 16.933, -19.417, 17.7, -20.017, 18.283, -20.667, 18.883, -21.767, 19.183, -23.1, 19.183, -24.6, 19.05, -25.367, 18.683, -26.267, 18.083, -27.1, 16.833, -28.183, 15.433, -29.017, 13.967, -29.517, 12.833, -29.683, 10.7, -29.65, 9.133, -29.383, 7.833, -28.85, 6.217, -27.567, 5.15, -26.133, 4.55, -24.7, 4.45, -23.167, 4.717, -22.067, 5.417, -20.967, 6.2, -20.283, 8.333, -18.983, 8.75, -18.533, 8.883, -18.067, 8.883, -15.633, 9, -15.517, 9.967, -15.517, 10.083, -15.633, 10.15, -19.6, 8.567, -20.25, 6.9, -21.283, 6.183, -21.967, 5.85, -22.533, 5.65, -23.233, 5.783, -24.567, 6.25, -25.6, 6.85, -26.433, 7.967, -27.483, 9.067, -28.083, 10.467, -28.417, 12.5, -28.517, 14, -28.25, 15.233, -27.75, 16.567, -26.85, 17.617, -25.667, 17.983, -24.567, 18.017, -23.433, 17.85, -22.533, 17.483, -21.667, 16.633, -20.717, 16.067, -20.317, 15, -19.783, 13.817, -19.433, 13.883, -15.633, 14, -15.517, 14.983, -15.533), PackedVector2Array(-2.417, 1.667, -2.45, -0.933, -3.533, -0.983, -4.333, -0.85, -4.733, -1.017, -7.15, -3.4, -7.217, -3.767, -7.117, -4.033, -6.133, -4.717, -5.683, -5.433, -5.683, -6.2, -6.05, -6.967, -6.667, -7.483, -7.633, -7.817, -8.833, -7.75, -10.467, -6.917, -10.933, -7.05, -11.217, -7.367, -12.55, -10.2, -12.583, -10.8, -12.283, -11.933, -14.933, -12.917, -13.883, -10.133, -12.617, -7.567, -11.95, -5.8, -7.6, -2.05, -5.3, 0.117, -3.833, 1.083, -2.417, 1.667), PackedVector2Array(-2.275, -35.617, -4.2, -35.617, -4.567, -35.717, -4.983, -36.1, -5.233, -36.917, -8.8, -36.917, -8.917, -36.8, -8.917, -35.1, -9.183, -34.367, -14.4, -29.683, -15.033, -29.383, -15.333, -29.483, -15.617, -29.933, -15.517, -30.567, -14.283, -33.7, -13.417, -37.5, -11.883, -42.167, -11.467, -42.583, -10.867, -42.65, -8.567, -41.983, -8.217, -42.933, -8.217, -43.067, -8.433, -43.183, -12.367, -44.45, -14.483, -38.2, -15.483, -33.933, -16.95, -30.067, -17.295, -27.347), PackedVector2Array(-17.383, -24.2, -16.65, -17.667, -15.733, -17.45, -11.067, -15.75, -10.85, -15.767, -10.517, -16.6, -10.567, -16.85, -14.867, -18.417, -15.45, -18.9, -15.65, -19.5, -16.083, -22.8, -16.217, -24.533, -16.117, -25.5, -15.4, -26.35, -8.1, -32.817, -7.3, -33.117, -5.233, -33.117, -4.917, -34.033, -4.633, -34.283, -4.2, -34.417, -2.275, -34.417), PackedVector2Array(-2.517, -49.133, -1.567, -49.417, -0.817, -50.1, -0.55, -50.767, -0.683, -51.633, -1.167, -52.217, -2.133, -52.683, -3.4, -52.717, -4.4, -52.383, -4.983, -51.9, -5.283, -51.3, -5.283, -50.7, -5.083, -50.233, -4.667, -49.783, -3.867, -49.317, -3.3, -49.15, -2.517, -49.133)])
 exit_kind = 1
 engage_line_enabled = true
 engage_line_offset_m = -2.0
-gate_distance_beyond_enemy = 11.5
-wear_path_override = PackedVector2Array(0, 0, 2, -6, -1, -12, 1, -19, 5, -26, 5, -35, 4, -41, 4, -55)
+gate_distance_beyond_enemy = 10.0
+gate_bar_axis_offset = 0.5
+wear_path_override = PackedVector2Array(0, 0, 1.5, -9, 1, -18, 2, -28, 4.5, -38, 4, -45, 4, -52, 4.5, -57)
 scatter_sets = Array[ExtResource("11_scatter_set")]([ExtResource("12_reeds")])
 scatter_budget = 4000
 reward_pool = ExtResource("13_wanderer_pool")

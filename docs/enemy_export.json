@@ -1028,7 +1028,7 @@
               "weight": 1.0,
               "anchor": [
                 4.0,
-                -41.5
+                -45.0
               ],
               "slot_yaw_degrees": 0.0,
               "cluster": null,
@@ -1042,8 +1042,8 @@
                   0.0,
                   -1.0
                 ],
-                "gate_distance_beyond_enemy": 11.5,
-                "bar_axis_offset": 0.0,
+                "gate_distance_beyond_enemy": 10.0,
+                "bar_axis_offset": 0.5,
                 "channel_max_width": 0.0,
                 "engage_line_offset_m": -2.0
               },
@@ -1063,13 +1063,88 @@
                   "card_reward": "ROLLED",
                   "position": [
                     4.0,
-                    -41.5
+                    -45.0
                   ],
-                  "yaw_degrees": 55.3,
+                  "yaw_degrees": -40.8,
                   "face_prop": null
                 }
               ],
               "props": [],
+              "keepsake_drop": null,
+              "armor_drop": null,
+              "glassbone": 0
+            },
+            {
+              "slot": "terrace_heron",
+              "option": "heron",
+              "weight": 0.5,
+              "anchor": [
+                -13.0,
+                -51.0
+              ],
+              "slot_yaw_degrees": 0.0,
+              "cluster": null,
+              "names": "Strawcrown",
+              "required": false,
+              "elite": false,
+              "gate_fight": false,
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
+              "patrol": null,
+              "members": [
+                {
+                  "member": 0,
+                  "name": "Strawcrown",
+                  "enemy_file": "res://battle/rules/enemies/strawcrown.tres",
+                  "hp": 32,
+                  "anchor": false,
+                  "card_reward": "ROLLED",
+                  "position": [
+                    -13.0,
+                    -51.0
+                  ],
+                  "yaw_degrees": -123.7,
+                  "face_prop": null
+                }
+              ],
+              "props": [],
+              "keepsake_drop": null,
+              "armor_drop": null,
+              "glassbone": 0
+            },
+            {
+              "slot": "terrace_heron",
+              "option": "heron_gone",
+              "weight": 0.5,
+              "anchor": [
+                -13.0,
+                -51.0
+              ],
+              "slot_yaw_degrees": 0.0,
+              "cluster": null,
+              "names": "",
+              "required": false,
+              "elite": false,
+              "gate_fight": false,
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
+              "patrol": null,
+              "members": [],
+              "props": [
+                {
+                  "scene": "res://field/nest_scrape.tscn",
+                  "position": [
+                    -12.8,
+                    -50.4
+                  ]
+                }
+              ],
               "keepsake_drop": null,
               "armor_drop": null,
               "glassbone": 0
@@ -2579,6 +2654,15 @@
           "cluster": "required",
           "required": true,
           "gate_fight": true
+        },
+        {
+          "region": 2,
+          "floor": 1,
+          "slot": "terrace_heron",
+          "option": "heron",
+          "cluster": null,
+          "required": false,
+          "gate_fight": false
         }
       ]
     },

@@ -386,20 +386,30 @@ and up the west shore north of z -27. (2026-10-17.)
   - **The tower** grows with RunState.floors_crossed instead, so it stays
     at least as big in Region 2; Region 2's own tower look is open.
   (2026-10-23.)
-- **Region 2 floor 1's reeds and pier are placeholders.** The floor is
-  wired from its generator (`assets/field/masks/source/region2_floor1/`:
-  `floor1_layout.json` and the masks beside region 1's). Left for later:
+- **Region 2 floor 1's reeds, pier and heron are placeholders.** The
+  floor - the open basin - is wired from its generator (`assets/field/
+  masks/source/region2_floor1/`: `floor1_layout.json` and the masks beside
+  region 1's). Left for later:
   - **Reed height.** One REED scatter entry per outline in the layout,
-    1.5 m tall and 0.8 m short, where the layout asks 2-4 m and 0.8-1.5 m;
+    2.5 m tall and 0.8 m short, where the layout asks 2-4 m and 0.6-1.1 m;
     full height waits for field occlusion, so the reeds don't hide him at
     the bends. The reed masks are imported but nothing reads them yet -
-    scatter places by the outlines.
+    scatter places by the outlines, so the two tall outlines that are holes
+    in the thicket (1 and 7, 2 m2 and 1 m2) have no entry.
+  - **The terrace heron.** An optional slot at the terrace's north-west
+    end, even odds: a lone Strawcrown stands in until the heron exists;
+    the empty roll shows a nest scrape, a plain dark decal
+    (`field/nest_scrape.tscn`).
+  - **The dry mask.** `region2_floor1_dry.png` (terrace, island top,
+    their faces and the bank) is imported; nothing reads it yet.
   - **Outer ground.** The outer mask marks both the wet silt under the
     reeds and the dry land past the bank; both take Ground's one scene-wide
     outer_color and pebble grain. To be judged in game.
   - **The pier's art.** `assets/models/props/pier/pier.glb` (make_pier.py)
     draws it under the painted shader; the Pier prop's collision follows
-    the layout's fields and the model's rail lines. (2026-10-23.)
+    the layout's fields and the model's rail lines - its south deck rail
+    run on to the platform's south rail, closing a 0.72 m gap the model
+    leaves. (2026-10-23; the basin 2026-11-02.)
 - **Floor 1 beach look (Bible §6a), lighting first.** The target image
   is approved; this pass changes floor 1's light only, through
   FloorData's Light group (sun elevation, energy, colour, shadow
