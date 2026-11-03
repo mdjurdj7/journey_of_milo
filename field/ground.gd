@@ -676,6 +676,17 @@ signal wear_keep_out_changed
 	set(value):
 		wear_darken = value
 		_apply_uniform("wear_darken", value)
+# The band's own colour, over the sand before wear_darken, by
+# wear_tint_strength - a path lighter than the ground it crosses. 0 (the
+# default): none. Per floor, from FloorData.
+@export var wear_color: Color = Color(0.74, 0.70, 0.60):
+	set(value):
+		wear_color = value
+		_apply_uniform("wear_color", value)
+@export_range(0.0, 1.0) var wear_tint_strength: float = 0.0:
+	set(value):
+		wear_tint_strength = value
+		_apply_uniform("wear_tint_strength", value)
 @export_range(0.0, 1.0) var wear_flatten: float = 0.6:
 	set(value):
 		wear_flatten = value
@@ -1213,6 +1224,22 @@ signal wear_keep_out_changed
 		outer_mask = value
 		_push_canvas_paintings()
 @export_group("")
+
+# Dry top: high ground in a colour of its own, over the sand base where
+# dry_mask says so - a floor whose ground_color is the low silt and whose
+# terraces stand dry above it. Under outer ground, the slope tint and
+# rock. No mask, no dry top. See ground.gdshader's own block.
+@export_group("Dry Top")
+@export var dry_top_color: Color = Color(0.74, 0.70, 0.60):
+	set(value):
+		dry_top_color = value
+		_apply_uniform("dry_top_color", value)
+# On the same canvas as landmass_mask: white = dry top.
+@export var dry_mask: Texture2D = null:
+	set(value):
+		dry_mask = value
+		_push_canvas_paintings()
+@export_group("")
 @export var region_field_path: NodePath = ^".."
 @export var sea_path: NodePath = ^"../Sea"
 # The render layers the sand's meshes (the relief and the dressing
@@ -1444,6 +1471,8 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("wear_fray_amplitude", wear_fray_amplitude)
 	_apply_uniform("wear_shore_fade", wear_shore_fade)
 	_apply_uniform("wear_darken", wear_darken)
+	_apply_uniform("wear_color", wear_color)
+	_apply_uniform("wear_tint_strength", wear_tint_strength)
 	_apply_uniform("wear_flatten", wear_flatten)
 	_apply_uniform("wear_ripple_flatten", wear_ripple_flatten)
 	_apply_uniform("wear_mark_cell", wear_mark_cell)
@@ -1506,6 +1535,7 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("basin_color", basin_color)
 	_apply_uniform("basin_tint_strength", basin_tint_strength)
 	_apply_uniform("outer_color", outer_color)
+	_apply_uniform("dry_top_color", dry_top_color)
 	_apply_uniform("outer_grain_scale", outer_grain_scale)
 	_apply_uniform("outer_grain_strength", outer_grain_strength)
 	_apply_uniform("outer_grain_gap", outer_grain_gap)
@@ -1757,7 +1787,7 @@ func set_rut_path(points: PackedVector2Array) -> void:
 	_apply_uniform("rut_point_count", used.size() if used.size() >= 2 else 0)
 
 # The paintings the shader samples on the landmass canvas (wear_mask,
-# rock_mask, outer_mask) and the canvas's image->world mapping, matching
+# rock_mask, outer_mask, dry_mask) and the canvas's image->world mapping, matching
 # _mask_world_to_pixel() exactly so each lines up with a landmass mask
 # painted on the same canvas. The mapping is pushed as the spawn point
 # plus the two image axes rather than a matrix, so the shader can do the
@@ -1767,6 +1797,9 @@ func _push_canvas_paintings() -> void:
 	_apply_uniform("wear_mask_ready", wear_mask != null)
 	_apply_uniform("rock_mask_ready", rock_mask != null)
 	_apply_uniform("outer_mask_ready", outer_mask != null)
+	_apply_uniform("dry_mask_ready", dry_mask != null)
+	if dry_mask != null:
+		_apply_uniform("dry_mask", dry_mask)
 	if wear_mask != null:
 		_apply_uniform("wear_mask", wear_mask)
 	if rock_mask != null:
@@ -1885,19 +1918,7 @@ func get_landmass_distance(world_xz: Vector2) -> float:
 # Decoded once per texture, on first ask; 0 with no painting, or one not
 # the landmass mask's size. FieldScatter keeps off it.
 func get_wear_mask_at(world_xz: Vector2) -> float:
-	if wear_mask == null or not _mask_ready:
-		return 0.0
-	if _wear_mask_decoded_for != wear_mask:
-		_wear_mask_decoded_for = wear_mask
-		_wear_mask_bytes = PackedByteArray()
-		var image: Image = _decode_l8_image(wear_mask)
-		if image != null and image.get_width() == _mask_width and image.get_height() == _mask_height:
-			_wear_mask_bytes = image.get_data()
-		else:
-			push_warning("Ground: wear_mask isn't the landmass mask's size; not read on the CPU.")
-	if _wear_mask_bytes.is_empty():
-		return 0.0
-	return _canvas_sample(_wear_mask_bytes, world_xz)
+	return get_canvas_painting_at(wear_mask, world_xz)
 
 # 0..1: where stone may show (rock_mask) at a world XZ, read as
 # get_wear_mask_at() reads its painting. Only the mask - the shader's rule
@@ -1905,19 +1926,28 @@ func get_wear_mask_at(world_xz: Vector2) -> float:
 # applies the same. 0 with no painting, or one not the landmass mask's
 # size.
 func get_rock_mask_at(world_xz: Vector2) -> float:
-	if rock_mask == null or not _mask_ready:
+	return get_canvas_painting_at(rock_mask, world_xz)
+
+# 0..1: any painting on the landmass canvas at a world XZ - the one
+# bilinear read the shader takes of a painting there, for wear_mask and
+# rock_mask and for those Ground doesn't own (a scatter entry's
+# area_mask, a MaskMass's mask). Decoded once per texture, on first ask;
+# 0 with no painting, or one not the landmass mask's size.
+func get_canvas_painting_at(painting: Texture2D, world_xz: Vector2) -> float:
+	if painting == null or not _mask_ready:
 		return 0.0
-	if _rock_mask_decoded_for != rock_mask:
-		_rock_mask_decoded_for = rock_mask
-		_rock_mask_bytes = PackedByteArray()
-		var image: Image = _decode_l8_image(rock_mask)
+	if not _painting_bytes.has(painting):
+		var bytes := PackedByteArray()
+		var image: Image = _decode_l8_image(painting)
 		if image != null and image.get_width() == _mask_width and image.get_height() == _mask_height:
-			_rock_mask_bytes = image.get_data()
+			bytes = image.get_data()
 		else:
-			push_warning("Ground: rock_mask isn't the landmass mask's size; not read on the CPU.")
-	if _rock_mask_bytes.is_empty():
+			push_warning("Ground: painting '%s' isn't the landmass mask's size; not read on the CPU." % painting.resource_path)
+		_painting_bytes[painting] = bytes
+	var decoded: PackedByteArray = _painting_bytes[painting]
+	if decoded.is_empty():
 		return 0.0
-	return _canvas_sample(_rock_mask_bytes, world_xz)
+	return _canvas_sample(decoded, world_xz)
 
 # 0..1: is the nearest water to this world XZ a pool rather than the sea?
 # Same bilinear read as _mask_distance_sample(), on the same grid.
@@ -2482,12 +2512,9 @@ var _mask_ready: bool = false
 var _mask_bytes: PackedByteArray = PackedByteArray()
 var _mask_width: int = 0
 var _mask_height: int = 0
-# wear_mask decoded for get_wear_mask_at(), and the texture it came from.
-var _wear_mask_bytes: PackedByteArray = PackedByteArray()
-var _wear_mask_decoded_for: Texture2D = null
-# rock_mask decoded for get_rock_mask_at(), likewise.
-var _rock_mask_bytes: PackedByteArray = PackedByteArray()
-var _rock_mask_decoded_for: Texture2D = null
+# Each painting get_canvas_painting_at() has decoded, by texture: its
+# luminance bytes on the landmass canvas, empty if it didn't fit.
+var _painting_bytes: Dictionary[Texture2D, PackedByteArray] = {}
 # elevation_mask's own luminance bytes on the landmass mask's canvas (same
 # _mask_width x _mask_height, checked at decode), read by _elevation_lift()
 # through the same _canvas_sample(). Empty, with _elevation_ready false,

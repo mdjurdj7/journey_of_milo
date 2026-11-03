@@ -804,6 +804,16 @@ func _enter_tree() -> void:
 		ground.basin_tint_strength = floor_data.basin_tint_strength
 		ground.basin_tint_heights = floor_data.basin_tint_heights
 		ground.wear_darken = floor_data.wear_darken
+		ground.wear_color = floor_data.wear_color
+		ground.wear_tint_strength = floor_data.wear_tint_strength
+		if floor_data.ground_color.a > 0.0:
+			ground.ground_color = floor_data.ground_color
+		if floor_data.rock_color.a > 0.0:
+			ground.rock_color = floor_data.rock_color
+		if floor_data.outer_color.a > 0.0:
+			ground.outer_color = floor_data.outer_color
+		ground.dry_mask = floor_data.dry_mask
+		ground.dry_top_color = floor_data.dry_top_color
 		ground.slope_tint_color = floor_data.slope_tint_color
 		ground.slope_tint_strength = floor_data.slope_tint_strength
 		ground.slope_tint_min = floor_data.slope_tint_min

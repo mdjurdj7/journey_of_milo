@@ -78,6 +78,22 @@ class_name FloorData
 # Ground.wear_darken for this floor: how much darker the worn band's core
 # is than the ground under it. 0.1 is the region's own value.
 @export_range(0.0, 1.0) var wear_darken: float = 0.1
+# Ground.wear_color / wear_tint_strength for this floor: the worn band
+# laid toward its own colour, for a path lighter than the ground it
+# crosses. Strength 0 (the default) is off.
+@export var wear_color: Color = Color(0.74, 0.70, 0.60)
+@export_range(0.0, 1.0) var wear_tint_strength: float = 0.0
+# Ground's own colours, for this floor. Alpha 0 (the default) leaves
+# Ground's scene value. ground_color is the base sand - and what
+# footprints, contact shadows and the figures' ground-matched materials
+# key off - so a floor whose open ground is silt sets it to the silt.
+@export var ground_color: Color = Color(0.0, 0.0, 0.0, 0.0)
+@export var rock_color: Color = Color(0.0, 0.0, 0.0, 0.0)
+@export var outer_color: Color = Color(0.0, 0.0, 0.0, 0.0)
+# Ground's Dry Top, for this floor: on the landmass canvas, white is high
+# ground in dry_top_color over the base. Null (the default) is none.
+@export var dry_mask: Texture2D = null
+@export var dry_top_color: Color = Color(0.74, 0.70, 0.60)
 # Ground's Slope Tint, for this floor: faces past slope_tint_min degrees
 # toward slope_tint_color (full slope_tint_blend further on) at
 # slope_tint_strength - wind-packed sand, so a slope reads by value even

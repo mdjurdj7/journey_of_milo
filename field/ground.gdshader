@@ -256,6 +256,11 @@ uniform float wear_fray_amplitude = 0.25;
 // nobody wears a track into ground the sea washes twice a day.
 uniform float wear_shore_fade = 3.0;
 uniform float wear_darken : hint_range(0.0, 1.0) = 0.05;
+// The band's own colour, laid over the sand before wear_darken: by
+// wear_tint_strength toward wear_color - a path lighter than the silt it
+// crosses, which darkening alone can't draw. Not on rock. 0: none.
+uniform vec4 wear_color : source_color = vec4(0.74, 0.70, 0.60, 1.0);
+uniform float wear_tint_strength : hint_range(0.0, 1.0) = 0.0;
 // How much of the grain/speckle detail the band flattens away.
 uniform float wear_flatten : hint_range(0.0, 1.0) = 0.6;
 // How much of the wind ripples it flattens: feet level them first.
@@ -489,6 +494,17 @@ uniform float outer_grain_strength : hint_range(0.0, 1.0) = 0.12;
 uniform float outer_grain_gap : hint_range(0.0, 1.0) = 0.3;
 uniform sampler2D outer_mask : filter_linear, repeat_disable;
 uniform bool outer_mask_ready = false;
+
+// --- Dry top ---
+//
+// High ground in a colour of its own: where dry_mask is white the sand
+// base gives way to dry_top_color - for a floor whose base is low silt
+// and whose terraces stand dry above it. Over the basin tint; under outer
+// ground, the slope tint and rock, so a face inside the mask keeps its
+// stone. No mask, no dry top: mix(x, y, 0).
+uniform vec4 dry_top_color : source_color = vec4(0.74, 0.70, 0.60, 1.0);
+uniform sampler2D dry_mask : filter_linear, repeat_disable;
+uniform bool dry_mask_ready = false;
 
 // The landmass canvas's image->world mapping, shared by every painting on
 // it the shader samples (wear_mask, rock_mask) - see canvas_uv().
@@ -1575,6 +1591,10 @@ void fragment() {
 	float basin_t = clamp((v_world_height - basin_height_low) / max(basin_height_high - basin_height_low, 0.001), 0.0, 1.0);
 	float basin = basin_tint_strength * (1.0 - smoothstep(0.0, 1.0, basin_t));
 	vec3 sand_base = mix(dry_color.rgb, basin_color.rgb, basin);
+	// The dry top over it (see dry_top_color's doc).
+	if (dry_mask_ready) {
+		sand_base = mix(sand_base, dry_top_color.rgb, canvas_sample(dry_mask, v_world_xz));
+	}
 	// Outer ground over the (basin-tinted) sand, under rock - see
 	// outer_color's doc.
 	float outer = outer_factor(v_world_xz);
@@ -1736,6 +1756,7 @@ void fragment() {
 	// Applied after the dry detail and before anything water-side, so the
 	// shore, the sheet and the pools are untouched by it. Rock takes
 	// neither marks nor ruts.
+	sand_albedo = mix(sand_albedo, wear_color.rgb, wear * wear_tint_strength * (1.0 - rock));
 	sand_albedo *= 1.0 - wear * wear_darken;
 	if (wear_info.y > 0.0 && wear_mark_density > 0.0) {
 		sand_albedo *= 1.0 - wear_marks(v_world_xz, wear_info.zw) * wear_mark_darken * wear_info.y * (1.0 - rock) * sand_detail;
