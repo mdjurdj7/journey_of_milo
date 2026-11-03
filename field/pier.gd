@@ -30,8 +30,9 @@ class_name Pier
 # One height per XZ (WalkSurface): wherever the pier stands, the walk
 # height is its top, so the sand under it must be out of his reach - the
 # floor seals it with ledges. No enemy stands on it (none grounds on a
-# walk surface), and it leaves no footprints. Scatter isn't kept off its
-# outline: the reeds grow on under it.
+# walk surface), and it leaves no footprints. Scatter keeps off its deck,
+# platform and steps (get_world_outlines()): nothing grows up through the
+# planks or shows between them from below.
 
 @export_group("Shape")
 @export var deck_root: Vector2 = Vector2.ZERO:
@@ -82,6 +83,13 @@ class_name Pier
 	set(value):
 		steps_sink_m = value
 		_rebuild()
+# The whole pier - model, deck, platform, rails and steps - raised this
+# far over the land level, metres: clear of the relief's own bumps where
+# the deck runs out level from a bank top at the bank's painted height.
+@export var lift_m: float = 0.0:
+	set(value):
+		lift_m = value
+		_rebuild()
 
 @export_group("Rails")
 # Polylines at deck height, XZ in the pier's frame.
@@ -123,6 +131,17 @@ class_name Pier
 	set(value):
 		wood_color = value
 		_apply_graybox_material()
+# Under a model's planks: a board this colour underlay_depth_m below the
+# deck, platform and steps tops, so the gaps between planks show wood
+# rather than whatever lies far below. Alpha 0 (the default) draws none.
+@export var underlay_color: Color = Color(0.0, 0.0, 0.0, 0.0):
+	set(value):
+		underlay_color = value
+		_rebuild()
+@export var underlay_depth_m: float = 0.08:
+	set(value):
+		underlay_depth_m = value
+		_rebuild()
 # The render layers its meshes are on besides layer 1: a figure on it
 # lays its contact pool here (ContactShadowData.perch_layers), and the
 # body is in ContactShadow.STANDABLE_GROUP so the pool finds the top.
@@ -138,6 +157,7 @@ class_name Pier
 var _ground: Ground = null
 var _sky: RegionSky = null
 var _graybox_material: StandardMaterial3D = null
+var _underlay_material: StandardMaterial3D = null
 var _fog: ShaderMaterial = null
 # The deck top, local Y, as last built.
 var _deck_top: float = 0.0
@@ -193,7 +213,34 @@ func is_railed() -> bool:
 func get_rail_shapes() -> Array[CollisionShape3D]:
 	return _rail_shapes
 
+# The deck strip, the platform and the steps (to their foot), each as
+# world XZ, in order.
+func get_world_outlines() -> Array[PackedVector2Array]:
+	var outlines: Array[PackedVector2Array] = []
+	if not _built:
+		return outlines
+	var axis: Vector2 = deck_end - deck_root
+	if axis.length() > 0.001:
+		outlines.append(_world_strip(deck_root, deck_end, deck_width_m))
+	if platform.has_area():
+		outlines.append(_to_world(PackedVector2Array([platform.position, Vector2(platform.end.x, platform.position.y), platform.end, Vector2(platform.position.x, platform.end.y)])))
+	if _steps_run() > 0.001:
+		outlines.append(_world_strip(steps_from, steps_to, steps_width_m))
+	return outlines
+
 # --- the shape, in the pier's own XZ ---
+
+# A strip `width` wide from `a` to `b` (the pier's XZ), in world XZ.
+func _world_strip(a: Vector2, b: Vector2, width: float) -> PackedVector2Array:
+	var side: Vector2 = (b - a).normalized().orthogonal() * width * 0.5
+	return _to_world(PackedVector2Array([a + side, b + side, b - side, a - side]))
+
+func _to_world(points: PackedVector2Array) -> PackedVector2Array:
+	var world := PackedVector2Array()
+	for point in points:
+		var at: Vector3 = global_transform * Vector3(point.x, 0.0, point.y)
+		world.append(Vector2(at.x, at.z))
+	return world
 
 func _to_pier(world_xz: Vector2) -> Vector2:
 	var local: Vector3 = global_transform.affine_inverse() * Vector3(world_xz.x, global_position.y, world_xz.y)
@@ -254,7 +301,7 @@ func _rebuild() -> void:
 	_fog = null
 	# The land level is Ground's local Y; the pier's own frame is only
 	# ever turned about Y, so the offset carries over.
-	var land: float = to_local(ground.to_global(Vector3(0.0, ground.get_land_level(), 0.0))).y
+	var land: float = to_local(ground.to_global(Vector3(0.0, ground.get_land_level(), 0.0))).y + lift_m
 	_deck_top = land + deck_height_m
 	_built = true
 	var drawn: bool = model_path.is_empty()
@@ -300,6 +347,8 @@ func _rebuild() -> void:
 		_apply_graybox_material()
 	else:
 		_add_model(land)
+		if underlay_color.a > 0.0:
+			_add_underlay()
 
 # A basis whose +X runs along `axis` (XZ), level.
 func _flat_basis(axis: Vector2) -> Basis:
@@ -329,6 +378,40 @@ func _add_box(size: Vector3, basis: Basis, centre: Vector3, drawn: bool) -> Coll
 		add_child(mesh_instance)
 		_generated.append(mesh_instance)
 	return collision
+
+# The underlay boards (see underlay_color): the deck strip, the platform
+# and the steps, each a little inside its edges, drawn only.
+func _add_underlay() -> void:
+	if _underlay_material == null:
+		_underlay_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
+	_underlay_material.albedo_color = Color(underlay_color.r, underlay_color.g, underlay_color.b)
+	var board: float = 0.04
+	var y: float = _deck_top - underlay_depth_m - board * 0.5
+	var axis: Vector2 = deck_end - deck_root
+	if axis.length() > 0.001:
+		var mid: Vector2 = (deck_root + deck_end) * 0.5
+		_add_board(Vector3(axis.length(), board, deck_width_m - 0.1), _flat_basis(axis), Vector3(mid.x, y, mid.y))
+	if platform.has_area():
+		var centre: Vector2 = platform.get_center()
+		_add_board(Vector3(platform.size.x - 0.1, board, platform.size.y - 0.1), Basis(), Vector3(centre.x, y, centre.y))
+	var run: float = _steps_run()
+	if run > 0.001:
+		var slope: float = atan(_steps_fall())
+		var steps_basis: Basis = _sloped_basis(_steps_dir(), slope)
+		var dir: Vector2 = _steps_dir()
+		var mid_top := Vector3(steps_from.x + dir.x * run * 0.5, _deck_top - run * 0.5 * _steps_fall(), steps_from.y + dir.y * run * 0.5)
+		_add_board(Vector3(run / cos(slope), board, steps_width_m - 0.1), steps_basis, mid_top + steps_basis * Vector3(0.0, -underlay_depth_m - board * 0.5, 0.0))
+
+func _add_board(size: Vector3, basis: Basis, centre: Vector3) -> void:
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = "Underlay"
+	mesh_instance.mesh = mesh
+	mesh_instance.transform = Transform3D(basis, centre)
+	mesh_instance.material_override = _underlay_material
+	add_child(mesh_instance)
+	_generated.append(mesh_instance)
 
 func _add_model(land: float) -> void:
 	var scene := load(model_path) as PackedScene if ResourceLoader.exists(model_path) else null

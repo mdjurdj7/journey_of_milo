@@ -27,6 +27,16 @@ func get_top_normal_at(_world_xz: Vector2) -> Vector3:
 func get_world_outline() -> PackedVector2Array:
 	return PackedVector2Array()
 
+# Every piece's edge, for scatter's keep-out: get_world_outline() alone
+# unless a surface in several pieces (a Pier's deck, platform and steps)
+# gives one each - nothing grows up through any of them.
+func get_world_outlines() -> Array[PackedVector2Array]:
+	var outline: PackedVector2Array = get_world_outline()
+	var outlines: Array[PackedVector2Array] = []
+	if outline.size() >= 3:
+		outlines.append(outline)
+	return outlines
+
 # Whether it keeps him on with rails rather than its drops (a Pier): the
 # walk grid then doesn't close its cells for the drop at its edge, and
 # stamps get_rail_shapes() instead (NavGrid).

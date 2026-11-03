@@ -33,9 +33,9 @@ class_name FieldScatter
 #   - every static body's footprint (props, ledges) grown by prop_margin_m
 #     - his walk-up to anything stops at that edge - or a ledge's by the
 #     entry's own ledge_margin_m, when it has one; the gate's shapes by
-#     gate_margin_m; a walk surface's outline (a rock shelf's) by
-#     shelf_margin_m; an empty Siltjaw spot's old mounds and trails
-#     (SiltjawSigns) by prop_margin_m;
+#     gate_margin_m; a walk surface's outlines (a rock shelf's; a pier's
+#     deck, platform and steps) by shelf_margin_m; an empty Siltjaw
+#     spot's old mounds and trails (SiltjawSigns) by prop_margin_m;
 #     the spawn by spawn_clear_m;
 #   - the floor's own keep-outs (FloorData.scatter_keep_outs), but for an
 #     entry with an area of its own, which places inside it regardless;
@@ -829,8 +829,7 @@ func _build_keepouts() -> void:
 		var surface := node as WalkSurface
 		if surface == null:
 			continue
-		var outline: PackedVector2Array = surface.get_world_outline()
-		if outline.size() >= 3:
+		for outline in surface.get_world_outlines():
 			_keepouts.append(_polygon(outline, shelf_margin_m))
 	# A Siltjaw's spot rolled empty: its old mounds and trails, each
 	# footprint grown by prop_margin_m, as a body's would be.
