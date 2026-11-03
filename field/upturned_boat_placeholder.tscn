@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_hull"]
+radius = 0.6
+height = 3.2
+
+[node name="UpturnedBoatPlaceholder" type="Node3D"]
+
+[node name="Hull" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CapsuleMesh_hull")

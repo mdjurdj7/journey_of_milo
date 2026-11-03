@@ -1045,7 +1045,7 @@
                 "gate_distance_beyond_enemy": 10.0,
                 "bar_axis_offset": 0.5,
                 "channel_max_width": 0.0,
-                "engage_line_offset_m": -2.0
+                "engage_line_offset_m": null
               },
               "elite_rewards": {
                 "gold_multiplier": null,

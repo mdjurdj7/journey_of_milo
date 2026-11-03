@@ -386,30 +386,42 @@ and up the west shore north of z -27. (2026-10-17.)
   - **The tower** grows with RunState.floors_crossed instead, so it stays
     at least as big in Region 2; Region 2's own tower look is open.
   (2026-10-23.)
-- **Region 2 floor 1's reeds, pier and heron are placeholders.** The
-  floor - the open basin - is wired from its generator (`assets/field/
-  masks/source/region2_floor1/`: `floor1_layout.json` and the masks beside
-  region 1's). Left for later:
-  - **Reed height.** One REED scatter entry per outline in the layout,
-    2.5 m tall and 0.8 m short, where the layout asks 2-4 m and 0.6-1.1 m;
-    full height waits for field occlusion, so the reeds don't hide him at
-    the bends. The reed masks are imported but nothing reads them yet -
-    scatter places by the outlines, so the two tall outlines that are holes
-    in the thicket (1 and 7, 2 m2 and 1 m2) have no entry.
+- **Region 2 floor 1's vegetation, boat, pier and heron are placeholders.**
+  The floor - the open basin, 4 m banks - is wired from its generator
+  (`assets/field/masks/source/region2_floor1/`: `floor1_layout.json` and
+  the masks beside region 1's). Left for later:
+  - **Vegetation.** The willows and the reed thicket are MaskMass meshes
+    from their masks (flat colour, rounded by distance from the outline,
+    the layout's heights: willow 3-5 m, thicket 2.5-3.5 m), no collision -
+    the ledges fence them. Short reeds (0.8-1.1 m) and dry grass tufts
+    are REED scatter kept to their masks (ScatterEntry.area_mask). A tall
+    willow between the field camera and the Wanderer hides him; that
+    waits for field occlusion.
+  - **The island find.** An upturned-boat stand-in (a half-buried capsule
+    on BaskingSlab, in the pier's grey wood) with an ordinary bundle off
+    its bow.
+  - **Ground tones.** Silt as the floor's ground_color, the dry top from
+    the dry mask, the bank faces as rock, the worn path in its own colour
+    (FloorData's ground colours, dry_mask, wear_color) - the
+    palette_target hexes taken as albedo; to be tuned against the target
+    image from field screenshots. The outer ground takes the silt colour.
+  - **Elevation precision.** Godot loads a 16-bit PNG as 8 bits, so the
+    floor reads the 8-bit `region2_floor1_elev.png` (31 mm a level at its
+    8 m span); `region2_floor1_elev16.png` stays in the generator folder,
+    unimported. Two 8-bit halves would carry it if the steps ever show.
+  - **No engage line.** The gate line holds the exit; the Dunecur's fight
+    starts on contact only, so the terrace detour to the heron is open.
   - **The terrace heron.** An optional slot at the terrace's north-west
     end, even odds: a lone Strawcrown stands in until the heron exists;
     the empty roll shows a nest scrape, a plain dark decal
     (`field/nest_scrape.tscn`).
-  - **The dry mask.** `region2_floor1_dry.png` (terrace, island top,
-    their faces and the bank) is imported; nothing reads it yet.
-  - **Outer ground.** The outer mask marks both the wet silt under the
-    reeds and the dry land past the bank; both take Ground's one scene-wide
-    outer_color and pebble grain. To be judged in game.
   - **The pier's art.** `assets/models/props/pier/pier.glb` (make_pier.py)
     draws it under the painted shader; the Pier prop's collision follows
     the layout's fields and the model's rail lines - its south deck rail
     run on to the platform's south rail, closing a 0.72 m gap the model
-    leaves. (2026-10-23; the basin 2026-11-02.)
+    leaves. No walking under it: the terrace's ledge runs fence the ground
+    beneath, their gap at the root drawn in to the deck's width + 0.1 m.
+    (2026-10-23; the basin 2026-11-02; 4 m banks 2026-11-03.)
 - **Floor 1 beach look (Bible §6a), lighting first.** The target image
   is approved; this pass changes floor 1's light only, through
   FloorData's Light group (sun elevation, energy, colour, shadow
