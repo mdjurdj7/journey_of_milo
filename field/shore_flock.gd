@@ -152,10 +152,10 @@ func _place() -> void:
 	print("ShoreFlock: %d birds at (%.1f, %.1f)" % [_birds.size(), _spot.x, _spot.y])
 
 # Open sand by the water first, any open sand after: in a shuffled order,
-# the first he can walk to from the spawn.
+# the first he can walk to from where he starts.
 func _pick_spot(rng: RandomNumberGenerator) -> Vector2:
 	var nav: NavGrid = _field.get_nav_grid()
-	var spawn3: Vector3 = _field.get_spawn_position()
+	var spawn3: Vector3 = _field.get_player_start()
 	var spawn := Vector2(spawn3.x, spawn3.z)
 	var tiers: Array[PackedVector2Array] = [
 		_scatter.open_ground(_data.prefer_zones, _data.prefer_inland_m, _data.path_distance_m, _data.stance_clearance_m),

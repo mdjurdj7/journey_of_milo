@@ -870,18 +870,17 @@ func _field_width() -> float:
 # spawn() so get_near_edge_z() below can call it without needing the
 # meshes to exist yet — unlike the rest of that function, this only
 # touches _wanderer and region_field, both already safe to resolve early.
+# From the floor's layout origin (RegionField.get_spawn_position()), not
+# where the Wanderer stands or starts; his own position only with no
+# RegionField.
 func _compute_near_edge_z() -> float:
 	var region_field := get_node_or_null(region_field_path) as RegionField
 	_forward = region_field.get_forward() if region_field else Vector3.FORWARD
 	var spawn: Vector3 = Vector3.ZERO
-	if _wanderer != null:
-		# Before the Wanderer has entered the tree (Ground asks from
-		# RegionField's _enter_tree()), its global_position would refuse:
-		# RegionField reads the same node through its local transform.
-		if _wanderer.is_inside_tree() or region_field == null:
-			spawn = _wanderer.global_position
-		else:
-			spawn = region_field.get_spawn_position()
+	if region_field != null:
+		spawn = region_field.get_spawn_position()
+	elif _wanderer != null and _wanderer.is_inside_tree():
+		spawn = _wanderer.global_position
 	return (spawn - _forward * sea_edge_distance).z
 
 # Lazily resolves _wanderer if needed, so this is safe to call from

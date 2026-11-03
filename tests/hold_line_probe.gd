@@ -94,8 +94,8 @@ var _exited: bool = false
 var _opened: bool = false
 var _worst_past_m: float = -INF
 var _line_shows: int = 0
-# Floor 2's spawn, read as it loads (get_spawn_position() is where he
-# stands now).
+# Floor 2's spawn, its layout origin (get_spawn_position()), read as it
+# loads.
 var _spawn: Vector3 = Vector3.ZERO
 var _line_texts: Array[String] = []
 var _line_was_visible: bool = false

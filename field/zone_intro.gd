@@ -699,7 +699,7 @@ func _apply_pose() -> void:
 	var tower := _tower()
 	if region_field == null or camera_rig == null or tower == null:
 		return
-	var spawn: Vector3 = region_field.get_spawn_position()
+	var spawn: Vector3 = region_field.get_player_start()
 	var tower_base: Vector3 = tower.get_base_position()
 	var to_tower := Vector3(tower_base.x - spawn.x, 0.0, tower_base.z - spawn.z)
 	to_tower = to_tower.normalized() if to_tower.length() > 0.0001 else region_field.get_forward()

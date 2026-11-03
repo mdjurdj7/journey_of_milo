@@ -879,7 +879,8 @@ func _enter_tree() -> void:
 		if floor_data.sea_inland_reach_m >= 0.0:
 			sea.mesh_inland_reach = floor_data.sea_inland_reach_m
 	if spawn_node != null and floor_data != null:
-		spawn_node.position = Vector3(floor_data.spawn.x, 0.0, floor_data.spawn.y)
+		var start: Vector2 = floor_data.spawn + floor_data.player_start
+		spawn_node.position = Vector3(start.x, 0.0, start.y)
 		var exit: Vector3 = get_exit_direction()
 		spawn_node.rotation.y = atan2(-exit.x, -exit.z)
 	if spawn_node != null and ground != null:
@@ -1512,8 +1513,10 @@ func _physics_process(delta: float) -> void:
 		_run_lost_to_wading = true
 		_end_run_lost("drowned")
 
-# The field's forward direction: normalized XZ vector from the
-# Wanderer's spawn to the ForwardMarker. Nothing else should assume an
+# The field's forward direction: normalized XZ vector from the floor's
+# layout origin (get_spawn_position()) to the ForwardMarker - not from
+# where the Wanderer starts, so a player_start leaves the land's
+# orientation alone. Nothing else should assume an
 # axis or sign for "ahead" — call get_forward() instead. Falls back to
 # Godot's own -Z forward convention if the marker isn't present. The
 # Tower used to be the far end of this vector; it is a landmark now
@@ -1524,16 +1527,13 @@ func _physics_process(delta: float) -> void:
 # calls _ready() bottom-up (children before their parent), and Sea is
 # RegionField's child, so Sea's _ready() runs before RegionField's own
 # — an eager computation here would still be Vector3.FORWARD's default
-# when Sea first asks. Resolving Wanderer via get_node_or_null() rather
-# than the @onready var for the same reason: @onready isn't populated
-# until immediately before RegionField's own _ready(), which may be
-# after this first runs.
+# when Sea first asks. The origin comes from the floor's data
+# (get_floor_data() is lazy too), never a node's _ready().
 func _compute_forward() -> Vector3:
-	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
 	var marker := get_node_or_null(forward_marker_path) as Node3D
-	if spawn_node == null or marker == null:
+	if marker == null:
 		return Vector3.FORWARD
-	var to_marker := _world_position_of(marker) - _world_position_of(spawn_node)
+	var to_marker := _world_position_of(marker) - get_spawn_position()
 	to_marker.y = 0.0
 	return to_marker.normalized() if to_marker.length() > 0.0001 else Vector3.FORWARD
 
@@ -1603,14 +1603,35 @@ func get_exit_direction() -> Vector3:
 func get_inland_z() -> float:
 	return (field_extents.y / 2.0) * get_forward().z
 
-# The Wanderer's spawn, in world space - Ground places its landmass mask's
-# origin pixel here (see Ground._mask_world_to_pixel()). Resolved by node
-# lookup, not the @onready var, for the same child-before-parent reason
-# _compute_forward() does it that way; falls back to this node's own
-# origin if the Wanderer isn't present.
+# The floor's layout origin (FloorData.spawn), in world space at Y 0 -
+# Ground places its landmass mask's origin pixel here (see Ground._mask_
+# world_to_pixel()), and every slot, prop, ledge and path offset is from
+# it. Read from the floor, never the Wanderer, so it holds still as he
+# walks and stays put under a player_start (get_player_start() is where
+# he starts). This node's own origin with no floor.
 func get_spawn_position() -> Vector3:
-	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
-	return _world_position_of(spawn_node) if spawn_node != null else global_position
+	var floor_data := get_floor_data()
+	var spawn: Vector2 = floor_data.spawn if floor_data != null else Vector2.ZERO
+	return _local_to_world(Vector3(spawn.x, 0.0, spawn.y))
+
+# Where the Wanderer starts, in world space: the layout origin plus
+# FloorData.player_start, at the height he is released onto there once
+# Ground is built (Y 0 before). Read live.
+func get_player_start() -> Vector3:
+	var floor_data := get_floor_data()
+	var start: Vector2 = floor_data.spawn + floor_data.player_start if floor_data != null else Vector2.ZERO
+	var world: Vector3 = _local_to_world(Vector3(start.x, 0.0, start.y))
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null and ground.is_built():
+		var local: Vector3 = ground.to_local(world)
+		world.y = ground.get_height_at(Vector2(local.x, local.z)) + spawn_ground_clearance
+	return world
+
+# A point in this node's space, in world space - in the tree or not yet
+# (Ground asks from this node's _enter_tree()).
+func _local_to_world(local: Vector3) -> Vector3:
+	var base: Transform3D = global_transform if is_inside_tree() else transform
+	return base * local
 
 # `node`'s world position - its global_position once it is in the tree;
 # before, through its own and its parents' local transforms up to this
@@ -4141,14 +4162,16 @@ func _on_debug_traveller_toggled(on: bool) -> void:
 
 # One piece of Glassbone, through the run's own grant (RunState.add_
 # glassbone()) - a debug button, not a game source.
-# Debug: the Wanderer back to the floor's spawn (FloorData.spawn, on the
-# ground there), facing its exit as a floor opens, stopped - no path, no
-# velocity - and the camera's follow snapped onto him. In the field only:
-# never while a fight or a screen holds it (the field can't process then).
+# Debug: the Wanderer back to the floor's start (get_player_start(), on
+# the ground there), facing its exit as a floor opens, stopped - no path,
+# no velocity - and the camera's follow snapped onto him. In the field
+# only: never while a fight or a screen holds it (the field can't process
+# then).
 func _on_debug_spawn_pressed() -> void:
 	if _battle_open or not can_process() or wanderer == null:
 		return
-	var spawn: Vector2 = _floor_spawn_xz()
+	var start: Vector3 = get_player_start()
+	var spawn := Vector2(start.x, start.z)
 	var height: float = wanderer.global_position.y
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground != null:
@@ -5008,17 +5031,10 @@ func _build_nav_grid() -> void:
 		if surface != null and is_ancestor_of(surface):
 			rails.append_array(surface.get_rail_shapes())
 	grid.build(ground, sea_level, rect, _nav_static_shapes(ground), rails)
-	grid.compute_reachable(_floor_spawn_xz())
+	var spawn: Vector3 = get_spawn_position()
+	grid.compute_reachable(Vector2(spawn.x, spawn.z))
 	_nav = grid
 	print("RegionField: walk grid %d x %d at %.2f m (%.0f x %.0f m) in %d ms" % [grid.cols, grid.rows, grid.cell_size, rect.size.x, rect.size.y, grid.build_msec])
-
-# The floor's spawn, world XZ - from its FloorData, never the Wanderer's
-# live position (get_spawn_position() is that).
-func _floor_spawn_xz() -> Vector2:
-	var floor_data := get_floor_data()
-	var local := Vector3(floor_data.spawn.x, 0.0, floor_data.spawn.y) if floor_data != null else Vector3.ZERO
-	var world: Vector3 = to_global(local)
-	return Vector2(world.x, world.z)
 
 # Ground a fight may leave him on: a walk-grid cell he can reach from the
 # floor's spawn (NavGrid.compute_reachable()), with every cell within

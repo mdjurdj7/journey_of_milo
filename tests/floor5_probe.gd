@@ -100,8 +100,8 @@ var _log_dir: String = RunLogger.dir_override() if not RunLogger.dir_override().
 var _run_state: Node = null
 var _field: Node3D = null
 var _wanderer: CharacterBody3D = null
-# Where he spawned - RegionField.get_spawn_position() is his own position,
-# so it is read once, at the load, before he moves.
+# The floor's layout origin (RegionField.get_spawn_position()), where he
+# spawns on this floor, read once at the load.
 var _spawn: Vector3 = Vector3.ZERO
 var _failures: int = 0
 var _completed: int = 0

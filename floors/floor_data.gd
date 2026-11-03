@@ -313,10 +313,20 @@ class_name FloorData
 		emit_changed()
 
 @export_group("Layout")
-# The Wanderer's start, world XZ. Every floor so far spawns at the
-# origin and lets mask_origin do the shifting, which keeps the
-# spawn->ForwardMarker forward exactly the region's own.
+# The floor's layout origin, world XZ: the point the mask's origin pixel
+# sits on and every layout offset (slots, props, ledges, paths) is from
+# (RegionField.get_spawn_position()), and the forward's start. Every
+# floor so far keeps it at the origin and lets mask_origin do the
+# shifting, which keeps the forward exactly the region's own.
 @export var spawn: Vector2 = Vector2.ZERO
+# Where the Wanderer starts, as an XZ offset from `spawn` - (0, 0), the
+# default, starts him on it. Moves him alone: the land, the layout and
+# the forward stay on `spawn` (RegionField.get_player_start()). Read
+# live, by the debug Spawn button and each later reader.
+@export var player_start: Vector2 = Vector2.ZERO:
+	set(value):
+		player_start = value
+		emit_changed()
 # Unit XZ, the way OUT of this floor: the gate (its channel or its hold
 # line - see exit_kind), the camera's inland bound, the worn band's end
 # and the transition trigger all lie along it. Independent of the tower

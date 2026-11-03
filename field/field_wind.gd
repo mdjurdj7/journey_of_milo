@@ -366,8 +366,8 @@ func _push_live(delta: float) -> void:
 func _camera_focus() -> Vector2:
 	var camera: Camera3D = get_viewport().get_camera_3d() if is_inside_tree() else null
 	if camera == null:
-		var spawn: Vector3 = _field.get_spawn_position()
-		return Vector2(spawn.x, spawn.z)
+		var start: Vector3 = _field.get_player_start()
+		return Vector2(start.x, start.z)
 	var origin: Vector3 = camera.global_position
 	var forward: Vector3 = -camera.global_transform.basis.z
 	var ground_y: float = _ground.get_height_at(Vector2(origin.x, origin.z)) if _ground != null else 0.0

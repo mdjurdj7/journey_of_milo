@@ -5,7 +5,7 @@ extends SceneTree
 # scene:
 #
 #   loads    - the field, its Wanderer, its exit gate and its walk grid
-#   walkable - a planned path from spawn to the exit gate (short of its
+#   walkable - a planned path from his start to the exit gate (short of its
 #              centre, or of the nearest point along its line that the
 #              grid reaches - a LINE gate spans the floor), reaching it and
 #              never in deep water
@@ -31,7 +31,7 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 # drawn bottom over the ground, metres.
 const BODY_TOLERANCE_M := 0.05
 const GROUND_TOLERANCE_M := 0.15
-# Short of the gate's centre, metres, toward spawn.
+# Short of the gate's centre, metres, toward his start.
 const GATE_SHORT_M := 2.0
 # Sampling a path, metres.
 const STEP := 0.1
@@ -96,11 +96,11 @@ func _check_floor(region_index: int, floor_index: int) -> void:
 		await _teardown()
 		return
 	# --- walkable ---
-	var spawn: Vector3 = _field.call("get_spawn_position")
+	var start: Vector3 = _field.call("get_player_start")
 	var exit_dir: Vector3 = _field.call("get_exit_direction")
-	var target: Vector3 = _short_of_gate(spawn, gate.global_position - exit_dir * GATE_SHORT_M, exit_dir)
-	var path: PackedVector3Array = _field.call("plan_path", spawn, target, null, false)
-	_expect(path.size() >= 2 and _flat(path[path.size() - 1]).distance_to(_flat(target)) < 0.5, "%s: a path from spawn reaches the exit" % label)
+	var target: Vector3 = _short_of_gate(start, gate.global_position - exit_dir * GATE_SHORT_M, exit_dir)
+	var path: PackedVector3Array = _field.call("plan_path", start, target, null, false)
+	_expect(path.size() >= 2 and _flat(path[path.size() - 1]).distance_to(_flat(target)) < 0.5, "%s: a path from his start reaches the exit" % label)
 	var deep: int = 0
 	for sample in _samples(path):
 		if bool(nav.call("is_deep", nav.call("world_to_cell", sample))):
@@ -144,12 +144,12 @@ func _check_floor(region_index: int, floor_index: int) -> void:
 
 # Short of the gate's centre where the grid reaches it, else the nearest
 # point along its line that it does.
-func _short_of_gate(spawn: Vector3, centre: Vector3, exit_dir: Vector3) -> Vector3:
+func _short_of_gate(start: Vector3, centre: Vector3, exit_dir: Vector3) -> Vector3:
 	var across := Vector3(-exit_dir.z, 0.0, exit_dir.x)
 	for i in 161:
 		var offset: float = ceilf(float(i) / 2.0) * 0.5 * (1.0 if i % 2 == 1 else -1.0)
 		var point: Vector3 = centre + across * offset
-		var path: PackedVector3Array = _field.call("plan_path", spawn, point, null, false)
+		var path: PackedVector3Array = _field.call("plan_path", start, point, null, false)
 		if path.size() >= 2 and _flat(path[path.size() - 1]).distance_to(_flat(point)) < 0.5:
 			return point
 	return centre
