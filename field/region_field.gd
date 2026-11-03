@@ -847,6 +847,9 @@ func _enter_tree() -> void:
 		ground.damp_strength = floor_data.damp_strength
 		ground.damp_foot_depth = floor_data.damp_foot_depth
 		ground.damp_bank_width_m = floor_data.damp_bank_width_m
+		ground.strata_strength = floor_data.strata_strength
+		ground.strata_thickness_m = floor_data.strata_thickness_m
+		ground.lip_strength = floor_data.lip_strength
 	# The floor's own depth fog over the region's, when it names one.
 	var sky := get_node_or_null(sky_path) as RegionSky
 	if sky != null and floor_data != null and floor_data.fog_depth_begin > 0.0 and floor_data.fog_depth_end > floor_data.fog_depth_begin:

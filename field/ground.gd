@@ -844,6 +844,42 @@ signal wear_keep_out_changed
 	set(value):
 		rock_slope_blend = value
 		_apply_uniform("rock_slope_blend", value)
+# Strata: the rock in horizontal bands by world height, each a step
+# lighter or darker by up to strata_strength of its value, strata_
+# thickness_m.x to .y thick, their edges wobbled by strata_wobble_m (noise
+# at strata_wobble_scale cycles a metre). 0 is off. Per floor.
+@export_range(0.0, 0.2) var strata_strength: float = 0.0:
+	set(value):
+		strata_strength = value
+		_apply_uniform("strata_strength", value)
+@export var strata_thickness_m: Vector2 = Vector2(0.4, 0.7):
+	set(value):
+		strata_thickness_m = value
+		_apply_uniform("strata_thickness_m", value)
+@export var strata_wobble_m: float = 0.12:
+	set(value):
+		strata_wobble_m = value
+		_apply_uniform("strata_wobble_m", value)
+@export var strata_wobble_scale: float = 0.3:
+	set(value):
+		strata_wobble_scale = value
+		_apply_uniform("strata_wobble_scale", value)
+# The lip: lighter by lip_strength along a rock face's top edge - where
+# the slope comes on (lip_slope_lead degrees short of rock_slope_min),
+# inside the rock mask, on ground lip_rise_m.x to .y above its smoothed
+# surroundings, never a face's foot. 0 is off. Per floor.
+@export_range(0.0, 0.3) var lip_strength: float = 0.0:
+	set(value):
+		lip_strength = value
+		_apply_uniform("lip_strength", value)
+@export var lip_slope_lead: float = 12.0:
+	set(value):
+		lip_slope_lead = value
+		_apply_uniform("lip_slope_lead", value)
+@export var lip_rise_m: Vector2 = Vector2(0.05, 0.3):
+	set(value):
+		lip_rise_m = value
+		_apply_uniform("lip_rise_m", value)
 # On the same canvas as landmass_mask, like wear_mask: white = stone may
 # show here, if the ground is steep enough. Rough is fine - the slope
 # finds the edge.
@@ -1493,6 +1529,13 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("rock_color", rock_color)
 	_apply_uniform("rock_slope_min", rock_slope_min)
 	_apply_uniform("rock_slope_blend", rock_slope_blend)
+	_apply_uniform("strata_strength", strata_strength)
+	_apply_uniform("strata_thickness_m", strata_thickness_m)
+	_apply_uniform("strata_wobble_m", strata_wobble_m)
+	_apply_uniform("strata_wobble_scale", strata_wobble_scale)
+	_apply_uniform("lip_strength", lip_strength)
+	_apply_uniform("lip_slope_lead", lip_slope_lead)
+	_apply_uniform("lip_rise_m", lip_rise_m)
 	_apply_uniform("slope_tint_color", slope_tint_color)
 	_apply_uniform("slope_tint_strength", slope_tint_strength)
 	_apply_uniform("slope_tint_min", slope_tint_min)

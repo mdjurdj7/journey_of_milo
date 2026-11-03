@@ -345,6 +345,24 @@ uniform vec4 rock_color : source_color = vec4(0.55, 0.58, 0.515, 1.0);
 uniform float rock_value_cap = 0.0;
 uniform float rock_slope_min = 22.0;
 uniform float rock_slope_blend = 12.0;
+// Strata: the rock's tone in horizontal bands by world height, each a
+// step lighter or darker by up to strata_strength (a share of its value),
+// strata_thickness_m.x to .y thick band to band, their edges wobbled up
+// and down by strata_wobble_m with noise at strata_wobble_scale cycles a
+// metre so no band is a ruled line. 0 (the default) is off.
+uniform float strata_strength = 0.0;
+uniform vec2 strata_thickness_m = vec2(0.4, 0.7);
+uniform float strata_wobble_m = 0.12;
+uniform float strata_wobble_scale = 0.3;
+// The lip: a little lighter, by lip_strength, along the top edge of a
+// rock face - where the slope first comes on (lip_slope_lead degrees
+// before rock_slope_min to rock_slope_min), inside the rock mask, on
+// ground standing lip_rise_m.x to .y above its smoothed surroundings
+// (the dune form's height - a top edge, never a face's foot). 0 (the
+// default) is off.
+uniform float lip_strength = 0.0;
+uniform float lip_slope_lead = 12.0;
+uniform vec2 lip_rise_m = vec2(0.05, 0.3);
 // Slopes read by value: past slope_tint_min degrees of slope the sand
 // blends toward slope_tint_color - wind-packed sand on a face, darker and
 // cooler than the open floor - full by slope_tint_blend further on, at
@@ -1353,6 +1371,37 @@ float rock_factor(vec2 world_xz, float world_up) {
 	return ramp * canvas_sample(rock_mask, world_xz);
 }
 
+// The strata's step at a point (see strata_strength's doc), -1..1.
+float strata_value(vec2 world_xz, float height) {
+	float mean_thickness = max(0.5 * (strata_thickness_m.x + strata_thickness_m.y), 0.05);
+	float spread = clamp((strata_thickness_m.y - strata_thickness_m.x) / mean_thickness, 0.0, 1.0);
+	float h = height + (value_noise(world_xz * strata_wobble_scale) - 0.5) * 2.0 * strata_wobble_m;
+	// The band coordinate runs faster or slower with a slow noise up the
+	// face, so bands differ in thickness - never backwards (its slope stays
+	// under the plain one's).
+	float coord = h / mean_thickness + spread * (value_noise(vec2(h / mean_thickness * 0.37, 7.3)) - 0.5);
+	float band = floor(coord);
+	float here = hash(vec2(band, 3.1)) * 2.0 - 1.0;
+	float next = hash(vec2(band + 1.0, 3.1)) * 2.0 - 1.0;
+	float soft = 0.05 / mean_thickness;
+	return mix(here, next, smoothstep(1.0 - soft, 1.0, fract(coord)));
+}
+
+// The lip at a point (see lip_strength's doc), 0..1.
+float lip_factor(vec2 world_xz, float slope_degrees, float height) {
+	if (!rock_mask_ready || !dune_form_ready) {
+		return 0.0;
+	}
+	float lead = smoothstep(rock_slope_min - lip_slope_lead, rock_slope_min - lip_slope_lead * 0.5, slope_degrees);
+	lead *= 1.0 - smoothstep(rock_slope_min, rock_slope_min + max(rock_slope_blend, 0.001) * 0.5, slope_degrees);
+	if (lead <= 0.0) {
+		return 0.0;
+	}
+	vec2 uv = ((world_xz - dune_form_origin) / max(dune_form_cell, 0.001) + 0.5) / max(dune_form_dims, vec2(1.0));
+	float above = height - texture(dune_form_tex, uv).b;
+	return lead * smoothstep(lip_rise_m.x, max(lip_rise_m.y, lip_rise_m.x + 0.001), above) * canvas_sample(rock_mask, world_xz);
+}
+
 // 0..1 of "this is outer ground" (see outer_color's doc). Clamped to the
 // canvas rather than cut at it like canvas_sample(): the painting is
 // white along every edge, so the outer ground runs on past it.
@@ -1656,7 +1705,13 @@ void fragment() {
 		float sand_value = dot(sand_base, vec3(0.299, 0.587, 0.114));
 		rock_tone *= min(1.0, sand_value * rock_value_cap / max(rock_value, 0.001));
 	}
+	if (strata_strength > 0.0) {
+		rock_tone *= 1.0 + strata_strength * strata_value(v_world_xz, v_world_height);
+	}
 	vec3 dry = mix(sand_base, rock_tone, rock);
+	if (lip_strength > 0.0) {
+		dry *= 1.0 + lip_strength * lip_factor(v_world_xz, slope_degrees, v_world_height);
+	}
 	// The dune tonal breaks, darken-only (see dune_tone()): the lee and the
 	// erosion lines over everything dry - sand, rock, outer ground - the
 	// damp strip on bare sand alone; then the lee's cool shift toward a

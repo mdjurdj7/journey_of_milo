@@ -145,6 +145,21 @@ class_name FloorData
 @export_range(0.0, 0.4) var damp_strength: float = 0.0
 @export var damp_foot_depth: Vector2 = Vector2(0.04, 0.2)
 @export var damp_bank_width_m: float = 1.2
+# Ground's rock strata and lip, for this floor (see Ground's own exports):
+# banded rock faces by world height, and a lighter line along a face's
+# top edge. Each strength 0 (the default) is off.
+@export_range(0.0, 0.2) var strata_strength: float = 0.0:
+	set(value):
+		strata_strength = value
+		emit_changed()
+@export var strata_thickness_m: Vector2 = Vector2(0.4, 0.7):
+	set(value):
+		strata_thickness_m = value
+		emit_changed()
+@export_range(0.0, 0.3) var lip_strength: float = 0.0:
+	set(value):
+		lip_strength = value
+		emit_changed()
 # The relief mesh's own size and density, onto Ground's exports of the
 # same names - a floor whose painted land runs past the default extent
 # (Z -35..35 at 100 x 70, centred on spawn) needs its own, or the land
