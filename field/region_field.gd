@@ -520,6 +520,28 @@ var _forward_computed: bool = false
 # The floor this scene load is playing - see get_floor_data().
 var _floor: FloorData = null
 var _floor_resolved: bool = false
+# The scene's own sun and ambient, before the floor's light goes over
+# them - see _capture_scene_light().
+var _scene_sun_elevation_degrees: float = 0.0
+var _scene_sun_energy: float = 0.0
+var _scene_sun_color: Color = Color.WHITE
+var _scene_shadow_darkness: float = 0.0
+var _scene_shadow_softness: float = 0.0
+var _scene_shadow_blur: float = 0.0
+var _scene_ambient_energy: float = 0.0
+var _scene_light_captured: bool = false
+# The scene's own sea colour and depth, likewise - see
+# _capture_scene_water().
+var _scene_sea_shallow_color: Color = Color.WHITE
+var _scene_sea_deep_color: Color = Color.WHITE
+var _scene_sea_shallow_alpha: float = 0.0
+var _scene_sea_depth_opaque: float = 0.0
+var _scene_sea_absorption: Vector3 = Vector3.ZERO
+var _scene_water_captured: bool = false
+# The scene's own value of each Sea / Ground property the floor's
+# sea_overrides / ground_overrides set - see _apply_property_overrides().
+var _scene_sea_values: Dictionary = {}
+var _scene_ground_values: Dictionary = {}
 # Set by _on_floor_exited() for the rest of this scene's life: the
 # trigger can't fire twice while the field stands frozen, but nothing
 # here should depend on that.
@@ -817,6 +839,20 @@ func _enter_tree() -> void:
 	if sky != null and floor_data != null and floor_data.fog_depth_begin > 0.0 and floor_data.fog_depth_end > floor_data.fog_depth_begin:
 		sky.fog_depth_begin = floor_data.fog_depth_begin
 		sky.fog_depth_end = floor_data.fog_depth_end
+	# The floor's own sun and ambient over the scene's, when it names any.
+	_capture_scene_light()
+	_apply_floor_light()
+	if floor_data != null and not floor_data.changed.is_connected(_apply_floor_light):
+		floor_data.changed.connect(_apply_floor_light)
+	# The floor's own sea colour and depth over the scene's, likewise.
+	_capture_scene_water()
+	_apply_floor_water()
+	if floor_data != null and not floor_data.changed.is_connected(_apply_floor_water):
+		floor_data.changed.connect(_apply_floor_water)
+	# The floor's sand texture onto the ground, likewise live.
+	_apply_sand_texture()
+	if floor_data != null and not floor_data.changed.is_connected(_apply_sand_texture):
+		floor_data.changed.connect(_apply_sand_texture)
 	if floor_data != null:
 		wade_drain_enabled = floor_data.wade_drain_enabled
 	# The floor's ambience balance onto the Sea before its _ready() spawns
@@ -2310,6 +2346,113 @@ func _apply_wind_direction() -> void:
 	for child in get_children():
 		if child is Keeper:
 			(child as Keeper).refresh_wind()
+
+# The scene's own sun and ambient, read once before any floor value goes
+# over them, so a floor value set back to "keep" restores them live.
+func _capture_scene_light() -> void:
+	if _scene_light_captured:
+		return
+	_scene_light_captured = true
+	var sun := get_node_or_null(directional_light_path) as OvercastLight
+	if sun != null:
+		_scene_sun_elevation_degrees = sun.elevation_degrees
+		_scene_sun_energy = sun.energy
+		_scene_sun_color = sun.color
+		_scene_shadow_darkness = sun.shadow_darkness
+		_scene_shadow_softness = sun.shadow_softness
+		_scene_shadow_blur = sun.shadow_blur_amount
+	var sky := get_region_sky()
+	if sky != null:
+		_scene_ambient_energy = sky.ambient_energy
+
+# The floor's light (FloorData's Light group) onto the sun and the sky's
+# ambient through their own exports, so each re-applies as it does for an
+# edit; a value the floor leaves at "keep" gets the scene's. From
+# _enter_tree() and on any change to the floor's data, so it is live.
+func _apply_floor_light() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null:
+		return
+	var sun := get_node_or_null(directional_light_path) as OvercastLight
+	if sun != null:
+		sun.elevation_degrees = floor_data.sun_elevation_degrees if floor_data.sun_elevation_degrees >= 0.0 else _scene_sun_elevation_degrees
+		sun.energy = floor_data.sun_energy if floor_data.sun_energy >= 0.0 else _scene_sun_energy
+		sun.color = floor_data.sun_color if floor_data.sun_color.a > 0.0 else _scene_sun_color
+		sun.shadow_darkness = floor_data.shadow_darkness if floor_data.shadow_darkness >= 0.0 else _scene_shadow_darkness
+		sun.shadow_softness = floor_data.shadow_softness if floor_data.shadow_softness >= 0.0 else _scene_shadow_softness
+		sun.shadow_blur_amount = floor_data.shadow_blur if floor_data.shadow_blur >= 0.0 else _scene_shadow_blur
+	var sky := get_region_sky()
+	if sky != null:
+		sky.ambient_energy = floor_data.ambient_energy if floor_data.ambient_energy >= 0.0 else _scene_ambient_energy
+
+# The scene's own sea colour and depth, read once before any floor value
+# goes over them, so a floor value set back to "keep" restores them live.
+func _capture_scene_water() -> void:
+	if _scene_water_captured:
+		return
+	_scene_water_captured = true
+	var sea := get_node_or_null(sea_path) as Sea
+	if sea != null:
+		_scene_sea_shallow_color = sea.shallow_color
+		_scene_sea_deep_color = sea.deep_color
+		_scene_sea_shallow_alpha = sea.shallow_alpha
+		_scene_sea_depth_opaque = sea.depth_opaque
+		_scene_sea_absorption = sea.absorption
+
+# The floor's water (FloorData's Water group) onto the Sea's own exports,
+# each re-applying as it does for an edit; a value the floor leaves at
+# "keep" gets the scene's. From _enter_tree() and on any change to the
+# floor's data, so it is live.
+func _apply_floor_water() -> void:
+	var floor_data := get_floor_data()
+	var sea := get_node_or_null(sea_path) as Sea
+	if floor_data == null or sea == null:
+		return
+	sea.shallow_color = floor_data.sea_shallow_color if floor_data.sea_shallow_color.a > 0.0 else _scene_sea_shallow_color
+	sea.deep_color = floor_data.sea_deep_color if floor_data.sea_deep_color.a > 0.0 else _scene_sea_deep_color
+	sea.shallow_alpha = floor_data.sea_shallow_alpha if floor_data.sea_shallow_alpha >= 0.0 else _scene_sea_shallow_alpha
+	sea.depth_opaque = floor_data.sea_depth_opaque if floor_data.sea_depth_opaque >= 0.0 else _scene_sea_depth_opaque
+	var absorption: Vector3 = floor_data.sea_absorption
+	sea.absorption = absorption if minf(absorption.x, minf(absorption.y, absorption.z)) >= 0.0 else _scene_sea_absorption
+	_apply_property_overrides(sea, floor_data.sea_overrides, _scene_sea_values)
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		_apply_property_overrides(ground, floor_data.ground_overrides, _scene_ground_values)
+
+# A floor's overrides onto a node's exports, by name. scene_values keeps
+# each overridden property's value from before its first override, so a
+# key the floor drops gets it back.
+func _apply_property_overrides(target: Object, overrides: Dictionary, scene_values: Dictionary) -> void:
+	for key: String in scene_values.keys():
+		if not overrides.has(key):
+			target.set(key, scene_values[key])
+			scene_values.erase(key)
+	for key: String in overrides:
+		if not key in target:
+			push_warning("RegionField: the floor overrides '%s', which %s has no property of." % [key, target])
+			continue
+		if not scene_values.has(key):
+			scene_values[key] = target.get(key)
+		target.set(key, overrides[key])
+
+# The floor's sand texture (FloorData's Sand Texture group) onto the
+# ground's own exports. From _enter_tree() and on any change to the
+# floor's data, so it is live.
+func _apply_sand_texture() -> void:
+	var floor_data := get_floor_data()
+	var ground := get_node_or_null(ground_path) as Ground
+	if floor_data == null or ground == null:
+		return
+	ground.sand_albedo_texture = floor_data.sand_albedo_texture
+	ground.sand_normal_texture = floor_data.sand_normal_texture
+	ground.sand_texture_tile_m = floor_data.sand_texture_tile_m
+	ground.sand_texture_color_blend = floor_data.sand_texture_color_blend
+	ground.sand_texture_normal_strength = floor_data.sand_texture_normal_strength
+	ground.sand_texture_fade_distance = floor_data.sand_texture_fade_distance
+	ground.sand_texture_coverage_scale = floor_data.sand_texture_coverage_scale
+	ground.sand_texture_coverage_floor = floor_data.sand_texture_coverage_floor
+	ground.sand_texture_coverage_edges = floor_data.sand_texture_coverage_edges
+	ground.sand_texture_enabled = floor_data.sand_texture_enabled
 
 # The Sea's own fog copy (its shader is fog_disabled) onto RegionSky's
 # fog as it stands - the one source, override included.

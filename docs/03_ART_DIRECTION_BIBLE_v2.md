@@ -36,7 +36,13 @@ Contrast separates **depth planes**, not individual objects. Under the top-down 
 
 ## 6. Lighting
 
-Diffuse environmental illumination: overcast, haze, reflected light. Strong cinematic lighting only when narratively appropriate. Region 1: sun 0.9, neutral-cool, soft shadows at low opacity, neutral ambient; no warm light anywhere.
+Diffuse environmental illumination: overcast, haze, reflected light. Strong cinematic lighting only when narratively appropriate. Region 1: sun 0.9, neutral-cool, soft shadows at low opacity, neutral ambient; no warm light anywhere — except the opening beach, below.
+
+### 6a. Region 1 opening beach (floor 1): approved environment target
+
+**Approved 2026-10-29.** The target image is `docs/concept/region1_floor1_beach_target.png`: softly sunlit coast — warm, varied sand with subtle ripples; blue-green water with visible depth; a wet shoreline and foam; weathered surfaces (hulls, wood); clearer grounding shadows. For **floor 1's beach only** it supersedes the conflicting Region 1 palette and lighting rules here (§6, §20's Region 1 palette, §21's "restrained" reading) and in Region 01 §8 and §11: subtly warm sunlight is allowed there, and shadows may read darker than "low opacity".
+
+Unchanged: the Wanderer's design, the gameplay camera, layout, character scale and open combat space; dark figures on pale ground; no pure black; every other floor and region keeps its direction as written. The image sets the look, not the content — it adds no props, fiction or layout. Its sand detail and water colour come in their own passes (DESIGN.md, "Floor 1 beach look"); lighting alone is not expected to reproduce them.
 
 ## 7. Shadows
 

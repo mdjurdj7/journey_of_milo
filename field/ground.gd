@@ -564,6 +564,17 @@ signal wear_keep_out_changed
 	set(value):
 		swash_color = value
 		_apply_uniform("swash_color", value)
+# The leading edge broken into lace (see ground.gdshader's swash_edge_
+# breakup doc): how much of it is cut away (0 = the continuous edge) and
+# the lace's metres per feature.
+@export_range(0.0, 1.0) var swash_edge_breakup: float = 0.0:
+	set(value):
+		swash_edge_breakup = value
+		_apply_uniform("swash_edge_breakup", value)
+@export var swash_edge_breakup_scale: float = 1.2:
+	set(value):
+		swash_edge_breakup_scale = value
+		_apply_uniform("swash_edge_breakup_scale", value)
 
 # Caustics on the sand below sea_level - see ground.gdshader's own doc: a
 # scrolling two-layer cellular web brightening the wet sand by up to
@@ -913,6 +924,119 @@ signal wear_keep_out_changed
 		_apply_uniform("wind_ripple_form_fade", value)
 @export_group("")
 
+# A tiling sand colour map and normal map over the dry sand, in world XZ
+# - see ground.gdshader's sand_texture_enabled doc for where it fades.
+# Enabled needs both maps; off (the default) is the procedural sand
+# alone, so it is the one switch to compare the two. Per floor, from
+# FloorData's Sand Texture group.
+@export_group("Sand Texture")
+@export var sand_texture_enabled: bool = false:
+	set(value):
+		sand_texture_enabled = value
+		_push_sand_texture()
+@export var sand_albedo_texture: Texture2D = null:
+	set(value):
+		sand_albedo_texture = value
+		_push_sand_texture()
+@export var sand_normal_texture: Texture2D = null:
+	set(value):
+		sand_normal_texture = value
+		_push_sand_texture()
+# Metres of ground one tile covers, both maps alike.
+@export var sand_texture_tile_m: float = 3.0:
+	set(value):
+		sand_texture_tile_m = value
+		_apply_uniform("sand_texture_tile_m", value)
+# How far the dry colour goes toward the colour map's, at full coverage.
+@export_range(0.0, 1.0) var sand_texture_color_blend: float = 0.35:
+	set(value):
+		sand_texture_color_blend = value
+		_apply_uniform("sand_texture_color_blend", value)
+# The normal map's tilt, 1 = as baked.
+@export_range(0.0, 2.0) var sand_texture_normal_strength: float = 0.5:
+	set(value):
+		sand_texture_normal_strength = value
+		_apply_uniform("sand_texture_normal_strength", value)
+# Camera metres: full strength to x, gone by y.
+@export var sand_texture_fade_distance: Vector2 = Vector2(20.0, 35.0):
+	set(value):
+		sand_texture_fade_distance = value
+		_apply_uniform("sand_texture_fade_distance", value)
+# The coverage noise: metres per feature, the strength kept in the
+# smooth patches, and the noise values it eases up between.
+@export var sand_texture_coverage_scale: float = 7.0:
+	set(value):
+		sand_texture_coverage_scale = value
+		_apply_uniform("sand_texture_coverage_scale", value)
+@export_range(0.0, 1.0) var sand_texture_coverage_floor: float = 0.3:
+	set(value):
+		sand_texture_coverage_floor = value
+		_apply_uniform("sand_texture_coverage_floor", value)
+@export var sand_texture_coverage_edges: Vector2 = Vector2(0.35, 0.65):
+	set(value):
+		sand_texture_coverage_edges = value
+		_apply_uniform("sand_texture_coverage_edges", value)
+# Ripple patches: a second colour map's detail (broken ripples, grit) in
+# broad patches of the dry sand, the sand texture thinned under them -
+# see ground.gdshader's ripple_patch_enabled doc. Needs the sand texture
+# on and ripple_patch_texture set; off by default, per floor through
+# ground_overrides. ripple_patch_mean is the map's own mean colour
+# (linear), measured from the image.
+@export var ripple_patch_enabled: bool = false:
+	set(value):
+		ripple_patch_enabled = value
+		_push_ripple_patch()
+@export var ripple_patch_texture: Texture2D = null:
+	set(value):
+		ripple_patch_texture = value
+		_push_ripple_patch()
+@export var ripple_patch_mean: Color = Color(0.751, 0.521, 0.29):
+	set(value):
+		ripple_patch_mean = value
+		_apply_uniform("ripple_patch_mean", Vector3(value.r, value.g, value.b))
+@export var ripple_patch_tile_m: float = 6.0:
+	set(value):
+		ripple_patch_tile_m = value
+		_apply_uniform("ripple_patch_tile_m", value)
+@export var ripple_patch_angle_degrees: float = 86.0:
+	set(value):
+		ripple_patch_angle_degrees = value
+		_apply_uniform("ripple_patch_angle_degrees", value)
+@export_range(0.0, 1.0) var ripple_patch_blend: float = 0.6:
+	set(value):
+		ripple_patch_blend = value
+		_apply_uniform("ripple_patch_blend", value)
+@export var ripple_patch_scale: float = 10.0:
+	set(value):
+		ripple_patch_scale = value
+		_apply_uniform("ripple_patch_scale", value)
+# Slides the patch noise, in metres - which patches land where.
+@export var ripple_patch_offset_m: Vector2 = Vector2.ZERO:
+	set(value):
+		ripple_patch_offset_m = value
+		_apply_uniform("ripple_patch_offset_m", value)
+@export var ripple_patch_edges: Vector2 = Vector2(0.4, 0.62):
+	set(value):
+		ripple_patch_edges = value
+		_apply_uniform("ripple_patch_edges", value)
+@export_range(0.0, 1.0) var ripple_patch_route_quiet: float = 0.6:
+	set(value):
+		ripple_patch_route_quiet = value
+		_apply_uniform("ripple_patch_route_quiet", value)
+@export var ripple_patch_route_margin_m: float = 2.0:
+	set(value):
+		ripple_patch_route_margin_m = value
+		_apply_uniform("ripple_patch_route_margin_m", value)
+@export var ripple_patch_fade_distance: Vector2 = Vector2(24.0, 40.0):
+	set(value):
+		ripple_patch_fade_distance = value
+		_apply_uniform("ripple_patch_fade_distance", value)
+@export_range(0.0, 1.0) var ripple_patch_normal_cut: float = 0.75:
+	set(value):
+		ripple_patch_normal_cut = value
+		_apply_uniform("ripple_patch_normal_cut", value)
+@export_group("")
+
 # Dune tonal breaks - broad darken-only value masses read off the dunes'
 # own form (ground.gdshader's doc): the lee slope, wind-cut erosion lines
 # on the steep faces, and a damp strip at slope feet and along enclosed
@@ -1026,6 +1150,33 @@ signal wear_keep_out_changed
 	set(value):
 		damp_bank_width_m = value
 		_apply_uniform("damp_bank_width_m", value)
+# The damp strip along the open sea's shore - see ground.gdshader's
+# damp_shore_enabled doc. Off by default; a floor turns it on through
+# ground_overrides.
+@export var damp_shore_enabled: bool = false:
+	set(value):
+		damp_shore_enabled = value
+		_apply_uniform("damp_shore_enabled", value)
+@export_range(0.0, 0.4) var damp_shore_strength: float = 0.12:
+	set(value):
+		damp_shore_strength = value
+		_apply_uniform("damp_shore_strength", value)
+@export var damp_shore_width_m: float = 2.0:
+	set(value):
+		damp_shore_width_m = value
+		_apply_uniform("damp_shore_width_m", value)
+@export_range(0.0, 1.0) var damp_shore_breakup: float = 0.5:
+	set(value):
+		damp_shore_breakup = value
+		_apply_uniform("damp_shore_breakup", value)
+@export var damp_shore_breakup_scale: float = 4.0:
+	set(value):
+		damp_shore_breakup_scale = value
+		_apply_uniform("damp_shore_breakup_scale", value)
+@export var damp_shore_edge_m: float = 0.35:
+	set(value):
+		damp_shore_edge_m = value
+		_apply_uniform("damp_shore_edge_m", value)
 @export_group("")
 
 # Outer ground: past the walkable floor's ridge, a different surface -
@@ -1274,6 +1425,8 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("swash_sheet_alpha", swash_sheet_alpha)
 	_apply_uniform("swash_edge_width_ground", swash_edge_width_ground)
 	_apply_uniform("swash_color", swash_color)
+	_apply_uniform("swash_edge_breakup", swash_edge_breakup)
+	_apply_uniform("swash_edge_breakup_scale", swash_edge_breakup_scale)
 	_apply_uniform("caustic_strength", caustic_strength)
 	_apply_uniform("caustic_scale", caustic_scale)
 	_apply_uniform("caustic_speed", caustic_speed)
@@ -1324,6 +1477,7 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("wind_ripple_bend", wind_ripple_bend)
 	_apply_uniform("wind_ripple_vary", wind_ripple_vary)
 	_apply_uniform("wind_ripple_form_fade", wind_ripple_form_fade)
+	_push_sand_texture()
 	_apply_uniform("rock_value_cap", rock_value_cap)
 	_apply_uniform("dune_wind", dune_wind.normalized() if dune_wind.length() > 0.0001 else Vector2(1.0, 0.0))
 	_apply_uniform("lee_shade_strength", lee_shade_strength)
@@ -1342,6 +1496,12 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("damp_strength", damp_strength)
 	_apply_uniform("damp_foot_depth", damp_foot_depth)
 	_apply_uniform("damp_bank_width_m", damp_bank_width_m)
+	_apply_uniform("damp_shore_enabled", damp_shore_enabled)
+	_apply_uniform("damp_shore_strength", damp_shore_strength)
+	_apply_uniform("damp_shore_width_m", damp_shore_width_m)
+	_apply_uniform("damp_shore_breakup", damp_shore_breakup)
+	_apply_uniform("damp_shore_breakup_scale", damp_shore_breakup_scale)
+	_apply_uniform("damp_shore_edge_m", damp_shore_edge_m)
 	_push_dune_form()
 	_apply_uniform("basin_color", basin_color)
 	_apply_uniform("basin_tint_strength", basin_tint_strength)
@@ -1418,6 +1578,36 @@ func _apply_uniform(uniform_name: String, value: Variant) -> void:
 	if _material:
 		_material.set_shader_parameter(uniform_name, value)
 
+# Every sand texture uniform; on only with both maps set.
+func _push_sand_texture() -> void:
+	_apply_uniform("sand_texture_enabled", sand_texture_enabled and sand_albedo_texture != null and sand_normal_texture != null)
+	_apply_uniform("sand_albedo_texture", sand_albedo_texture)
+	_apply_uniform("sand_normal_texture", sand_normal_texture)
+	_apply_uniform("sand_texture_tile_m", sand_texture_tile_m)
+	_apply_uniform("sand_texture_color_blend", sand_texture_color_blend)
+	_apply_uniform("sand_texture_normal_strength", sand_texture_normal_strength)
+	_apply_uniform("sand_texture_fade_distance", sand_texture_fade_distance)
+	_apply_uniform("sand_texture_coverage_scale", sand_texture_coverage_scale)
+	_apply_uniform("sand_texture_coverage_floor", sand_texture_coverage_floor)
+	_apply_uniform("sand_texture_coverage_edges", sand_texture_coverage_edges)
+	_push_ripple_patch()
+
+# Every ripple patch uniform; on only with its map set.
+func _push_ripple_patch() -> void:
+	_apply_uniform("ripple_patch_enabled", ripple_patch_enabled and ripple_patch_texture != null)
+	_apply_uniform("ripple_patch_texture", ripple_patch_texture)
+	_apply_uniform("ripple_patch_mean", Vector3(ripple_patch_mean.r, ripple_patch_mean.g, ripple_patch_mean.b))
+	_apply_uniform("ripple_patch_tile_m", ripple_patch_tile_m)
+	_apply_uniform("ripple_patch_angle_degrees", ripple_patch_angle_degrees)
+	_apply_uniform("ripple_patch_blend", ripple_patch_blend)
+	_apply_uniform("ripple_patch_scale", ripple_patch_scale)
+	_apply_uniform("ripple_patch_offset_m", ripple_patch_offset_m)
+	_apply_uniform("ripple_patch_edges", ripple_patch_edges)
+	_apply_uniform("ripple_patch_route_quiet", ripple_patch_route_quiet)
+	_apply_uniform("ripple_patch_route_margin_m", ripple_patch_route_margin_m)
+	_apply_uniform("ripple_patch_fade_distance", ripple_patch_fade_distance)
+	_apply_uniform("ripple_patch_normal_cut", ripple_patch_normal_cut)
+
 # The same grid the ground reads, handed to the sea - it needs channel g
 # to know which water is a pool and drop the foam line and swash band
 # there. Pushed from here rather than pulled by Sea so the two can never
@@ -1454,6 +1644,28 @@ func set_dust_shadow(strength: float, scale: float, stretch: float, direction: V
 	_apply_uniform("dust_shadow_stretch", stretch)
 	_apply_uniform("dust_shadow_dir", direction)
 	_apply_uniform("dust_shadow_offset", offset)
+
+# Called by sea.gd (its _push_foam_mask()): the sea's foam mask, whether
+# it is on, its metres per tile, its strength and its travel, so the
+# run-up edge shows the same lace at the same XZ, moving with it - see
+# ground.gdshader's foam_mask_enabled doc. Just pushes uniforms; Sea
+# pushes again from its _ready().
+func set_foam_mask(mask: Texture2D, enabled: bool, scale_m: float, strength: float, travel_m: float) -> void:
+	_apply_uniform("foam_mask_enabled", enabled)
+	_apply_uniform("foam_mask", mask)
+	_apply_uniform("foam_mask_scale_m", scale_m)
+	_apply_uniform("foam_mask_strength", strength)
+	_apply_uniform("foam_travel_m", travel_m)
+
+# Called by sea.gd (its _push_pool_clarity()): its pool clarity switch and
+# the bed's and bank's values - see ground.gdshader's pool_clarity_enabled
+# doc. Just pushes uniforms; Sea pushes again from its _ready().
+func set_pool_clarity(enabled: bool, bed_wet_darken: float, bank_wet_darken: float, bed_detail: float, bank_wet_scale: float) -> void:
+	_apply_uniform("pool_clarity_enabled", enabled)
+	_apply_uniform("pool_bed_wet_darken", bed_wet_darken)
+	_apply_uniform("pool_bank_wet_darken", bank_wet_darken)
+	_apply_uniform("pool_bed_detail", bed_detail)
+	_apply_uniform("pool_bank_wet_scale", bank_wet_scale)
 
 # The walked band's centreline, in world XZ, from its start to its end
 # through every point between. Three points: start, a point it passes

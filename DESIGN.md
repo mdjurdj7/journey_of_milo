@@ -400,6 +400,75 @@ and up the west shore north of z -27. (2026-10-17.)
   - **The pier's art.** `assets/models/props/pier/pier.glb` (make_pier.py)
     draws it under the painted shader; the Pier prop's collision follows
     the layout's fields and the model's rail lines. (2026-10-23.)
+- **Floor 1 beach look (Bible §6a), lighting first.** The target image
+  is approved; this pass changes floor 1's light only, through
+  FloorData's Light group (sun elevation, energy, colour, shadow
+  opacity, ambient energy - trial values, under review). Deferred to
+  their own passes: the sand's surface detail (first prototype in:
+  `assets/textures/ground/beach_sand_v1/`, FloorData's Sand Texture
+  group - under review; the tile's repeated ripple clusters and baked
+  shading are known and not yet solved), the water's colours, foam and wet shoreline (Sea's scene values), the
+  hulls' textures (`hull.glb`'s own maps are ignored for a flat tint),
+  and tonemapper, exposure, saturation, fog and SSAO, kept as they are
+  for the first comparison. (2026-10-29)
+  - **Foam mask v1 under review** (`assets/textures/water/foam_mask_v1.png`,
+    AI-generated, Sea's foam_mask exports via floor 1's sea_overrides).
+    A faint seam at its left/right wrap (wrap jump ~2x the image's
+    average), not blurred away; a cleaner tile would fix it. Fixed with
+    it: Sea dropped Ground's enclosure grid (pushed before Sea's
+    material existed), so every pool on every floor had the sea's surf.
+  - **Beach experiment checkpoint (2026-10-30), working baseline.** On
+    top of the light: the beach_sand_v1 tile, a broken-ripple patch
+    layer (`sand_broken_ripples_v1`, Ground's ripple_patch_* - rotated
+    86 degrees so its baked light agrees with the sun, in separated
+    patches set by scale/edges/offset), damp sand along the waterline
+    (damp_shore_*), open-water crests (Sea's crest_*), the foam mask,
+    textured hulls, hull 3's dressing (DressingGroup/DressingItem: the
+    wrack decal and driftwood_v1). All floor 1 opt-ins through its
+    overrides; other floors unchanged.
+  - **Floor 1's enclosed pool: clarity pass (2026-10-31).** The pool by
+    the crab is 5 x 3 m and 7 cm deep on average, inside the sea's 0.3 m
+    shore_fade_width, so the open sea's depth curve left it ~2% water:
+    wet-darkened sand under a faint cyan shift, ringed by a wide wet band
+    (the slopes are gentle). Sea's Pool water group (off by default;
+    floor 1 opts in through sea_overrides, pool_glint_strength 0.15),
+    scaled by the enclosure grid so the open sea is untouched: the pool's
+    own waterline fade (pool_edge_depth_m), a light veil (pool_tint) and
+    a colour filter on the bed (pool_filter) in place of a painted tint,
+    halved absorption, a moving sky sheen and fine drifting glint lines;
+    and, pushed to Ground, the bed and bank keep most of the dry sand's
+    detail (pool_bed_detail), a lighter bed, a narrow wet edge above the
+    waterline. The mask's square lower-left corner of that pool is
+    rounded (Map2_mask.png, ~1.5 m round world (-4.0, -11.5); depth and
+    enclosure unchanged).
+  - **Deferred: the pool still reads soft and milky.** Accepted for now;
+    not yet known which term carries it (the veil, the sheen, the
+    filter's lift of the bed, or the bed's own wet tone). Next look:
+    each of those one at a time from Sea's Pool water group, live.
+  - **Lighting and upper-boat dressing reviewed (2026-10-31): accepted
+    intermediate state, not yet a match to the target.** Floor 1's light:
+    sun elevation 45 (from 35; azimuth 70, energy 1.1, colour kept),
+    shadow softness 0.5 deg and blur 1.0 (FloorData shadow_softness/
+    shadow_blur, new; the scene's 3 deg / 4.0 had drawn the dotted,
+    striped shadows), darkness 0.6, ambient 0.35 (from 0.5); the
+    region's fog unchanged. Two diagnostics, off by default:
+    OvercastLight.shadow_diagnostic_hard and RegionSky.fog_diagnostic_off.
+    Hull 3's dressing gained a Gathered group (its own toggle): debris
+    tight round the bow and stern, wrack inside the hull, a bare middle.
+    Known limits: one wrack painting for all seven decals, its strands
+    ~1-2 px at the field camera; samphire flat-tinted.
+  - **Striped shadows on the ground: resolved on floor 1 (2026-10-31).**
+    Under floor 1's trial
+    light, the Wanderer's and the hulls' shadows read as fine stripes
+    on the sand to their left (the sun's side away), seen on the left of
+    the map. Suspected, not confirmed: the sun's soft shadows
+    (`shadow_softness` 3, `shadow_blur` 4, filter quality 3) spread
+    over the longer 35-degree shadow. Next tests, one at a time: his
+    ContactShadow hidden; his meshes' Cast Shadow off; then
+    `shadow_blur` 4 -> 1, `shadow_softness` 3 -> 1. Not yet known
+    whether it showed before the lighting change. Resolved: the hard
+    diagnostic (softness 0, blur 1) drew a clean shadow, and floor 1 now
+    keeps 0.5 deg / 1.0. Other floors keep the scene's 3 / 4.
 - **The Samurai is a shell; these are left as they are.** She is a
   second CharacterData (`run/data/samurai.tres`), selected by
   RegionField's `starting_character` export, with no cards, mechanics or

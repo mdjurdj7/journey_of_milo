@@ -167,6 +167,23 @@ uniform vec4 swash_sheet_color : source_color = vec4(0.60, 0.66, 0.66, 1.0);
 uniform float swash_sheet_alpha : hint_range(0.0, 1.0) = 0.45;
 uniform float swash_edge_width_ground = 0.08;
 uniform vec4 swash_color : source_color = vec4(0.82, 0.84, 0.82, 1.0);
+// The leading edge as lace rather than a line: two octaves of value
+// noise every swash_edge_breakup_scale metres cut it, swash_edge_breakup
+// of the way (0, the default, keeps the continuous edge). The sheet
+// itself is untouched.
+uniform float swash_edge_breakup : hint_range(0.0, 1.0) = 0.0;
+uniform float swash_edge_breakup_scale = 1.2;
+// The sea's foam mask, handed over by Sea (set_foam_mask()) with its
+// scale and strength, so the edge shows the same lace at the same XZ as
+// the sea's foam. While on, it cuts the edge swash_edge_breakup of the
+// way IN PLACE of the noise lace above.
+uniform bool foam_mask_enabled = false;
+uniform sampler2D foam_mask : hint_default_black, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float foam_mask_scale_m = 3.0;
+uniform float foam_mask_strength = 1.0;
+// The sea's foam_travel_m, handed over with the mask - see foam_surf_
+// motion().
+uniform float foam_travel_m = 0.0;
 
 // Caustics: a scrolling bright web on the sand BELOW sea_level, so the
 // seabed reads as lit through moving water. Two Worley (cellular) layers
@@ -394,6 +411,33 @@ uniform float erosion_break_soft = 0.15;
 uniform float damp_strength = 0.0;
 uniform vec2 damp_foot_depth = vec2(0.04, 0.2);
 uniform float damp_bank_width_m = 1.2;
+// The damp strip along the open sea's shore: darker by damp_shore_strength
+// on the sand within damp_shore_width_m of the waterline (the floor mask's
+// shore distance), that width varied by up to damp_shore_breakup of
+// itself by noise every damp_shore_breakup_scale metres so the inland
+// edge wanders, softened over damp_shore_edge_m. Off the water itself and
+// pools; joins the damp strip's darken-only tone, so the sand texture and
+// ripples carry on through it. Off unless damp_shore_enabled.
+uniform bool damp_shore_enabled = false;
+uniform float damp_shore_strength = 0.12;
+uniform float damp_shore_width_m = 2.0;
+uniform float damp_shore_breakup : hint_range(0.0, 1.0) = 0.5;
+uniform float damp_shore_breakup_scale = 4.0;
+uniform float damp_shore_edge_m = 0.35;
+// Pool clarity, Ground's half (pushed by Sea - see sea.gdshader's
+// pool_clarity_enabled doc), by the enclosure grid: a pool's bed and bank
+// are wet-darkened in place of wet_darken - the bed under the water by
+// pool_bed_wet_darken, the bank above it by pool_bank_wet_darken, so the
+// waterline keeps a narrow wet edge - and keep
+// pool_bed_detail of the dry sand's own detail (its texture, ripple
+// patches, grain and wind ripples), which wet and submerged sand
+// otherwise lose; the height-band damp bank round it is
+// pool_bank_wet_scale as tall. The open shore is untouched.
+uniform bool pool_clarity_enabled = false;
+uniform float pool_bed_wet_darken : hint_range(0.0, 1.0) = 0.9;
+uniform float pool_bank_wet_darken : hint_range(0.0, 1.0) = 0.8;
+uniform float pool_bed_detail : hint_range(0.0, 1.0) = 0.85;
+uniform float pool_bank_wet_scale : hint_range(0.0, 1.0) = 0.35;
 // Wind ripples on dry open sand: a fine wave along one world direction,
 // wind_ripple_angle degrees from +X toward +Z (its crests run across it),
 // wind_ripple_scale metres crest to crest, warped by slow noise
@@ -454,6 +498,61 @@ uniform vec2 canvas_forward = vec2(0.0, -1.0);
 uniform vec2 canvas_origin_uv = vec2(0.5);
 uniform vec2 canvas_metres = vec2(1.0);
 
+// The sand texture: a tiling colour map and normal map laid over the dry
+// sand in world XZ, one tile every sand_texture_tile_m metres (u along +X,
+// v along +Z - image rows run toward +Z, so the map's +Y is world -Z; see
+// fragment()'s normal block). Its colour is blended into the dry colour
+// (a mix, not a multiply - two sand colours multiplied darken), its normal
+// tilts the lighting; neither moves the relief. Both fade out on wet and
+// submerged sand, on the walked band (the normal), on rock and outer
+// ground, with camera distance from fade_distance.x to .y, and across the
+// ground by a slow coverage noise - sand_texture_coverage_floor of the
+// strength in the smooth patches, all of it in the rippled ones - so the
+// tile's repeats break up and smooth sand stays. Off (the default)
+// changes nothing.
+uniform bool sand_texture_enabled = false;
+uniform sampler2D sand_albedo_texture : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D sand_normal_texture : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float sand_texture_tile_m = 3.0;
+uniform float sand_texture_color_blend : hint_range(0.0, 1.0) = 0.35;
+uniform float sand_texture_normal_strength : hint_range(0.0, 2.0) = 0.5;
+uniform vec2 sand_texture_fade_distance = vec2(20.0, 35.0);
+uniform float sand_texture_coverage_scale = 7.0;
+uniform float sand_texture_coverage_floor : hint_range(0.0, 1.0) = 0.3;
+uniform vec2 sand_texture_coverage_edges = vec2(0.35, 0.65);
+// Ripple patches: a second colour map (broken ripples, grit, pebbles) in
+// broad irregular patches of the dry sand, over the sand texture. Its
+// detail, not its colour: the map divided by its own mean colour
+// (ripple_patch_mean, linear) scales the sand underneath, so the floor's
+// sand keeps its hue and the patches bring the ripple shading and grit.
+// World XZ, one tile every ripple_patch_tile_m metres, turned
+// ripple_patch_angle_degrees about +Y (positive from +X toward +Z) so the
+// ripples' baked light falls from the sun's side. Patches where a slow
+// noise every ripple_patch_scale metres clears ripple_patch_edges, at up
+// to ripple_patch_blend; ripple_patch_route_quiet of that taken away on
+// the walked band and over ripple_patch_route_margin_m beside it; gone on
+// wet and submerged sand, pools, rock and outer ground, and with camera
+// distance over ripple_patch_fade_distance. The sand texture, whose
+// normal and colour don't match this map, is turned down by
+// ripple_patch_normal_cut of the patch (both of them) so two ripple
+// patterns don't stack. Needs sand_texture_enabled; off unless
+// ripple_patch_enabled.
+uniform bool ripple_patch_enabled = false;
+uniform sampler2D ripple_patch_texture : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform vec3 ripple_patch_mean = vec3(0.751, 0.521, 0.290);
+uniform float ripple_patch_tile_m = 6.0;
+uniform float ripple_patch_angle_degrees = 86.0;
+uniform float ripple_patch_blend : hint_range(0.0, 1.0) = 0.6;
+uniform float ripple_patch_scale = 10.0;
+// Slides the patch noise over the ground, in metres: which patches land
+// where, without changing their size.
+uniform vec2 ripple_patch_offset_m = vec2(0.0);
+uniform vec2 ripple_patch_edges = vec2(0.4, 0.62);
+uniform float ripple_patch_route_quiet : hint_range(0.0, 1.0) = 0.6;
+uniform float ripple_patch_route_margin_m = 2.0;
+uniform vec2 ripple_patch_fade_distance = vec2(24.0, 40.0);
+uniform float ripple_patch_normal_cut : hint_range(0.0, 1.0) = 0.75;
+
 varying vec2 v_world_xz;
 varying float v_world_height;
 
@@ -484,6 +583,31 @@ float value_noise(vec2 p) {
 	float c = hash(i + vec2(0.0, 1.0));
 	float d = hash(i + vec2(1.0, 1.0));
 	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+// The sand texture's coverage at this XZ (see sand_texture_enabled's
+// doc): two octaves of slow noise, eased between the edges, from
+// coverage_floor up to 1.
+float sand_texture_coverage(vec2 world_xz) {
+	vec2 p = world_xz / max(sand_texture_coverage_scale, 0.01);
+	float n = value_noise(p + vec2(41.7, -13.2)) * 0.65 + value_noise(p * 2.03 + vec2(-7.9, 23.4)) * 0.35;
+	return mix(sand_texture_coverage_floor, 1.0, smoothstep(sand_texture_coverage_edges.x, sand_texture_coverage_edges.y, n));
+}
+
+// The ripple patches' UV at this XZ: turned, then tiled (see
+// ripple_patch_enabled's doc).
+vec2 ripple_patch_uv(vec2 world_xz) {
+	float a = radians(ripple_patch_angle_degrees);
+	vec2 turned = mat2(vec2(cos(a), -sin(a)), vec2(sin(a), cos(a))) * world_xz;
+	return turned / max(ripple_patch_tile_m, 0.01);
+}
+
+// Where the ripple patches lie, 0..1, before the gates: two octaves of
+// slow noise, eased between the edges.
+float ripple_patch_coverage(vec2 world_xz) {
+	vec2 p = (world_xz + ripple_patch_offset_m) / max(ripple_patch_scale, 0.01);
+	float n = value_noise(p + vec2(-19.3, 57.1)) * 0.65 + value_noise(p * 2.11 + vec2(31.6, -4.8)) * 0.35;
+	return smoothstep(ripple_patch_edges.x, ripple_patch_edges.y, n);
 }
 
 // 0 = fully dry, 1 = fully wet. wetness_amount biases the large-scale
@@ -635,6 +759,53 @@ vec2 landmass_distance_uv(vec2 world_xz) {
 
 float landmass_distance_at(vec2 world_xz) {
 	return texture(landmass_distance_tex, landmass_distance_uv(world_xz)).r;
+}
+
+// --- Foam mask motion - the same math as sea.gdshader's copy (see its
+// foam_mask_motion()), so the run-up edge and the sea's swash foam move
+// as one: carried shoreward through the advance and climb, drawn back
+// slower; for the surf, dissolving from the recede to the wrap and
+// reshuffled to a fresh tile offset each cycle while it is gone. ---
+const float FOAM_PUSH_END = 0.52;
+float foam_travel(float phase) {
+	if (phase < FOAM_PUSH_END) {
+		return smoothstep(0.0, FOAM_PUSH_END, phase);
+	}
+	return 1.0 - smoothstep(FOAM_PUSH_END, 1.0, phase);
+}
+
+float foam_dissolve(float phase) {
+	return max(1.0 - smoothstep(0.0, 0.08, phase), smoothstep(SWASH_HOLD_END, 0.95, phase));
+}
+
+vec2 shoreward_at(vec2 world_xz) {
+	if (!landmass_distance_ready) {
+		return vec2(0.0);
+	}
+	float e = max(landmass_distance_cell, 0.01);
+	vec2 g = vec2(
+		landmass_distance_at(world_xz + vec2(e, 0.0)) - landmass_distance_at(world_xz - vec2(e, 0.0)),
+		landmass_distance_at(world_xz + vec2(0.0, e)) - landmass_distance_at(world_xz - vec2(0.0, e)));
+	return length(g) > 0.00001 ? -normalize(g) : vec2(0.0);
+}
+
+// The surf's uv and dissolve at this XZ (the sea's surf_uv / dissolve).
+// hash() here is the same integer hash as the sea's lace_hash().
+void foam_surf_motion(vec2 world_xz, float phase, float time, out vec2 surf_uv, out float dissolve) {
+	float scale = max(foam_mask_scale_m, 0.01);
+	vec2 carried = shoreward_at(world_xz) * foam_travel(phase) * foam_travel_m;
+	surf_uv = (world_xz - carried) / scale;
+	dissolve = 0.0;
+	if (foam_travel_m > 0.0) {
+		float offset = (texture(surface_noise, world_xz / max(swash_phase_noise_scale, 0.001)).r - 0.5) * swash_phase_spread;
+		float cycle = floor(time / max(swash_period, 0.001) + offset);
+		surf_uv += vec2(hash(vec2(cycle, 3.0)), hash(vec2(cycle, 11.0)));
+		dissolve = foam_dissolve(phase);
+	}
+}
+
+float foam_surf_mask(float value, float dissolve) {
+	return clamp((value - dissolve) / max(1.0 - dissolve, 0.001), 0.0, 1.0);
 }
 
 // 0..1: is the nearest water a pool rather than the sea? The grid's
@@ -1278,6 +1449,22 @@ vec4 dune_tone(vec2 world_xz) {
 	return tone;
 }
 
+// The open shore's damp strip at a point (see damp_shore_enabled's doc),
+// 0..damp_shore_strength.
+float shore_damp(vec2 world_xz) {
+	if (!damp_shore_enabled || !landmass_distance_ready || damp_shore_width_m <= 0.0) {
+		return 0.0;
+	}
+	// Negative on sand: how far inland of the waterline.
+	float inland = -landmass_distance_at(world_xz);
+	vec2 p = world_xz / max(damp_shore_breakup_scale, 0.001);
+	float n = value_noise(p) * 0.65 + value_noise(p * 2.7 + vec2(7.3, -2.1)) * 0.35;
+	float width = damp_shore_width_m * (1.0 + (n - 0.5) * 2.0 * damp_shore_breakup);
+	float soft = max(damp_shore_edge_m, 0.001);
+	float band = (1.0 - smoothstep(width - soft, width, inland)) * smoothstep(0.0, 0.1, inland);
+	return damp_shore_strength * band * (1.0 - landmass_enclosure_at(world_xz));
+}
+
 float wear_gate(float shore_distance, float sand_wetness, float underwater) {
 	float gate = (1.0 - underwater) * (1.0 - sand_wetness);
 	if (landmass_distance_ready) {
@@ -1353,6 +1540,10 @@ void fragment() {
 
 	float base_wetness = wetness_mask(v_world_xz);
 	float band_height = shore_band_height(shore_distance, runup_max, swash_ph, swash_amp, open);
+	// Pool clarity (see its doc): the damp bank's band narrowed round a
+	// pool.
+	float pool_clear = pool_clarity_enabled ? enclosure : 0.0;
+	band_height = mix(band_height, max(band_height * pool_bank_wet_scale, 0.001), pool_clear);
 	float sand_wetness = sand_wetness_mask(v_world_xz, v_world_height, band_height);
 	// The run-up's own wet mark, on top of the height band: as far as the
 	// sheet reached this cycle, drying back over wet_dry_time.
@@ -1362,6 +1553,11 @@ void fragment() {
 	// A stamped pool's damp rim, and the pool itself further down.
 	float pool_stamp_d = pool_stamp_distance(v_world_xz);
 	sand_wetness = max(sand_wetness, 1.0 - smoothstep(0.0, max(pool_stamp_rim, 0.001), pool_stamp_d));
+	// The dry detail's own gates, relaxed by pool_bed_detail over a pool
+	// (see pool_clarity_enabled's doc).
+	float pool_keep = pool_clear * pool_bed_detail;
+	float detail_wetness = sand_wetness * (1.0 - pool_keep);
+	float detail_dry = (1.0 - detail_wetness) * (1.0 - smoothstep(0.0, 0.05, sea_level - v_world_height) * (1.0 - pool_keep));
 
 	// VERTEX in fragment() is view-space; its length is distance from the camera.
 	float dist = length(VERTEX);
@@ -1384,6 +1580,44 @@ void fragment() {
 	float outer = outer_factor(v_world_xz);
 	float sand_detail = 1.0 - outer;
 	sand_base = mix(sand_base, outer_color.rgb, outer);
+	// The sand texture's colour into the dry sand (see sand_texture_
+	// enabled's doc), under the slope tint, rock and dune tones, so they
+	// still go over it. Its weight is gone on wet and submerged sand, so
+	// the wet band, swash and pools read as they did; the normal block at
+	// the end reuses it. Sampled outside any per-pixel branch, so the
+	// mip selection keeps its derivatives.
+	vec2 sand_texture_uv = v_world_xz / max(sand_texture_tile_m, 0.01);
+	vec3 sand_texture_color = texture(sand_albedo_texture, sand_texture_uv).rgb;
+	vec2 sand_texture_xy = texture(sand_normal_texture, sand_texture_uv).rg * 2.0 - 1.0;
+	float sand_texture_weight = 0.0;
+	// The ripple patches (see ripple_patch_enabled's doc): the same dry
+	// gate, their own coverage and distance fade, quieted along the walked
+	// band - its distance only looked up where a patch is. Weighed first,
+	// since they thin the sand texture under them.
+	vec3 ripple_patch_color = texture(ripple_patch_texture, ripple_patch_uv(v_world_xz)).rgb;
+	float ripple_patch_weight = 0.0;
+	if (sand_texture_enabled && ripple_patch_enabled) {
+		float ripple_patch_dry = detail_dry;
+		float ripple_patch_near = 1.0 - smoothstep(ripple_patch_fade_distance.x, max(ripple_patch_fade_distance.y, ripple_patch_fade_distance.x + 0.001), dist);
+		ripple_patch_weight = ripple_patch_coverage(v_world_xz) * ripple_patch_dry * ripple_patch_near * sand_detail * (1.0 - rock);
+		if (ripple_patch_weight > 0.001 && wear_enabled) {
+			float route_edge = wear_half_width + wear_edge_width * 0.5 + wear_wander_amplitude;
+			float on_route = 1.0 - smoothstep(route_edge, route_edge + max(ripple_patch_route_margin_m, 0.001), wear_nearest(v_world_xz).x);
+			ripple_patch_weight *= 1.0 - ripple_patch_route_quiet * on_route;
+		}
+	}
+	if (sand_texture_enabled) {
+		float sand_texture_dry = detail_dry;
+		float sand_texture_near = 1.0 - smoothstep(sand_texture_fade_distance.x, max(sand_texture_fade_distance.y, sand_texture_fade_distance.x + 0.001), dist);
+		sand_texture_weight = sand_texture_coverage(v_world_xz) * sand_texture_dry * sand_texture_near * sand_detail;
+		// Its colour thinned under the patches as its normal is below, so
+		// the two maps' ripples don't stack.
+		float sand_texture_color_weight = sand_texture_weight * (1.0 - ripple_patch_normal_cut * ripple_patch_weight);
+		sand_base = mix(sand_base, sand_texture_color, sand_texture_color_blend * sand_texture_color_weight);
+		// The patches' detail over it.
+		vec3 ripple_patch_detail = ripple_patch_color / max(ripple_patch_mean, vec3(0.001));
+		sand_base = mix(sand_base, sand_base * ripple_patch_detail, ripple_patch_blend * ripple_patch_weight);
+	}
 	// Slopes by value (see slope_tint_color's doc): the face toward the
 	// packed tint, flat high ground lighter. Never on outer ground.
 	float world_up = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
@@ -1408,12 +1642,14 @@ void fragment() {
 	// damp strip on bare sand alone; then the lee's cool shift toward a
 	// grey of its own value.
 	vec4 tone = dune_tone(v_world_xz);
+	tone.w = max(tone.w, shore_damp(v_world_xz));
 	float tone_shade = clamp(max(max(tone.y, tone.z), tone.w * sand_detail * (1.0 - rock)), 0.0, 0.9);
 	dry *= 1.0 - tone_shade;
 	float tone_value = dot(dry, vec3(0.299, 0.587, 0.114));
 	dry = mix(dry, vec3(tone_value) * lee_shade_cool_tint, clamp(lee_shade_cool * tone.x, 0.0, 1.0));
 	dry *= distance_tint;
-	vec3 wet = dry * wet_darken;
+	float pool_wet_darken = mix(pool_bank_wet_darken, pool_bed_wet_darken, smoothstep(0.0, 0.02, sea_level - v_world_height));
+	vec3 wet = dry * mix(wet_darken, pool_wet_darken, pool_clear);
 
 	vec3 sand_albedo = mix(dry, wet, sand_wetness);
 
@@ -1438,7 +1674,7 @@ void fragment() {
 	// grainy - by the same sand_wetness driving the dry/wet blend above,
 	// and quieted again on a walked band, which is packed for the same
 	// reason.
-	float grain_suppression = (1.0 - sand_wetness) * wear_smoothing * sand_detail;
+	float grain_suppression = (1.0 - detail_wetness) * wear_smoothing * sand_detail;
 	float grain = grain_value(v_world_xz) * grain_strength * grain_suppression;
 	sand_albedo *= 1.0 + grain;
 
@@ -1464,7 +1700,7 @@ void fragment() {
 		float wind_aa = 1.0 - smoothstep(0.25, 0.5, fwidth(wind_phase));
 		float wind_wave = sin(wind_phase * 6.2831853);
 		wind_wave *= abs(wind_wave);
-		float ripple_suppression = (1.0 - sand_wetness) * (1.0 - wear * wear_ripple_flatten) * sand_detail;
+		float ripple_suppression = (1.0 - detail_wetness) * (1.0 - wear * wear_ripple_flatten) * sand_detail;
 		sand_albedo *= 1.0 + wind_ripple_strength * wind_wave * wind_aa * (1.0 - slope_t) * ripple_suppression * form_fade;
 	}
 
@@ -1520,11 +1756,23 @@ void fragment() {
 	// line (the sea draws from there), with its bright leading edge on
 	// the inland end. Last, over everything on the sand - it's water on
 	// top of it. Extent goes to 0 with the envelope, so nothing pops.
+	// The sea's foam mask at this XZ (see foam_mask_enabled's doc).
+	vec2 foam_surf_uv;
+	float foam_surf_dissolve;
+	foam_surf_motion(v_world_xz, swash_ph, sea_time, foam_surf_uv, foam_surf_dissolve);
+	float foam_mask_value = foam_surf_mask(texture(foam_mask, foam_surf_uv).r * foam_mask_strength, foam_surf_dissolve);
 	if (landmass_distance_ready) {
 		// x smoothstep(runup) so the two edges' overlap can't leave a
 		// hairline at the line while the sheet is (nearly) drained.
 		float sheet = smoothstep(-runup - 0.02, -runup, shore_distance) * (1.0 - smoothstep(-0.02, 0.0, shore_distance)) * smoothstep(0.0, 0.05, runup) * open;
 		float sheet_edge = sheet * (1.0 - smoothstep(0.0, max(swash_edge_width_ground, 0.001), shore_distance + runup));
+		if (foam_mask_enabled) {
+			sheet_edge *= mix(1.0, foam_mask_value, swash_edge_breakup);
+		} else if (swash_edge_breakup > 0.0) {
+			vec2 lace_p = v_world_xz / max(swash_edge_breakup_scale, 0.001);
+			float lace = value_noise(lace_p) * 0.6 + value_noise(lace_p * 2.7 + vec2(13.1, -7.3)) * 0.4;
+			sheet_edge *= mix(1.0, smoothstep(0.42, 0.62, lace), swash_edge_breakup);
+		}
 		sand_albedo = mix(sand_albedo, swash_sheet_color.rgb, sheet * swash_sheet_alpha);
 		sand_albedo = mix(sand_albedo, swash_color.rgb, sheet_edge);
 	}
@@ -1556,6 +1804,25 @@ void fragment() {
 	// nothing; a mesh drawn with this material to read as the sand
 	// (SandMound) darkens itself with it, over whatever the sand is there.
 	ALBEDO = mix(sand_albedo, pool_color.rgb, pool_factor) * COLOR.rgb;
+	// The sand texture's normal (see sand_texture_enabled's doc), through
+	// a basis built for its own projection rather than the mesh's UVs or
+	// tangents: T = world +X projected onto the surface (the map's +u),
+	// B = N x T, which is world -Z on flat ground - the map's +Y, image
+	// rows running toward +Z. z is rebuilt from xy, so a two-channel
+	// (RGTC) import reads the same. Weighted as the colour, and quieted
+	// again on the walked band, rock and pools.
+	if (sand_texture_enabled) {
+		float sand_texture_tilt = sand_texture_weight * sand_texture_normal_strength * (1.0 - wear * wear_ripple_flatten) * (1.0 - rock) * (1.0 - pool_factor);
+		// Turned down under the ripple patches, whose ripples it doesn't match.
+		sand_texture_tilt *= 1.0 - ripple_patch_normal_cut * ripple_patch_weight;
+		vec3 geometry_normal = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
+		vec3 texture_tangent = normalize(vec3(1.0, 0.0, 0.0) - geometry_normal * geometry_normal.x);
+		vec3 texture_bitangent = cross(geometry_normal, texture_tangent);
+		float texture_z = sqrt(max(1.0 - dot(sand_texture_xy, sand_texture_xy), 0.0));
+		vec3 texture_normal = normalize(vec3(sand_texture_xy * sand_texture_tilt, texture_z));
+		vec3 world_normal = texture_tangent * texture_normal.x + texture_bitangent * texture_normal.y + geometry_normal * texture_normal.z;
+		NORMAL = normalize((VIEW_MATRIX * vec4(world_normal, 0.0)).xyz);
+	}
 	// Diffuse only, everywhere - see render_mode's own doc.
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;

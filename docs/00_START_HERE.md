@@ -54,7 +54,7 @@ These come up constantly. They are all stated in the docs; collected here becaus
 
 **Visual**
 - Dark figures on pale ground. Characters, enemies and UI are the dark elements; the world is the pale one.
-- Region 1: **no warm light anywhere.** Dry surfaces may lean slightly warm; light may not.
+- Region 1: **no warm light anywhere.** Dry surfaces may lean slightly warm; light may not. Exception: floor 1's beach, which follows an approved target image (Bible §6a).
 - Every model — characters, enemies, props — is textured and drawn on the painted shader: albedo only, soft wrapped light. Older props keep a flat tint until they are regenerated.
 - No glow, no boxes, no icon libraries in UI. Ink on the world; bone cards with ink type; hairlines.
 - Two voices: world voice in Spectral, system voice in Alegreya Sans.

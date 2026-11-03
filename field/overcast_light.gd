@@ -33,7 +33,7 @@ class_name OvercastLight
 @export var shadow_softness: float = 1.5:
 	set(value):
 		shadow_softness = value
-		light_angular_distance = value
+		_apply_shadow_filter()
 # Post-blur on top of shadow_softness's own penumbra. Named _amount, not
 # shadow_blur, because Light3D already has a native property of that
 # exact name - redeclaring it here would shadow (no pun intended) the
@@ -41,7 +41,7 @@ class_name OvercastLight
 @export var shadow_blur_amount: float = 2.5:
 	set(value):
 		shadow_blur_amount = value
-		shadow_blur = value
+		_apply_shadow_filter()
 # How dark/opaque the shadow reads (1 = fully opaque, lower = lighter).
 # Overcast light is soft and ambient-heavy, so a fully black shadow reads
 # wrong - ~0.6 keeps it present without crushing shadowed detail to
@@ -52,6 +52,20 @@ class_name OvercastLight
 	set(value):
 		shadow_darkness = value
 		shadow_opacity = value
+
+# Diagnostic, off by default: while on, the shadow drops shadow_softness's
+# penumbra (light_angular_distance 0, so no soft-shadow blocker search)
+# and filters at shadow_diagnostic_blur in place of shadow_blur_amount -
+# a hard, minimally filtered shadow to compare live against the tuned one.
+# Neither export is touched, so turning it off restores them exactly.
+@export var shadow_diagnostic_hard: bool = false:
+	set(value):
+		shadow_diagnostic_hard = value
+		_apply_shadow_filter()
+@export_range(0.0, 10.0) var shadow_diagnostic_blur: float = 1.0:
+	set(value):
+		shadow_diagnostic_blur = value
+		_apply_shadow_filter()
 
 # Battle framing is a tight two-character medium shot (see CameraRig's
 # own battle_distance_min..max/battle_fov), nowhere near as wide as the field
@@ -77,8 +91,7 @@ func _ready() -> void:
 	light_energy = energy
 	light_color = color
 	shadow_enabled = shadows_enabled
-	light_angular_distance = shadow_softness
-	shadow_blur = shadow_blur_amount
+	_apply_shadow_filter()
 	shadow_opacity = shadow_darkness
 	# 4-split PSSM (cascaded shadow maps) - a fixed technique choice, not
 	# exposed as a tunable, so it's applied unconditionally whenever
@@ -112,3 +125,9 @@ func enter_battle() -> void:
 func exit_battle() -> void:
 	_in_battle = false
 	directional_shadow_max_distance = shadow_max_distance
+
+# shadow_softness and shadow_blur_amount onto the light, or the hard
+# diagnostic's values while shadow_diagnostic_hard is on.
+func _apply_shadow_filter() -> void:
+	light_angular_distance = 0.0 if shadow_diagnostic_hard else shadow_softness
+	shadow_blur = shadow_diagnostic_blur if shadow_diagnostic_hard else shadow_blur_amount
