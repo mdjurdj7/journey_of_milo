@@ -607,7 +607,13 @@ const SEA_BUS_NAME := &"Sea"
 @export_range(0.0, 1.0) var fog_strength: float = 1.0:
 	set(value):
 		fog_strength = value
-		_apply_uniform("fog_strength", value)
+		_apply_uniform("fog_strength", fog_strength * fog_density)
+# RegionSky.fog_density as it stands (the same push): the environment's
+# full fog amount, which fog_strength is a share of.
+@export_range(0.0, 1.0) var fog_density: float = 1.0:
+	set(value):
+		fog_density = value
+		_apply_uniform("fog_strength", fog_strength * fog_density)
 @export var fog_near_distance: float = 22.0:
 	set(value):
 		fog_near_distance = value
@@ -1138,7 +1144,7 @@ func _apply_all_uniforms() -> void:
 
 	_apply_uniform("shore_fade_width", shore_fade_width)
 	_apply_uniform("fog_color", fog_color)
-	_apply_uniform("fog_strength", fog_strength)
+	_apply_uniform("fog_strength", fog_strength * fog_density)
 	_apply_uniform("fog_near_distance", fog_near_distance)
 	_apply_uniform("fog_far_distance", fog_far_distance)
 

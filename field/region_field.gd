@@ -852,6 +852,8 @@ func _enter_tree() -> void:
 	if sky != null and floor_data != null and floor_data.fog_depth_begin > 0.0 and floor_data.fog_depth_end > floor_data.fog_depth_begin:
 		sky.fog_depth_begin = floor_data.fog_depth_begin
 		sky.fog_depth_end = floor_data.fog_depth_end
+	if sky != null and floor_data != null and floor_data.fog_density > 0.0:
+		sky.fog_density = floor_data.fog_density
 	# The floor's own sun and ambient over the scene's, when it names any.
 	_capture_scene_light()
 	_apply_floor_light()
@@ -2538,6 +2540,7 @@ func _sync_sea_fog() -> void:
 	sea.fog_color = sky.fog_color
 	sea.fog_near_distance = sky.current_fog_depth_begin()
 	sea.fog_far_distance = sky.current_fog_depth_end()
+	sea.fog_density = sky.fog_density
 
 # Re-pushes the fog and enemy_fog_factor into every enemy's fog overlay,
 # and the fog into the Wanderer's (Wanderer.refresh_fog()).

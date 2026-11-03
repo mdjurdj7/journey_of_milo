@@ -186,6 +186,13 @@ class_name FloorData
 # keeps the region's own.
 @export var fog_depth_begin: float = 0.0
 @export var fog_depth_end: float = 0.0
+# The depth fog's full amount for this floor (RegionSky.fog_density - the
+# environment's fog, the fog passes on painted props and bodies, and the
+# sea's own copy all follow it). 0 (the default) keeps the region's own.
+@export_range(0.0, 1.0, 0.01) var fog_density: float = 0.0:
+	set(value):
+		fog_density = value
+		emit_changed()
 
 @export_group("Light")
 # This floor's sun and ambient over the scene's own (OvercastLight,
